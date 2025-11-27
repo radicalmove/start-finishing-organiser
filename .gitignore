@@ -1,0 +1,44 @@
+# Byte-compiled / cache
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.so
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Local databases
+*.db
+*.sqlite
+
+# Node/build artifacts
+node_modules/
+dist/
+build/
+
+# OS / editor cruft
+.DS_Store
+.idea/
+.vscode/
+
+# Logs
+*.log
+logs/
+
+# Coverage / test artifacts
+.coverage
+coverage.xml
+.pytest_cache/
+
+# Uvicorn reload pid
+*.pid
+
+# Uploaded or generated content
+uploads/
+
+# dotenv / secrets
+.env
