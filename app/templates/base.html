@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ title or "Start Finishing Organiser" }}</title>
+  <link rel="stylesheet" href="{{ url_for('static', path='/css/main.css') }}">
+  <script defer src="{{ url_for('static', path='/js/main.js') }}"></script>
+</head>
+<body>
+  <div class="page">
+    <header class="header">
+      <div class="brand">
+        <div class="brand-mark">SFO</div>
+        <div>
+          <h1>Start Finishing Organiser</h1>
+          <div class="subtitle">Meaningful work, neon focus, quiet confidence.</div>
+        </div>
+      </div>
+      <div class="tbar">
+        <span class="pill">v0.1 prototype</span>
+        <span class="pill">4 work + 3 personal weekly cap</span>
+      </div>
+    </header>
+    {% block content %}{% endblock %}
+  </div>
+</body>
+</html>
