@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block content %}
+  {% if form_success %}
+    <div class="toast success">{{ form_success }}</div>
+  {% endif %}
+  <section class="grid" style="margin-top: 18px;">
+    <div class="panel">
+      <h3>Weekly Focus (4+3)</h3>
+      <div class="muted">Review active projects for this week.</div>
+      <div class="cta-row">
+        <span class="pill">Work: {{ weekly_work_count }} / 4</span>
+        <span class="pill">Personal: {{ weekly_personal_count }} / 3</span>
+        <a class="btn ghost" href="/capture?tab=project">Adjust focus</a>
+      </div>
+      <div class="list" style="margin-top: 10px;">
+        {% for p in projects if p.active_this_week %}
+          <div class="list-item">
+            <div>{{ p.title }}</div>
+            <div class="muted">{{ p.description or "No description yet." }}</div>
+            <div class="task-meta">
+              <span class="pill">{{ p.category.value }}</span>
+              {% if p.target_date %}<span class="pill">Target: {{ p.target_date }}</span>{% endif %}
+              {% if p.level_of_success %}<span class="pill">{{ p.level_of_success.value|title }} success</span>{% endif %}
+            </div>
+          </div>
+        {% else %}
+          <div class="muted">No projects flagged this week.</div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="panel">
+      <h3>Resurface now</h3>
+      <div class="muted">Items parked for Month/Quarter/Later that are due for review.</div>
+      <div class="list" style="margin-top: 10px;">
+        {% for t in due_resurface %}
+          <div class="list-item">
+            <div>{{ t.verb_noun }}</div>
+            <div class="muted">Resurface on: {{ t.resurface_on }}</div>
+            <div class="task-meta">
+              {% if t.project %}<span class="pill">{{ t.project.title }}</span>{% endif %}
+              <span class="pill">{{ t.when_bucket.value }}</span>
+            </div>
+            <form method="post" action="/resurface/{{ t.id }}" class="form" style="margin-top: 8px;">
+              <button class="btn" type="submit">Pull into this week</button>
+            </form>
+          </div>
+        {% else %}
+          <div class="muted">Nothing due to resurface this week.</div>
+        {% endfor %}
+      </div>
+    </div>
+  </section>
+{% endblock %}

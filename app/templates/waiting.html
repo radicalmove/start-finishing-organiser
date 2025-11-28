@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block content %}
+  {% if form_success %}
+    <div class="toast success">{{ form_success }}</div>
+  {% endif %}
+  <section class="panel" style="margin-top: 18px;">
+    <h3>Waiting On / OPP</h3>
+    <p class="muted">Items captured as Other People’s Priority or waiting on someone.</p>
+    <div class="list" style="margin-top: 10px;">
+      {% for w in rows %}
+        <div class="list-item">
+          <div>{{ w.description }}</div>
+          <div class="muted">
+            {% if w.person %}Person: {{ w.person }} | {% endif %}
+            Created: {{ w.created_at.date() if w.created_at else "" }}
+          </div>
+          <form method="post" action="/waiting/resolve" class="form" style="margin-top: 8px;">
+            <input type="hidden" name="waiting_id" value="{{ w.id }}">
+            <button class="btn ghost" type="submit">Resolve</button>
+          </form>
+        </div>
+      {% else %}
+        <div class="muted">No waiting items.</div>
+      {% endfor %}
+    </div>
+  </section>
+{% endblock %}

@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+{% block content %}
+  {% if form_error %}
+    <div class="panel" style="margin-top: 16px; border-color: rgba(255,43,209,0.3);">
+      <div class="pill pill--limit">{{ form_error }}</div>
+    </div>
+  {% endif %}
+
+  <section class="grid" style="margin-top: 18px;">
+    <div class="panel">
+      <h3>Capture Project</h3>
+      <form method="post" action="/projects/form" class="form">
+        <label class="field">
+          <span>Title</span>
+          <input type="text" name="title" required placeholder="e.g. Finalise weekly plan">
+        </label>
+        <label class="field">
+          <span>Category</span>
+          <select name="category">
+            <option value="work">Work</option>
+            <option value="personal">Personal</option>
+          </select>
+        </label>
+        <label class="field">
+          <span>Time horizon</span>
+          <select name="time_horizon">
+            <option value="week">This week</option>
+            <option value="month">This month</option>
+            <option value="quarter">This quarter</option>
+            <option value="year">Year</option>
+          </select>
+          <div class="note">Week = auto-counted in 4+3. For longer horizons, choose if it’s part of this week’s focus.</div>
+        </label>
+        <div class="field checkbox">
+          <input type="radio" name="include_this_week" value="yes" checked>
+          <span>Include in this week’s 4+3 focus</span>
+        </div>
+        <div class="field checkbox">
+          <input type="radio" name="include_this_week" value="no">
+          <span>Park it outside this week</span>
+        </div>
+        <div class="note helper hidden" data-week-helper>
+          This is Month/Quarter/Year. Want to spotlight it this week? Toggle above.
+        </div>
+        <label class="field">
+          <span>Description (optional)</span>
+          <textarea name="description" rows="2" placeholder="Short context"></textarea>
+        </label>
+        <label class="field">
+          <span>Why alignment</span>
+          <div class="why-tags">
+            <label><input type="checkbox" name="why_tags" value="Identity"> Identity</label>
+            <label><input type="checkbox" name="why_tags" value="Contribution"> Contribution</label>
+            <label><input type="checkbox" name="why_tags" value="Growth"> Growth</label>
+            <label><input type="checkbox" name="why_tags" value="Family/Presence"> Family/Presence</label>
+            <label><input type="checkbox" name="why_tags" value="Health"> Health</label>
+            <label><input type="checkbox" name="why_tags" value="Service"> Service</label>
+          </div>
+          <textarea name="why_link_text" rows="2" placeholder="Which part of your Why does this serve? If none, consider moving to Later or letting it go."></textarea>
+        </label>
+        <button class="btn" type="submit">Save project</button>
+      </form>
+    </div>
+
+    <div class="panel">
+      <h3>Add Task</h3>
+      <form method="post" action="/tasks/form" class="form">
+        <label class="field">
+          <span>Verb–noun</span>
+          <input type="text" name="verb_noun" required placeholder="Draft weekly focus list">
+        </label>
+        <label class="field">
+          <span>Project (optional)</span>
+          <select name="project_id">
+            <option value="">— None —</option>
+            {% for p in projects %}
+              <option value="{{ p.id }}">{{ p.title }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label class="field">
+          <span>Description (optional)</span>
+          <textarea name="description" rows="2" placeholder="Notes"></textarea>
+        </label>
+        <div class="field two">
+          <label>
+            <span>When</span>
+            <select name="when_bucket">
+              <option value="today">Today</option>
+              <option value="week">This week</option>
+              <option value="month">This month</option>
+              <option value="later">Later</option>
+            </select>
+          </label>
+          <label>
+            <span>Block type</span>
+            <select name="block_type">
+              <option value="">—</option>
+              <option value="focus">Focus</option>
+              <option value="admin">Admin</option>
+              <option value="social">Social</option>
+              <option value="recovery">Recovery</option>
+            </select>
+          </label>
+        </div>
+        <label class="field">
+          <span>Duration (minutes, optional)</span>
+          <input type="number" name="duration_minutes" min="5" step="5" placeholder="e.g. 45">
+        </label>
+        <label class="field checkbox">
+          <input type="checkbox" name="frog" value="true">
+          <span>Mark as Frog</span>
+        </label>
+        <button class="btn" type="submit">Save task</button>
+      </form>
+    </div>
+  </section>
+{% endblock %}

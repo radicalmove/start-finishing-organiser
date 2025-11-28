@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block content %}
+  {% if form_success %}
+    <div class="toast success">{{ form_success }}</div>
+  {% endif %}
+  <section class="panel" style="margin-top: 18px;">
+    <h3>Resurface</h3>
+    <p class="muted">Tasks parked for Month/Quarter/Later that are due to be reconsidered.</p>
+    <div class="list" style="margin-top: 10px;">
+      {% for t in due_tasks %}
+        <div class="list-item">
+          <div>{{ t.verb_noun }}</div>
+          <div class="muted">
+            Resurface on: {{ t.resurface_on }} |
+            Created: {{ t.created_at.date() if t.created_at else "" }}
+          </div>
+          <div class="task-meta">
+            {% if t.project %}<span class="pill">{{ t.project.title }}</span>{% endif %}
+            <span class="pill">{{ t.when_bucket.value }}</span>
+          </div>
+          <form method="post" action="/resurface/{{ t.id }}" class="form" style="margin-top: 8px;">
+            <button class="btn" type="submit">Pull into this week</button>
+          </form>
+        </div>
+      {% else %}
+        <div class="muted">Nothing to resurface right now.</div>
+      {% endfor %}
+    </div>
+  </section>
+{% endblock %}

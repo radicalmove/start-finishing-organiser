@@ -1,0 +1,129 @@
+{% extends "base.html" %}
+{% block content %}
+  {% if form_error %}
+    <div class="panel" style="margin-top: 16px; border-color: rgba(255,43,209,0.3);">
+      <div class="pill pill--limit">{{ form_error }}</div>
+    </div>
+  {% endif %}
+
+  <section class="panel" style="margin-top: 18px;">
+    <h3>Guided Capture</h3>
+    <p class="muted">One question at a time. We’ll place this safely and surface it when relevant.</p>
+    <form method="post" action="/capture/wizard" id="wizardForm">
+      <div class="wizard-step" data-step="1">
+        <div class="field">
+          <span>What is it?</span>
+          <input type="text" name="capture_text" required placeholder="Type the thing you’re capturing">
+        </div>
+      </div>
+
+      <div class="wizard-step hidden" data-step="2">
+        <div class="field">
+          <span>Whose priority is this?</span>
+          <div class="why-tags">
+            <label><input type="radio" name="owner_type" value="mine" checked> Mine</label>
+            <label><input type="radio" name="owner_type" value="shared"> Shared</label>
+            <label><input type="radio" name="owner_type" value="opp"> Other People’s Priority (OPP)</label>
+          </div>
+        </div>
+        <div class="field hidden" data-waiting-person>
+          <span>Who are you waiting on? (optional)</span>
+          <input type="text" name="waiting_person" placeholder="Name or team">
+        </div>
+      </div>
+
+      <div class="wizard-step hidden" data-step="3">
+        <div class="field">
+          <span>Is this a task or a project?</span>
+          <div class="why-tags">
+            <label><input type="radio" name="item_kind" value="task" checked> Task (15–120 min)</label>
+            <label><input type="radio" name="item_kind" value="project"> Project (bigger than a task)</label>
+          </div>
+        </div>
+        <div class="field hidden" data-attach-project>
+          <span>Attach to an existing project (optional)</span>
+          <select name="project_id">
+            <option value="">— None —</option>
+            {% for p in projects %}
+              <option value="{{ p.id }}">{{ p.title }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="field" data-project-category>
+          <span>Category (for new project)</span>
+          <select name="category">
+            <option value="work">Work</option>
+            <option value="personal">Personal</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="wizard-step hidden" data-step="4">
+        <div class="field">
+          <span>Time horizon</span>
+          <select name="horizon">
+            <option value="today">Today</option>
+            <option value="week" selected>This week</option>
+            <option value="month">This month</option>
+            <option value="quarter">This quarter</option>
+            <option value="later">Later/Someday</option>
+          </select>
+          <div class="note">Week auto-counts in 4+3. Month/Quarter/Later parks it; you can pull it forward.</div>
+        </div>
+        <div class="field checkbox" data-include-week>
+          <input type="radio" name="include_this_week" value="yes" checked>
+          <span>Include in this week’s 4+3 focus</span>
+        </div>
+        <div class="field checkbox" data-include-week>
+          <input type="radio" name="include_this_week" value="no">
+          <span>Park it outside this week</span>
+        </div>
+        <div class="note helper hidden" data-week-helper>
+          Month/Quarter/Later selected. Want to spotlight it this week? Toggle above.
+        </div>
+      </div>
+
+      <div class="wizard-step hidden" data-step="5">
+        <div class="field">
+          <span>Why alignment</span>
+          <div class="why-tags">
+            <label><input type="checkbox" name="why_tags" value="Identity"> Identity</label>
+            <label><input type="checkbox" name="why_tags" value="Contribution"> Contribution</label>
+            <label><input type="checkbox" name="why_tags" value="Growth"> Growth</label>
+            <label><input type="checkbox" name="why_tags" value="Family/Presence"> Family/Presence</label>
+            <label><input type="checkbox" name="why_tags" value="Health"> Health</label>
+            <label><input type="checkbox" name="why_tags" value="Service"> Service</label>
+          </div>
+          <textarea name="why_link_text" rows="2" placeholder="How does this serve your Why? If unclear, consider parking it."></textarea>
+        </div>
+      </div>
+
+      <div class="wizard-step hidden" data-step="6">
+        <div class="field">
+          <span>Block type / energy fit</span>
+          <select name="block_type">
+            <option value="">—</option>
+            <option value="focus">Focus</option>
+            <option value="admin">Admin</option>
+            <option value="social">Social</option>
+            <option value="recovery">Recovery</option>
+          </select>
+        </div>
+        <label class="field">
+          <span>Duration (minutes, optional)</span>
+          <input type="number" name="duration_minutes" min="5" step="5" placeholder="e.g. 45">
+        </label>
+        <div class="field checkbox">
+          <input type="checkbox" name="frog" value="true">
+          <span>Mark as Frog (dread-heavy)</span>
+        </div>
+      </div>
+
+      <div class="wizard-actions">
+        <button type="button" class="btn ghost" data-prev>Back</button>
+        <button type="button" class="btn" data-next>Next</button>
+        <button type="submit" class="btn hidden" data-submit>Save</button>
+      </div>
+    </form>
+  </section>
+{% endblock %}

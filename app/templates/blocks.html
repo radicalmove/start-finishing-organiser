@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% block content %}
+  {% if form_success %}
+    <div class="toast success">{{ form_success }}</div>
+  {% endif %}
+  <section class="grid" style="margin-top: 18px;">
+    <div class="panel">
+      <h3>Blocks Planner</h3>
+      <p class="muted">Placeholder: schedule Focus/Admin/Social/Recovery blocks. Future work: drag to calendar.</p>
+      <div class="list">
+        {% for b in blocks %}
+          <div class="list-item">
+            <div>{{ b.date }} — {{ b.block_type.value|title }}</div>
+            <div class="muted">
+              {% if b.start_time and b.end_time %}
+                {{ b.start_time }} - {{ b.end_time }}
+              {% else %}
+                Time TBD
+              {% endif %}
+            </div>
+            {% if b.project %}
+              <div class="task-meta"><span class="pill">{{ b.project.title }}</span></div>
+            {% endif %}
+            <form method="post" action="/blocks/unschedule" class="form" style="margin-top: 8px;">
+              <input type="hidden" name="block_id" value="{{ b.id }}">
+              <button class="btn ghost" type="submit">Unschedule</button>
+            </form>
+          </div>
+        {% else %}
+          <div class="muted">No blocks yet.</div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="panel">
+      <h3>Tasks to schedule</h3>
+      <div class="muted">Tasks with block type + duration, unscheduled.</div>
+      <div class="list" style="margin-top: 10px;">
+        {% for t in sched_ready %}
+          <div class="list-item">
+            <div>{{ t.verb_noun }}</div>
+            <div class="task-meta">
+              <span class="pill">{{ t.block_type.value }}</span>
+              {% if t.duration_minutes %}<span class="pill">{{ t.duration_minutes }} min</span>{% endif %}
+              {% if t.project %}<span class="pill">{{ t.project.title }}</span>{% endif %}
+            </div>
+            <form method="post" action="/blocks/schedule" class="form" style="margin-top: 8px;">
+              <input type="hidden" name="task_id" value="{{ t.id }}">
+              <div class="field two">
+                <label>
+                  <span>Date</span>
+                  <input type="date" name="date" required>
+                </label>
+                <label>
+                  <span>Start</span>
+                  <input type="time" name="start_time" required>
+                </label>
+              </div>
+              <div class="field two">
+                <label>
+                  <span>Duration</span>
+                  <input type="number" name="duration_minutes" value="{{ t.duration_minutes or 30 }}" min="5" step="5">
+                </label>
+                <label>
+                  <span>Block type</span>
+                  <select name="block_type">
+                    <option value="focus" {% if t.block_type.value == "focus" %}selected{% endif %}>Focus</option>
+                    <option value="admin" {% if t.block_type.value == "admin" %}selected{% endif %}>Admin</option>
+                    <option value="social" {% if t.block_type.value == "social" %}selected{% endif %}>Social</option>
+                    <option value="recovery" {% if t.block_type.value == "recovery" %}selected{% endif %}>Recovery</option>
+                  </select>
+                </label>
+              </div>
+              <button class="btn" type="submit">Schedule</button>
+            </form>
+          </div>
+        {% else %}
+          <div class="muted">Nothing to schedule yet.</div>
+        {% endfor %}
+      </div>
+    </div>
+  </section>
+{% endblock %}

@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, Request, Form, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy.orm import Session
 from urllib.parse import quote_plus
+from datetime import date, datetime
 
 from ..db import get_db
 from ..models import (
@@ -13,40 +14,17 @@ from ..models import (
     Block,
     BlockType,
 )
+from ..utils.rules import enforce_weekly_cap, compose_why_text
 
 router = APIRouter()
-
-
-def _enforce_weekly_cap(db: Session, category: ProjectCategory, make_active: bool) -> None:
-    """Prevent adding more than 4 work or 3 personal active projects per week."""
-    if not make_active:
-        return
-    cap = 4 if category == ProjectCategory.WORK else 3
-    current = (
-        db.query(Project)
-        .filter(Project.category == category, Project.active_this_week.is_(True))
-        .count()
-    )
-    if current >= cap:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Weekly cap reached for {category.value} projects ({current}/{cap}).",
-        )
-
-
-def _compose_why_text(free_text: str | None, tags: list[str] | None) -> str | None:
-    """Combine quick Why tags with free text into one stored field."""
-    tag_part = ""
-    if tags:
-        tag_part = "Tags: " + ", ".join([t for t in tags if t.strip()])
-    parts = [p for p in [free_text or None, tag_part or None] if p]
-    return "\n".join(parts) if parts else None
 
 
 @router.get("/", response_class=HTMLResponse)
 def landing(request: Request, db: Session = Depends(get_db)):
     templates = request.app.state.templates
 
+    today = date.today()
+    now = datetime.now().time()
     projects = (
         db.query(Project)
         .filter(Project.status != ProjectStatus.ARCHIVED)
@@ -57,6 +35,12 @@ def landing(request: Request, db: Session = Depends(get_db)):
         db.query(Task)
         .filter(Task.when_bucket == WhenBucket.TODAY)
         .order_by(Task.block_type.asc().nulls_last(), Task.priority.asc().nulls_last())
+        .all()
+    )
+    inbox_tasks = (
+        db.query(Task)
+        .filter(Task.when_bucket.in_([WhenBucket.LATER, WhenBucket.MONTH, WhenBucket.QUARTER]))
+        .order_by(Task.created_at.desc())
         .all()
     )
     week_blocks = (
@@ -70,6 +54,31 @@ def landing(request: Request, db: Session = Depends(get_db)):
     weekly_personal = [
         p for p in projects if p.active_this_week and p.category == ProjectCategory.PERSONAL
     ]
+    sched_ready = (
+        db.query(Task)
+        .filter(Task.block_type.isnot(None), Task.duration_minutes.isnot(None), Task.scheduled_for.is_(None))
+        .order_by(Task.when_bucket.asc(), Task.created_at.desc())
+        .all()
+    )
+    todays_blocks = [b for b in week_blocks if b.date == today]
+    # Determine current block based on time if start/end present
+    current_block = None
+    upcoming_blocks = []
+    timeline_events = []
+    for b in todays_blocks:
+        if b.start_time and b.end_time and b.start_time <= now <= b.end_time:
+            current_block = b
+        elif b.start_time and b.start_time > now:
+            upcoming_blocks.append(b)
+        timeline_events.append(
+            {
+                "label": f"{b.block_type.value.title()}",
+                "start": b.start_time,
+                "end": b.end_time,
+                "project": b.project.title if b.project else None,
+            }
+        )
+    upcoming_blocks = sorted(upcoming_blocks, key=lambda x: (x.start_time or datetime.max.time()))
 
     return templates.TemplateResponse(
         "home.html",
@@ -77,10 +86,17 @@ def landing(request: Request, db: Session = Depends(get_db)):
             "request": request,
             "projects": projects,
             "today_tasks": today_tasks,
+            "inbox_tasks": inbox_tasks,
             "week_blocks": week_blocks,
+            "todays_blocks": todays_blocks,
+            "current_block": current_block,
+            "upcoming_blocks": upcoming_blocks,
+            "timeline_events": sorted(timeline_events, key=lambda e: e["start"] or datetime.max.time()),
             "weekly_work_count": len(weekly_work),
             "weekly_personal_count": len(weekly_personal),
             "form_error": request.query_params.get("error"),
+            "form_success": request.query_params.get("success"),
+            "sched_ready": sched_ready,
         },
     )
 
@@ -99,7 +115,7 @@ def create_project(
     active_this_week = include_this_week.lower() == "yes" or time_horizon == "week"
     if active_this_week:
         try:
-            _enforce_weekly_cap(db, category, True)
+            enforce_weekly_cap(db, category, True)
         except HTTPException as exc:
             msg = quote_plus(str(exc.detail))
             return RedirectResponse(url=f"/?error={msg}", status_code=303)
@@ -109,7 +125,7 @@ def create_project(
         category=category,
         description=description or None,
         active_this_week=active_this_week,
-        why_link_text=_compose_why_text(why_link_text, why_tags),
+        why_link_text=compose_why_text(why_link_text, why_tags),
         time_horizon=time_horizon,
     )
     db.add(project)
@@ -124,6 +140,7 @@ def create_task(
     description: str | None = Form(None),
     when_bucket: WhenBucket = Form(WhenBucket.TODAY),
     block_type: str | None = Form(""),
+    duration_minutes: int | None = Form(None),
     frog: bool = Form(False),
     db: Session = Depends(get_db),
 ):
@@ -136,8 +153,9 @@ def create_task(
         description=description or None,
         when_bucket=when_bucket,
         block_type=BlockType(btype) if btype else None,
+        duration_minutes=duration_minutes or None,
         frog=frog,
     )
     db.add(task)
     db.commit()
-    return RedirectResponse(url="/", status_code=303)
+    return RedirectResponse(url="/?success=Saved", status_code=303)

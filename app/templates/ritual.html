@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block content %}
+  {% if form_success %}
+    <div class="toast success">{{ form_success }}</div>
+  {% endif %}
+  <section class="panel" style="margin-top: 18px;">
+    <h3>{{ ritual_type|title }} ritual</h3>
+    <form method="post" action="/ritual/save" class="form">
+      <input type="hidden" name="ritual_type" value="{{ ritual_type }}">
+      <label class="field">
+        <span>Date</span>
+        <input type="date" name="entry_date" value="{{ (last_entry.entry_date if last_entry else none) or '' }}">
+      </label>
+      {% if ritual_type == "morning" %}
+        <label class="field">
+          <span>Today’s One Thing</span>
+          <input type="text" name="one_thing" value="{{ last_entry.one_thing if last_entry else '' }}" placeholder="The one thing that makes today a win">
+        </label>
+        <label class="field">
+          <span>Frog (optional)</span>
+          <input type="text" name="frog" value="{{ last_entry.frog if last_entry else '' }}" placeholder="Dread-heavy task to swallow early">
+        </label>
+        <label class="field">
+          <span>Gratitude / anticipation</span>
+          <textarea name="gratitude" rows="2">{{ last_entry.gratitude if last_entry else '' }}</textarea>
+        </label>
+        <label class="field">
+          <span>Why cue</span>
+          <textarea name="why_reflection" rows="2">{{ last_entry.why_reflection if last_entry else '' }}</textarea>
+        </label>
+      {% elif ritual_type == "midday" %}
+        <label class="field">
+          <span>Adjustments</span>
+          <textarea name="adjustments" rows="3">{{ last_entry.adjustments if last_entry else '' }}</textarea>
+        </label>
+        <label class="field">
+          <span>Energy check</span>
+          <input type="text" name="energy" value="{{ last_entry.energy if last_entry else '' }}" placeholder="e.g., flat, wired, calm">
+        </label>
+      {% elif ritual_type == "evening" %}
+        <label class="field">
+          <span>Wins (include invisible work)</span>
+          <textarea name="wins" rows="3">{{ last_entry.wins if last_entry else '' }}</textarea>
+        </label>
+        <label class="field">
+          <span>Adjustments / reassignments</span>
+          <textarea name="adjustments" rows="3">{{ last_entry.adjustments if last_entry else '' }}</textarea>
+        </label>
+        <label class="field">
+          <span>Emotion / reflection</span>
+          <textarea name="notes" rows="3">{{ last_entry.notes if last_entry else '' }}</textarea>
+        </label>
+      {% endif %}
+      <button class="btn" type="submit">Save</button>
+    </form>
+  </section>
+{% endblock %}
