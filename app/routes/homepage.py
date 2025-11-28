@@ -65,9 +65,14 @@ def landing(request: Request, db: Session = Depends(get_db)):
     current_block = None
     upcoming_blocks = []
     timeline_events = []
+    now_action = None
     for b in todays_blocks:
         if b.start_time and b.end_time and b.start_time <= now <= b.end_time:
             current_block = b
+            if b.project:
+                now_action = f"{b.block_type.value.title()} block • {b.project.title}"
+            else:
+                now_action = f"{b.block_type.value.title()} block"
         elif b.start_time and b.start_time > now:
             upcoming_blocks.append(b)
         timeline_events.append(
@@ -92,6 +97,7 @@ def landing(request: Request, db: Session = Depends(get_db)):
             "current_block": current_block,
             "upcoming_blocks": upcoming_blocks,
             "timeline_events": sorted(timeline_events, key=lambda e: e["start"] or datetime.max.time()),
+            "now_action": now_action,
             "weekly_work_count": len(weekly_work),
             "weekly_personal_count": len(weekly_personal),
             "form_error": request.query_params.get("error"),

@@ -98,4 +98,23 @@ document.addEventListener("DOMContentLoaded", () => {
     syncHorizon();
     showStep(0);
   }
+
+  // Digital clock
+  const clockTime = document.querySelector("#clock-time");
+  const clockDate = document.querySelector("#clock-date");
+  const updateClock = () => {
+    const now = new Date();
+    let hours = now.getHours();
+    const ampm = hours >= 12 ? "PM" : "AM";
+    hours = hours % 12 || 12;
+    const minutes = String(now.getMinutes()).padStart(2, "0");
+    const seconds = String(now.getSeconds()).padStart(2, "0");
+    if (clockTime) clockTime.textContent = `${hours}:${minutes}:${seconds} ${ampm}`;
+    if (clockDate) {
+      const options = { weekday: "long", year: "numeric", month: "long", day: "numeric" };
+      clockDate.textContent = now.toLocaleDateString(undefined, options);
+    }
+  };
+  updateClock();
+  setInterval(updateClock, 1000);
 });

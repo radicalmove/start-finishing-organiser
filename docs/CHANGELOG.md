@@ -1,6 +1,9 @@
 # Changelog
 
-## Unreleased
+## 0.2.0 (planned)
+- Placeholder for the next phase of changes.
+
+## 0.1.0 - Prototype
 
 ### Added
 - FastAPI/Jinja/SQLite scaffold with Start Finishing Organiser branding.

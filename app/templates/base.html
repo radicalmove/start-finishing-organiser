@@ -4,6 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{{ title or "Start Finishing Organiser" }}</title>
+  <link rel="icon" href="{{ url_for('static', path='/img/favicon.svg') }}">
+  <link rel="shortcut icon" href="{{ url_for('static', path='/img/favicon.svg') }}">
   <link rel="stylesheet" href="{{ url_for('static', path='/css/main.css') }}">
   <script defer src="{{ url_for('static', path='/js/main.js') }}"></script>
 </head>
@@ -14,13 +16,21 @@
         <div class="brand-mark">SFO</div>
         <div>
           <h1>Start Finishing Organiser</h1>
-          <div class="subtitle">Meaningful work, neon focus, quiet confidence.</div>
         </div>
       </div>
       <div class="tbar">
-        <span class="pill">v0.1 prototype</span>
-        <span class="pill">4 work + 3 personal weekly cap</span>
+        <div class="now-pill">
+          <div class="now-row">
+            <span class="now-label">Now:</span>
+            <span class="now-text">{{ now_action or "Pick your One Thing" }}</span>
+          </div>
+        </div>
+        <div class="clock">
+          <div id="clock-time">--:--:--</div>
+          <div id="clock-date">---</div>
+        </div>
       </div>
+      <div class="version-center">v0.2 in progress</div>
     </header>
     {% block content %}{% endblock %}
   </div>
