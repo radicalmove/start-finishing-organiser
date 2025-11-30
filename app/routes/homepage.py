@@ -1,8 +1,14 @@
+import os
+import ssl
+from datetime import date, datetime, time, timedelta
+from urllib.parse import quote_plus
+from urllib.request import Request as UrlRequest, urlopen
+import certifi
+
 from fastapi import APIRouter, Depends, Request, Form, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy.orm import Session
-from urllib.parse import quote_plus
-from datetime import date, datetime
+from icalendar import Calendar
 
 from ..db import get_db
 from ..models import (
@@ -17,6 +23,86 @@ from ..models import (
 from ..utils.rules import enforce_weekly_cap, compose_why_text
 
 router = APIRouter()
+_COZI_CACHE = {"fetched_at": None, "date": None, "events": [], "status": ""}  # in-memory cache of ICS feed
+_COZI_CACHE_TTL_SECONDS = 60
+
+
+def _fetch_cozi_events(target_date: date) -> tuple[list[dict], str]:
+    """
+    Fetch and cache Cozi ICS events for a given date.
+    Returns (events, status message). Uses a short TTL to avoid hammering Cozi.
+    """
+    url = os.getenv("COZI_ICS_URL")
+    if not url:
+        return [], "COZI_ICS_URL not set"
+
+    now = datetime.now().astimezone()  # cache timestamp in local tz
+    if (
+        _COZI_CACHE["date"] == target_date
+        and _COZI_CACHE["fetched_at"]
+        and (now - _COZI_CACHE["fetched_at"]).total_seconds() < _COZI_CACHE_TTL_SECONDS
+    ):
+        return _COZI_CACHE["events"], _COZI_CACHE.get("status", "")
+
+    events: list[dict] = []
+    try:
+        ssl_ctx = ssl.create_default_context(cafile=certifi.where())
+        req = UrlRequest(
+            url,
+            headers={
+                "User-Agent": "Mozilla/5.0 (StartFinishing/0.2)",
+                "Accept": "text/calendar,*/*",
+            },
+        )
+        with urlopen(req, timeout=10, context=ssl_ctx) as resp:
+            data = resp.read()
+        cal = Calendar.from_ical(data)
+    except Exception as exc:
+        status = f"Cozi fetch failed: {exc}"
+        return (
+            (_COZI_CACHE["events"] if _COZI_CACHE["date"] == target_date else []),
+            status,
+        )
+
+    for component in cal.walk("VEVENT"):
+        dtstart = component.get("dtstart")
+        if not dtstart:
+            continue
+        dtend = component.get("dtend")
+        summary = (component.get("summary") or "").strip() or "Cozi event"
+
+        start = dtstart.dt
+        end = dtend.dt if dtend else None
+
+        if isinstance(start, date) and not isinstance(start, datetime):
+            start_dt = datetime.combine(start, time.min)
+        else:
+            start_dt = start
+
+        if isinstance(end, date) and not isinstance(end, datetime):
+            end_dt = datetime.combine(end, time.min)
+        else:
+            end_dt = end
+
+        if isinstance(start_dt, datetime) and start_dt.tzinfo:
+            start_dt = start_dt.astimezone().replace(tzinfo=None)
+        if isinstance(end_dt, datetime) and end_dt and end_dt.tzinfo:
+            end_dt = end_dt.astimezone().replace(tzinfo=None)
+
+        if end_dt is None:
+            end_dt = start_dt + timedelta(hours=1)
+
+        # Keep events that touch the target day
+        if not (start_dt.date() <= target_date <= end_dt.date()):
+            continue
+
+        events.append({"label": summary, "start": start_dt, "end": end_dt})
+
+    _COZI_CACHE["fetched_at"] = now
+    _COZI_CACHE["date"] = target_date
+    _COZI_CACHE["events"] = events
+    _COZI_CACHE["status"] = f"OK ({len(events)} events)"
+    return events, _COZI_CACHE["status"]
 
 
 @router.get("/", response_class=HTMLResponse)
@@ -25,6 +111,7 @@ def landing(request: Request, db: Session = Depends(get_db)):
 
     today = date.today()
     now = datetime.now().time()
+    now_minutes = datetime.now().hour * 60 + datetime.now().minute
     projects = (
         db.query(Project)
         .filter(Project.status != ProjectStatus.ARCHIVED)
@@ -61,14 +148,28 @@ def landing(request: Request, db: Session = Depends(get_db)):
         .all()
     )
     todays_blocks = [b for b in week_blocks if b.date == today]
+    cozi_events, cozi_status = _fetch_cozi_events(today)
+    cozi_last_updated = None
+    if _COZI_CACHE.get("fetched_at"):
+        local_dt = _COZI_CACHE["fetched_at"].astimezone()
+        cozi_last_updated = local_dt.strftime("%d %b %I:%M %p")
     # Determine current block based on time if start/end present
     current_block = None
     upcoming_blocks = []
     timeline_events = []
     now_action = None
     calendar_events = []
-    day_start_minutes = 6 * 60
-    day_total_minutes = 16 * 60  # 6am-10pm
+    # Timeline window used for percentage positioning (hour rows are 48px tall in CSS)
+    day_start_minutes = 6.15 * 60
+    # 18-hour span here is a visual tweak to better match rendered grid spacing
+    day_total_minutes = 16.2 * 60
+    now_position = None
+    now_label = None
+    if day_start_minutes <= now_minutes <= day_start_minutes + day_total_minutes:
+        now_position = max(
+            0, min(100, (now_minutes - day_start_minutes) / day_total_minutes * 100)
+        )
+        now_label = datetime.now().strftime("%-I:%M %p")
     for b in todays_blocks:
         if b.start_time and b.end_time and b.start_time <= now <= b.end_time:
             current_block = b
@@ -106,6 +207,40 @@ def landing(request: Request, db: Session = Depends(get_db)):
                     "type": b.block_type.value,
                 }
             )
+
+    for ev in cozi_events:
+        start_dt = ev["start"]
+        end_dt = ev["end"]
+        start_min = start_dt.hour * 60 + start_dt.minute
+        end_min = end_dt.hour * 60 + end_dt.minute
+        window_start = day_start_minutes
+        window_end = day_start_minutes + day_total_minutes
+        effective_start = max(window_start, start_min)
+        effective_end = min(window_end, end_min)
+        if effective_end <= window_start or effective_start >= window_end:
+            continue
+        top_pct = max(0, (effective_start - window_start) / day_total_minutes * 100)
+        height_pct = max(5, (effective_end - effective_start) / day_total_minutes * 100)
+        # Color-code Cozi events by label prefix if desired (e.g., Brynlee/Jessica)
+        name_prefix = (ev["label"] or "").lower()
+        extra_class = None
+        if name_prefix.startswith("brynlee"):
+            extra_class = "cozi-brynlee"
+        elif name_prefix.startswith("jessica"):
+            extra_class = "cozi-jessica"
+
+        calendar_events.append(
+            {
+                "label": ev["label"],
+                "project": None,
+                "top": top_pct,
+                "height": height_pct,
+                "start_display": start_dt.strftime("%-I:%M %p"),
+                "end_display": end_dt.strftime("%-I:%M %p"),
+                "type": "external",
+                "extra_class": extra_class,
+            }
+        )
     upcoming_blocks = sorted(upcoming_blocks, key=lambda x: (x.start_time or datetime.max.time()))
 
     return templates.TemplateResponse(
@@ -121,6 +256,14 @@ def landing(request: Request, db: Session = Depends(get_db)):
             "upcoming_blocks": upcoming_blocks,
             "timeline_events": sorted(timeline_events, key=lambda e: e["start"] or datetime.max.time()),
             "calendar_events": calendar_events,
+            "cozi_event_count": len(cozi_events),
+            "cozi_status": cozi_status,
+            "cozi_last_updated": cozi_last_updated,
+            "server_today": today,
+            "now_position": now_position,
+            "now_label": now_label,
+            "day_start_minutes": day_start_minutes,
+            "day_total_minutes": day_total_minutes,
             "now_action": now_action,
             "weekly_work_count": len(weekly_work),
             "weekly_personal_count": len(weekly_personal),

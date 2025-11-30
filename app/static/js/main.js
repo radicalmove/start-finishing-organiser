@@ -102,7 +102,10 @@ document.addEventListener("DOMContentLoaded", () => {
   // Digital clock
   const clockTime = document.querySelector("#clock-time");
   const clockDate = document.querySelector("#clock-date");
+  const nowLine = document.querySelector("[data-now-line]");
+
   const updateClock = () => {
+    // Digital clock (header) + dynamic now-line on the calendar
     const now = new Date();
     let hours = now.getHours();
     const ampm = hours >= 12 ? "PM" : "AM";
@@ -113,7 +116,27 @@ document.addEventListener("DOMContentLoaded", () => {
       const options = { weekday: "long", year: "numeric", month: "long", day: "numeric" };
       clockDate.textContent = now.toLocaleDateString(undefined, options);
     }
+
+    if (nowLine) {
+      // Reposition the pink line once per second; data attrs come from the backend
+      const start = parseInt(nowLine.dataset.startMinutes || "360", 10);
+      const total = parseInt(nowLine.dataset.totalMinutes || "960", 10);
+      const minutesNow = now.getHours() * 60 + now.getMinutes();
+      const rel = ((minutesNow - start) / total) * 100;
+      const clamped = Math.max(0, Math.min(100, rel));
+      nowLine.style.top = `${clamped}%`;
+      const label = nowLine.querySelector(".now-line-label");
+      if (label) {
+        label.textContent = `${hours}:${minutes} ${ampm}`;
+      }
+      nowLine.style.display = minutesNow >= start && minutesNow <= start + total ? "block" : "none";
+    }
   };
   updateClock();
   setInterval(updateClock, 1000);
+
+  // Auto-refresh the page every minute to pick up new calendar events
+  setInterval(() => {
+    window.location.reload();
+  }, 60 * 1000);
 });
