@@ -66,6 +66,9 @@ def landing(request: Request, db: Session = Depends(get_db)):
     upcoming_blocks = []
     timeline_events = []
     now_action = None
+    calendar_events = []
+    day_start_minutes = 6 * 60
+    day_total_minutes = 16 * 60  # 6am-10pm
     for b in todays_blocks:
         if b.start_time and b.end_time and b.start_time <= now <= b.end_time:
             current_block = b
@@ -83,6 +86,26 @@ def landing(request: Request, db: Session = Depends(get_db)):
                 "project": b.project.title if b.project else None,
             }
         )
+        if b.start_time:
+            start_min = b.start_time.hour * 60 + b.start_time.minute
+            end_min = (
+                b.end_time.hour * 60 + b.end_time.minute
+                if b.end_time
+                else start_min + 30
+            )
+            top_pct = max(0, (start_min - day_start_minutes) / day_total_minutes * 100)
+            height_pct = max(5, (end_min - start_min) / day_total_minutes * 100)
+            calendar_events.append(
+                {
+                    "label": b.block_type.value.title(),
+                    "project": b.project.title if b.project else None,
+                    "top": top_pct,
+                    "height": height_pct,
+                    "start_display": b.start_time.strftime("%-I:%M %p"),
+                    "end_display": b.end_time.strftime("%-I:%M %p") if b.end_time else "",
+                    "type": b.block_type.value,
+                }
+            )
     upcoming_blocks = sorted(upcoming_blocks, key=lambda x: (x.start_time or datetime.max.time()))
 
     return templates.TemplateResponse(
@@ -97,6 +120,7 @@ def landing(request: Request, db: Session = Depends(get_db)):
             "current_block": current_block,
             "upcoming_blocks": upcoming_blocks,
             "timeline_events": sorted(timeline_events, key=lambda e: e["start"] or datetime.max.time()),
+            "calendar_events": calendar_events,
             "now_action": now_action,
             "weekly_work_count": len(weekly_work),
             "weekly_personal_count": len(weekly_personal),

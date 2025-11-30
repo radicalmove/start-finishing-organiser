@@ -4,122 +4,101 @@
     <div class="toast success">{{ form_success }}</div>
   {% endif %}
 
-  <section class="layout" style="margin-top: 18px;">
-    <div class="panel">
-      <h3>Inbox</h3>
-      <div class="muted">New/parked items. Process when you have a moment.</div>
-      <div class="list" style="margin-top: 10px;">
-        {% for t in inbox_tasks %}
-          <div class="list-item">
-            <div>{{ t.verb_noun }}</div>
-            <div class="muted">{{ t.when_bucket.value|title }}</div>
-            <div class="task-meta">
-              {% if t.project %}<span class="pill">{{ t.project.title }}</span>{% endif %}
+  <section class="main-shell">
+    <div class="left-col">
+      <div class="panel inbox-panel">
+        <h3>Inbox</h3>
+        <div class="muted">New/parked items. Process when you have a moment.</div>
+        <div class="list" style="margin-top: 10px;">
+          {% for t in inbox_tasks %}
+            <div class="list-item">
+              <div>{{ t.verb_noun }}</div>
+              <div class="muted">{{ t.when_bucket.value|title }}</div>
+              <div class="task-meta">
+                {% if t.project %}<span class="pill">{{ t.project.title }}</span>{% endif %}
+              </div>
             </div>
-          </div>
-        {% else %}
-          <div class="muted">Inbox clear.</div>
-        {% endfor %}
-      </div>
-      <div class="cta-row">
-        <a class="btn" href="/capture">Quick capture</a>
-        <a class="btn ghost" href="/capture/wizard">Guided capture</a>
-        <a class="btn ghost" href="/waiting">Waiting On / OPP</a>
-      </div>
-    </div>
-
-    <div class="panel">
-      <h3>Now</h3>
-      {% if current_block %}
-        <div class="list-item">
-          <div>{{ current_block.block_type.value|title }} block</div>
-          <div class="muted">
-            {{ current_block.start_time }} - {{ current_block.end_time }}
-          </div>
-          {% if current_block.project %}
-            <div class="task-meta"><span class="pill">{{ current_block.project.title }}</span></div>
-          {% endif %}
+          {% else %}
+            <div class="muted">Inbox clear.</div>
+          {% endfor %}
         </div>
-      {% else %}
-        <div class="muted">No block active right now. Choose your One Thing and a Frog.</div>
-      {% endif %}
-      <div class="cta-row">
-        <a class="btn ghost" href="/ritual/morning">Morning check-in</a>
-        <a class="btn ghost" href="/ritual/midday">Midday reset</a>
-        <a class="btn ghost" href="/ritual/evening">Evening check-out</a>
+        <div class="cta-row">
+          <a class="btn pink" href="/capture">Quick capture</a>
+          <a class="btn ghost" href="/capture/wizard">Guided capture</a>
+          <a class="btn ghost" href="/waiting">Waiting On / OPP</a>
+        </div>
       </div>
     </div>
-
-    <div class="panel">
-      <h3>Today schedule</h3>
-      <div class="muted">Blocks scheduled today.</div>
-      <div class="list" style="margin-top: 10px;">
-        {% for b in todays_blocks %}
-          <div class="list-item">
-            <div>{{ b.block_type.value|title }} — {{ b.start_time or 'TBD' }}{% if b.end_time %}–{{ b.end_time }}{% endif %}</div>
-            {% if b.project %}
-              <div class="task-meta"><span class="pill">{{ b.project.title }}</span></div>
+    <div class="right-col">
+      <div class="right-top">
+        <div class="panel calendar-panel">
+          <h3>Today calendar</h3>
+          <div class="muted">Blocks mapped on the day. External calendars will feed in here later.</div>
+          <div class="day-calendar">
+            <div class="day-calendar-scroll">
+              <div class="hours">
+                {% for hr in range(6, 22) %}
+                  <div class="hour-mark">{{ hr if hr <= 12 else hr-12 }} {{ 'AM' if hr < 12 else 'PM' }}</div>
+                {% endfor %}
+              </div>
+              <div class="events">
+                {% for ev in calendar_events %}
+                  <div class="event-block {{ ev.type }}" style="top: {{ ev.top }}%; height: {{ ev.height }}%;">
+                    <div class="event-time">{{ ev.start_display }}{% if ev.end_display %} – {{ ev.end_display }}{% endif %}</div>
+                    <div class="event-label">{{ ev.label }}</div>
+                    {% if ev.project %}<div class="event-project">{{ ev.project }}</div>{% endif %}
+                  </div>
+              {% endfor %}
+            </div>
+          </div>
+        </div>
+        </div>
+        <div class="right-stack">
+          <div class="panel">
+            <h3>Now</h3>
+            {% if current_block %}
+              <div class="list-item">
+                <div>{{ current_block.block_type.value|title }} block</div>
+                <div class="muted">
+                  {{ current_block.start_time }} - {{ current_block.end_time }}
+                </div>
+                {% if current_block.project %}
+                  <div class="task-meta"><span class="pill">{{ current_block.project.title }}</span></div>
+                {% endif %}
+              </div>
+            {% else %}
+              <div class="muted">No block active right now. Choose your One Thing and a Frog.</div>
             {% endif %}
-          </div>
-        {% else %}
-          <div class="muted">No blocks yet. Plan some.</div>
-        {% endfor %}
-      </div>
-      <div class="cta-row">
-        <a class="btn ghost" href="/blocks">Plan blocks</a>
-      </div>
-    </div>
-  </section>
-
-  <section class="grid" style="margin-top: 16px;">
-    <div class="panel">
-      <h3>Today tasks</h3>
-      <div class="muted">Focus/Frog tasks for Today.</div>
-      <div class="list" style="margin-top: 12px;">
-        {% for t in today_tasks %}
-          <div class="list-item">
-            <div>{{ t.verb_noun }}</div>
-            <div class="muted">{{ t.description or "No notes yet." }}</div>
-            <div class="task-meta">
-              {% if t.block_type %}<span class="pill">{{ t.block_type.value }}</span>{% endif %}
-              {% if t.frog %}<span class="pill pill--warn">Frog</span>{% endif %}
-              {% if t.alignment %}<span class="pill">{{ t.alignment.value }}</span>{% endif %}
+            <div class="cta-row">
+              <a class="btn ghost blue" href="/ritual/morning">Morning check-in</a>
+              <a class="btn ghost blue" href="/ritual/midday">Midday reset</a>
+              <a class="btn ghost blue" href="/ritual/evening">Evening check-out</a>
             </div>
           </div>
-        {% else %}
-          <div class="muted">No tasks in Today bucket. Add via Capture.</div>
-        {% endfor %}
-      </div>
-      <div class="cta-row">
-        <a class="btn" href="/capture">Quick capture</a>
-        <a class="btn ghost" href="/capture/wizard">Guided capture</a>
-      </div>
-    </div>
-
-    <div class="panel">
-      <h3>Today calendar</h3>
-      <div class="muted">Timeline for today’s blocks; tasks without times stay in Today list.</div>
-      <div class="timeline">
-        {% for ev in timeline_events %}
-          <div class="timeline-row">
-            <div class="timeline-time">
-              {% if ev.start %}{{ ev.start }}{% else %}TBD{% endif %}
-              {% if ev.end %}–{{ ev.end }}{% endif %}
+          <div class="panel today-tasks-panel">
+            <h3>Today tasks</h3>
+            <div class="muted">Focus/Frog tasks for Today.</div>
+            <div class="list" style="margin-top: 12px;">
+              {% for t in today_tasks %}
+                <div class="list-item">
+                  <div>{{ t.verb_noun }}</div>
+                  <div class="muted">{{ t.description or "No notes yet." }}</div>
+                  <div class="task-meta">
+                    {% if t.block_type %}<span class="pill">{{ t.block_type.value }}</span>{% endif %}
+                    {% if t.frog %}<span class="pill pill--warn">Frog</span>{% endif %}
+                    {% if t.alignment %}<span class="pill">{{ t.alignment.value }}</span>{% endif %}
+                  </div>
+                </div>
+              {% else %}
+                <div class="muted">No tasks in Today bucket. Add via Capture.</div>
+              {% endfor %}
             </div>
-            <div class="timeline-body">
-              <div>{{ ev.label }}</div>
-              {% if ev.project %}
-                <div class="muted">{{ ev.project }}</div>
-              {% endif %}
+            <div class="cta-row">
+              <a class="btn pink" href="/capture">Quick capture</a>
+              <a class="btn ghost" href="/capture/wizard">Guided capture</a>
             </div>
           </div>
-        {% else %}
-          <div class="muted">No timed blocks yet. Add via Plan blocks.</div>
-        {% endfor %}
-      </div>
-      <div class="cta-row">
-        <a class="btn ghost" href="/blocks">Schedule</a>
-        <a class="btn ghost" href="/weekly">Weekly review</a>
+        </div>
       </div>
     </div>
   </section>
