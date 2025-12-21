@@ -6,6 +6,7 @@
   <section class="panel" style="margin-top: 18px;">
     <h3>{{ ritual_type|title }} ritual</h3>
     <form method="post" action="/ritual/save" class="form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
       <input type="hidden" name="ritual_type" value="{{ ritual_type }}">
       <label class="field">
         <span>Date</span>

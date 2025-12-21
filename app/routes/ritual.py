@@ -5,11 +5,20 @@ from sqlalchemy.orm import Session
 
 from ..db import get_db
 from ..models import RitualEntry, RitualType
+from ..utils.coach import build_coach_context_json, ritual_summary
+from ..security import csrf_protect, require_html_auth
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(require_html_auth), Depends(csrf_protect)])
 
 
-def _render(templates, request, ritual_type: RitualType, last_entry: RitualEntry | None = None, success: str | None = None):
+def _render(
+    templates,
+    request,
+    ritual_type: RitualType,
+    last_entry: RitualEntry | None = None,
+    success: str | None = None,
+    coach_context_json: str | None = None,
+):
     return templates.TemplateResponse(
         "ritual.html",
         {
@@ -17,6 +26,7 @@ def _render(templates, request, ritual_type: RitualType, last_entry: RitualEntry
             "ritual_type": ritual_type.value,
             "last_entry": last_entry,
             "form_success": success,
+            "coach_context_json": coach_context_json,
         },
     )
 
@@ -33,19 +43,73 @@ def _get_last(db: Session, ritual_type: RitualType) -> RitualEntry | None:
 @router.get("/ritual/morning", response_class=HTMLResponse)
 def morning(request: Request, db: Session = Depends(get_db)):
     templates = request.app.state.templates
-    return _render(templates, request, RitualType.MORNING, _get_last(db, RitualType.MORNING), request.query_params.get("success"))
+    last_entry = _get_last(db, RitualType.MORNING)
+    coach_context_json = build_coach_context_json(
+        request_path=str(request.url.path),
+        screen_id="ritual_morning",
+        screen_title="Morning ritual",
+        screen_data={
+            "ritual_type": RitualType.MORNING.value,
+            "last_entry": ritual_summary(last_entry) if last_entry else None,
+        },
+        db=db,
+    )
+    return _render(
+        templates,
+        request,
+        RitualType.MORNING,
+        last_entry,
+        request.query_params.get("success"),
+        coach_context_json,
+    )
 
 
 @router.get("/ritual/midday", response_class=HTMLResponse)
 def midday(request: Request, db: Session = Depends(get_db)):
     templates = request.app.state.templates
-    return _render(templates, request, RitualType.MIDDAY, _get_last(db, RitualType.MIDDAY), request.query_params.get("success"))
+    last_entry = _get_last(db, RitualType.MIDDAY)
+    coach_context_json = build_coach_context_json(
+        request_path=str(request.url.path),
+        screen_id="ritual_midday",
+        screen_title="Midday ritual",
+        screen_data={
+            "ritual_type": RitualType.MIDDAY.value,
+            "last_entry": ritual_summary(last_entry) if last_entry else None,
+        },
+        db=db,
+    )
+    return _render(
+        templates,
+        request,
+        RitualType.MIDDAY,
+        last_entry,
+        request.query_params.get("success"),
+        coach_context_json,
+    )
 
 
 @router.get("/ritual/evening", response_class=HTMLResponse)
 def evening(request: Request, db: Session = Depends(get_db)):
     templates = request.app.state.templates
-    return _render(templates, request, RitualType.EVENING, _get_last(db, RitualType.EVENING), request.query_params.get("success"))
+    last_entry = _get_last(db, RitualType.EVENING)
+    coach_context_json = build_coach_context_json(
+        request_path=str(request.url.path),
+        screen_id="ritual_evening",
+        screen_title="Evening ritual",
+        screen_data={
+            "ritual_type": RitualType.EVENING.value,
+            "last_entry": ritual_summary(last_entry) if last_entry else None,
+        },
+        db=db,
+    )
+    return _render(
+        templates,
+        request,
+        RitualType.EVENING,
+        last_entry,
+        request.query_params.get("success"),
+        coach_context_json,
+    )
 
 
 @router.post("/ritual/save")

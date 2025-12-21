@@ -145,6 +145,7 @@ class Block(Base):
     __tablename__ = "blocks"
 
     id = Column(Integer, primary_key=True, index=True)
+    title = Column(String(200), nullable=True)
     date = Column(Date, nullable=False)
     start_time = Column(Time, nullable=True)
     end_time = Column(Time, nullable=True)
@@ -200,3 +201,29 @@ class RitualEntry(Base):
     energy = Column(String(50), nullable=True)
     notes = Column(Text, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
+class CoachConversation(Base):
+    __tablename__ = "coach_conversations"
+
+    id = Column(Integer, primary_key=True, index=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    messages = relationship(
+        "CoachMessage", back_populates="conversation", cascade="all, delete-orphan"
+    )
+
+
+class CoachMessage(Base):
+    __tablename__ = "coach_messages"
+
+    id = Column(Integer, primary_key=True, index=True)
+    conversation_id = Column(Integer, ForeignKey("coach_conversations.id"), nullable=False)
+    role = Column(String(20), nullable=False)
+    content = Column(Text, nullable=False)
+    context_json = Column(Text, nullable=True)
+    actions_json = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    conversation = relationship("CoachConversation", back_populates="messages")

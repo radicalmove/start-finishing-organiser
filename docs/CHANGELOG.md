@@ -1,7 +1,11 @@
 # Changelog
 
 ## 0.2.0 (planned)
-- Placeholder for the next phase of changes.
+- Added Charlie coach widget with optional local Ollama integration and coach-lite fallback.
+- Added in-app Guide page at `/guide` plus coach responses for “how to use” questions.
+- Added Cozi ICS integration (`COZI_ICS_URL`) and calendar error surfacing in the UI.
+- Added full-width 7-day calendar screen at `/calendar/week`.
+- Added lightweight `.env` auto-loader at startup (see `.env.example`).
 
 ## 0.1.0 - Prototype
 

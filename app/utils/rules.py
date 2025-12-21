@@ -2,7 +2,7 @@ from urllib.parse import quote_plus
 from fastapi import HTTPException
 from datetime import date, timedelta
 
-from ..models import Project, ProjectCategory
+from ..models import Project, ProjectCategory, BlockType
 from sqlalchemy.orm import Session
 
 
@@ -47,3 +47,12 @@ def compute_resurface_on(horizon: str) -> date | None:
     if horizon == "quarter":
         return today + timedelta(days=14)
     return today + timedelta(days=30)
+
+
+def parse_block_type(value: str | None) -> BlockType | None:
+    if not value:
+        return None
+    try:
+        return BlockType(value)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail="Invalid block type") from exc

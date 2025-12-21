@@ -7,16 +7,19 @@
   <link rel="icon" href="{{ url_for('static', path='/img/favicon.svg') }}">
   <link rel="shortcut icon" href="{{ url_for('static', path='/img/favicon.svg') }}">
   <link rel="stylesheet" href="{{ url_for('static', path='/css/main.css') }}">
+  <meta name="csrf-token" content="{{ csrf_token(request) }}">
   <script defer src="{{ url_for('static', path='/js/main.js') }}"></script>
 </head>
 <body>
   <div class="page">
     <header class="header">
       <div class="brand">
-        <div class="brand-mark">SFO</div>
-        <div>
-          <h1>Start Finishing Organiser</h1>
-        </div>
+        <a class="brand-link" href="/">
+          <div class="brand-mark">SFO</div>
+          <div>
+            <h1>Start Finishing Organiser</h1>
+          </div>
+        </a>
       </div>
       <div class="tbar">
         <div class="now-pill">
@@ -29,10 +32,51 @@
           <div id="clock-time">--:--:--</div>
           <div id="clock-date">---</div>
         </div>
+        {% if auth_enabled() %}
+          <div class="auth-actions">
+            {% if is_authenticated(request) %}
+              <a class="btn ghost btn-sm" href="/guide">Guide</a>
+              <form method="post" action="/logout" class="auth-form">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+                <button class="btn ghost btn-sm" type="submit">Log out</button>
+              </form>
+            {% else %}
+              <a class="btn ghost btn-sm" href="/login">Log in</a>
+            {% endif %}
+          </div>
+        {% else %}
+          <div class="auth-actions">
+            <a class="btn ghost btn-sm" href="/guide">Guide</a>
+          </div>
+        {% endif %}
       </div>
       <div class="version-center">v0.2 in progress</div>
     </header>
     {% block content %}{% endblock %}
   </div>
+  {% if not auth_enabled() or is_authenticated(request) %}
+    <div class="coach-widget" data-coach>
+      <button class="coach-toggle" type="button" data-coach-toggle>Charlie</button>
+      <div class="coach-panel hidden" data-coach-panel>
+        <div class="coach-header">
+          <div>
+            <div class="coach-title">Charlie</div>
+            <div class="coach-status" data-coach-status>Ready to help</div>
+          </div>
+          <button class="coach-close" type="button" data-coach-close>&times;</button>
+        </div>
+        <div class="coach-tools">
+          <button class="btn ghost btn-sm" type="button" data-coach-help>Help me with what I&apos;m looking at</button>
+        </div>
+        <div class="coach-messages" data-coach-messages></div>
+        <div class="coach-quick-actions" data-coach-quick-actions></div>
+        <form class="coach-input" data-coach-form>
+          <input type="text" name="message" placeholder="Ask Charlie..." autocomplete="off" data-coach-input>
+          <button class="btn pink btn-sm" type="submit">Send</button>
+        </form>
+      </div>
+    </div>
+  {% endif %}
+  <script type="application/json" id="coach-context">{{ (coach_context_json or "{}") | safe }}</script>
 </body>
 </html>

@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block content %}
+  <section class="week-shell">
+    <div class="panel week-calendar-panel">
+      <div class="panel-title-row">
+        <h3>7-day calendar</h3>
+        <div class="panel-actions">
+          <a class="btn pink btn-sm" href="/blocks#add-block">Add time block</a>
+          <a class="btn ghost blue btn-sm" href="/">Back to Today</a>
+        </div>
+      </div>
+      <div class="muted calendar-meta">
+        Cozi: {{ cozi_week_event_count }} this week · Updated {{ cozi_last_updated or '—' }}
+      </div>
+      {% if cozi_error %}
+        <div class="calendar-error">{{ cozi_error }}</div>
+      {% endif %}
+
+      <div class="week-calendar week-calendar--fullscreen" style="--calendar-hours: {{ calendar_hours }}; --calendar-hour-height: {{ calendar_hour_height }}px;">
+        <div class="week-calendar-scroll">
+          <div class="week-calendar-grid">
+            <div class="week-corner"></div>
+            {% for day in week_calendar %}
+              <div class="week-day-header{% if day.is_today %} is-today{% endif %}">
+                <div class="week-day-name">{{ day.weekday }}</div>
+                <div class="week-day-date">{{ day.label }}</div>
+              </div>
+            {% endfor %}
+
+            <div class="week-hours">
+              {% for hr in range(calendar_start_hour, calendar_end_hour) %}
+                <div class="hour-mark">{{ hr if hr <= 12 else hr-12 }} {{ 'AM' if hr < 12 else 'PM' }}</div>
+              {% endfor %}
+            </div>
+            {% for day in week_calendar %}
+              <div class="week-day-lane{% if day.is_today %} is-today{% endif %}">
+                <div class="timeline-align"></div>
+                {% for ev in day.events %}
+                  {% set label_prefix = ev.label_prefix %}
+                  {% set label_suffix = ev.label_suffix %}
+                  {% if not label_prefix and ev.type == "external" and ":" in ev.label %}
+                    {% set parts = ev.label.split(":", 1) %}
+                    {% set label_prefix = parts[0] ~ ":" %}
+                    {% set label_suffix = parts[1] | trim %}
+                  {% endif %}
+                  <div class="event-block event-block--mini {{ ev.type }}{% if ev.extra_class %} {{ ev.extra_class }}{% endif %}" style="top: {{ ev.top }}%; height: {{ ev.height }}%;">
+                    <div class="event-time">{{ ev.start_display }}{% if ev.end_display %} – {{ ev.end_display }}{% endif %}</div>
+                    {% if ev.type == "external" and label_prefix %}
+                      <div class="event-label event-label--split">
+                        <span class="event-label-strong">{{ label_prefix }}</span>
+                        {% if label_suffix %}
+                          <span class="event-label-body"> {{ label_suffix }}</span>
+                        {% endif %}
+                      </div>
+                    {% else %}
+                      <div class="event-label">{{ ev.label }}</div>
+                    {% endif %}
+                    {% if ev.block_id %}
+                      <div class="event-edit">
+                        <button type="button" class="event-edit-toggle">Edit</button>
+                        <form method="post" action="/blocks/update" class="event-edit-form hidden">
+                          <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+                          <input type="hidden" name="block_id" value="{{ ev.block_id }}">
+                          <input type="text" name="title" value="{{ ev.title or ev.label }}" placeholder="Block title">
+                          <button class="event-edit-save" type="submit">Save</button>
+                        </form>
+                      </div>
+                    {% endif %}
+                    {% if ev.project %}<div class="event-project">{{ ev.project }}</div>{% endif %}
+                  </div>
+                {% endfor %}
+              </div>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+{% endblock %}

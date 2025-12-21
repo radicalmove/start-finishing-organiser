@@ -13,6 +13,12 @@
   --danger: #ff5576;
   --glow: 0 0 24px rgba(53, 195, 255, 0.35), 0 0 18px rgba(255, 43, 209, 0.3);
   --radius: 14px;
+  --calendar-hour-height: 48px;
+  --calendar-hours: 17;
+  --calendar-half-hour: calc(var(--calendar-hour-height) / 2);
+  --calendar-grid-height: calc(var(--calendar-hours) * var(--calendar-hour-height));
+  --calendar-label-width: 50px;
+  --calendar-offset-y: 0px;
 }
 
 *,
@@ -78,6 +84,14 @@ h4 {
   gap: 12px;
 }
 
+.brand-link {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: inherit;
+  text-decoration: none;
+}
+
 .brand-mark {
   width: 42px;
   height: 42px;
@@ -113,6 +127,46 @@ h4 {
 .panel h3 {
   margin-bottom: 6px;
   letter-spacing: 0.4px;
+}
+
+.panel-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.panel-title-row h3 {
+  margin-bottom: 0;
+}
+
+.panel-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.btn-sm {
+  padding: 6px 10px;
+  font-size: 12px;
+  border-radius: 10px;
+  line-height: 1;
+}
+
+.calendar-meta {
+  font-size: 12px;
+  margin-top: 4px;
+}
+
+.calendar-error {
+  margin-top: 10px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 85, 118, 0.35);
+  background: rgba(255, 85, 118, 0.08);
+  color: var(--danger);
+  font-size: 12px;
+  line-height: 1.4;
 }
 
 .pill {
@@ -262,6 +316,16 @@ button:hover,
   display: flex;
   align-items: flex-end;
   gap: 16px;
+}
+
+.auth-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.auth-form {
+  margin: 0;
 }
 
 .now-pill {
@@ -446,6 +510,26 @@ button:hover,
   min-height: 0;
 }
 
+.week-shell {
+  margin-top: 20px;
+  flex: 1;
+  min-height: 0;
+}
+
+.week-calendar-panel {
+  height: calc(100vh - 220px);
+  max-height: calc(100vh - 220px);
+  min-height: 520px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.week-calendar--fullscreen {
+  flex: 1;
+  min-height: 0;
+}
+
 .left-col {
   height: auto;
   min-height: 0;
@@ -513,6 +597,108 @@ button:hover,
   overflow-y: hidden;
 }
 
+.week-calendar {
+  position: relative;
+  margin-top: 12px;
+  border-radius: var(--radius);
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.week-calendar-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+.week-calendar-grid {
+  display: grid;
+  grid-template-columns: var(--calendar-label-width) repeat(7, minmax(160px, 1fr));
+  grid-template-rows: 46px var(--calendar-grid-height);
+  width: 100%;
+  min-width: 1200px;
+}
+
+.week-corner {
+  position: sticky;
+  top: 0;
+  left: 0;
+  background: rgba(10, 14, 35, 0.9);
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  z-index: 4;
+}
+
+.week-day-header {
+  position: sticky;
+  top: 0;
+  padding: 8px 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  border-left: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(10, 14, 35, 0.85);
+  z-index: 3;
+}
+
+.week-day-header.is-today {
+  border-bottom-color: rgba(255, 43, 209, 0.45);
+  box-shadow: 0 0 0 1px rgba(255, 43, 209, 0.2) inset;
+}
+
+.week-day-name {
+  font-size: 11px;
+  color: var(--muted);
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+}
+
+.week-day-date {
+  font-size: 13px;
+  font-weight: 800;
+  margin-top: 2px;
+}
+
+.week-hours {
+  position: sticky;
+  left: 0;
+  background: rgba(10, 14, 35, 0.9);
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 0 3px 10px 8px;
+  font-size: 12px;
+  color: var(--muted);
+  height: var(--calendar-grid-height);
+  text-align: right;
+  z-index: 2;
+}
+
+.week-day-lane {
+  position: relative;
+  height: var(--calendar-grid-height);
+  padding: 0 10px 10px;
+  border-left: 1px solid rgba(255, 255, 255, 0.06);
+  background-image: repeating-linear-gradient(
+      to bottom,
+      rgba(53, 195, 255, 0.18) 0px,
+      rgba(53, 195, 255, 0.18) 3px,
+      transparent 3px,
+      transparent var(--calendar-half-hour),
+      rgba(255, 43, 209, 0.14) var(--calendar-half-hour),
+      rgba(255, 43, 209, 0.14) calc(var(--calendar-half-hour) + 1px),
+      transparent calc(var(--calendar-half-hour) + 1px),
+      transparent var(--calendar-hour-height)
+  );
+  background-size: 100% var(--calendar-hour-height);
+  background-position: 0 0;
+}
+
+.week-day-lane.is-today {
+  box-shadow: 0 0 0 1px rgba(255, 43, 209, 0.18) inset;
+}
+
 .day-calendar-scroll {
   display: grid;
   grid-template-columns: 60px 1fr;
@@ -526,22 +712,28 @@ button:hover,
 }
 
 .hours {
-  /* Hour labels column; height aligns with 16 rows at 48px each, minus top padding */
+  /* Hour labels column; height aligns with calendar grid settings */
   display: flex;
   flex-direction: column;
   gap: 0;
-  padding: 0 12px 10px 18px;
+  padding: 0 3px 0 8px;
   font-size: 12px;
   color: var(--muted);
   flex-shrink: 0;
-  height: 800px; /* 16 x 48px */
+  height: var(--calendar-grid-height);
   border-right: 1px solid rgba(255, 255, 255, 0.08);
+  text-align: right;
 }
 
 .hour-mark {
-  height: 48px;
+  height: var(--calendar-hour-height);
+  flex: 0 0 var(--calendar-hour-height);
   display: flex;
-  align-items: center;
+  align-items: flex-start;
+  padding-top: 0;
+  line-height: 1;
+  position: relative;
+  top: -4px;
   white-space: nowrap;
 }
 
@@ -550,41 +742,52 @@ button:hover,
   position: relative;
   padding: 0 12px 10px 80px; /* extra left padding so grid sits farther right of the labels */
   flex-shrink: 0;
-  height: 768px; /* 16 x 48px */
+  height: var(--calendar-grid-height);
   background-image: repeating-linear-gradient(
       to bottom,
       rgba(53, 195, 255, 0.28) 0px,
       rgba(53, 195, 255, 0.28) 3px,
       transparent 3px,
-      transparent 24px,
-      rgba(255, 43, 209, 0.2) 24px,
-      rgba(255, 43, 209, 0.2) 25px,
-      transparent 25px,
-      transparent 48px
+      transparent var(--calendar-half-hour),
+      rgba(255, 43, 209, 0.2) var(--calendar-half-hour),
+      rgba(255, 43, 209, 0.2) calc(var(--calendar-half-hour) + 1px),
+      transparent calc(var(--calendar-half-hour) + 1px),
+      transparent var(--calendar-hour-height)
     );
-  background-size: 100% 48px;
+  background-size: 100% var(--calendar-hour-height);
   background-position: 0 0;
 }
 
+.timeline-align {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  transform: translateY(var(--calendar-offset-y));
+}
+
 .inbox-panel,
-.day-calendar-scroll {
+.day-calendar-scroll,
+.week-calendar-scroll {
   scrollbar-width: thin;
   scrollbar-color: var(--accent-blue) rgba(255, 255, 255, 0.08);
 }
 
 .inbox-panel::-webkit-scrollbar,
-.day-calendar-scroll::-webkit-scrollbar {
+.day-calendar-scroll::-webkit-scrollbar,
+.week-calendar-scroll::-webkit-scrollbar {
   width: 10px;
 }
 
 .inbox-panel::-webkit-scrollbar-track,
-.day-calendar-scroll::-webkit-scrollbar-track {
+.day-calendar-scroll::-webkit-scrollbar-track,
+.week-calendar-scroll::-webkit-scrollbar-track {
   background: rgba(255, 255, 255, 0.05);
   border-radius: 10px;
 }
 
 .inbox-panel::-webkit-scrollbar-thumb,
-.day-calendar-scroll::-webkit-scrollbar-thumb {
+.day-calendar-scroll::-webkit-scrollbar-thumb,
+.week-calendar-scroll::-webkit-scrollbar-thumb {
   background: linear-gradient(180deg, var(--accent-blue), var(--accent-pink));
   border-radius: 10px;
   border: 2px solid rgba(0, 0, 0, 0.35);
@@ -592,7 +795,8 @@ button:hover,
 }
 
 .inbox-panel::-webkit-scrollbar-thumb:hover,
-.day-calendar-scroll::-webkit-scrollbar-thumb:hover {
+.day-calendar-scroll::-webkit-scrollbar-thumb:hover,
+.week-calendar-scroll::-webkit-scrollbar-thumb:hover {
   background: linear-gradient(180deg, var(--accent-pink), var(--accent-blue));
 }
 
@@ -600,6 +804,7 @@ button:hover,
 .event-block {
   /* Absolute-positioned blocks using percentage top/height from backend */
   position: absolute;
+  top: calc(var(--calendar-offset-y) + 0px);
   left: 6px;
   right: 6px;
   border-radius: 4px;
@@ -609,22 +814,95 @@ button:hover,
   flex-direction: column;
   gap: 2px;
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
-  transform: translateY(18px); /* align blocks with grid lines without moving the grid */
+}
+
+.event-block--mini {
+  padding: 5px 6px;
+  border-radius: 4px;
+}
+
+.event-block--mini .event-time {
+  font-size: 8px;
+}
+
+.event-block--mini .event-label {
+  font-size: 10px;
+  line-height: 1.15;
+}
+
+.event-block--mini .event-project {
+  font-size: 8px;
 }
 
 .event-block .event-time {
-  font-size: 11px;
+  font-size: 9px;
   font-weight: 700;
   opacity: 0.8;
 }
 
 .event-block .event-label {
-  font-size: 14px;
+  font-size: 12px;
   font-weight: 800;
 }
 
+.event-block .event-label.event-label--split {
+  font-weight: 400;
+}
+
+.event-label-strong {
+  font-weight: 800;
+}
+
+.event-label-body {
+  font-weight: 400;
+}
+
+.event-edit {
+  margin-top: 4px;
+}
+
+.event-edit-toggle,
+.event-edit-save {
+  border: 1px solid rgba(0, 0, 0, 0.25);
+  background: rgba(255, 255, 255, 0.85);
+  color: #0b0a18;
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.event-edit-toggle:hover,
+.event-edit-save:hover {
+  background: rgba(255, 255, 255, 0.98);
+}
+
+.event-edit-form {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  margin-top: 4px;
+}
+
+.event-edit-form input {
+  width: auto;
+  flex: 1;
+  min-width: 0;
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(0, 0, 0, 0.25);
+  color: #0b0a18;
+  padding: 3px 6px;
+  font-size: 10px;
+}
+
+.event-block--mini .event-edit-toggle,
+.event-block--mini .event-edit-save,
+.event-block--mini .event-edit-form input {
+  font-size: 9px;
+}
+
 .event-block .event-project {
-  font-size: 12px;
+  font-size: 10px;
   color: rgba(0, 0, 0, 0.7);
 }
 
@@ -677,7 +955,6 @@ button:hover,
   box-shadow: 0 0 12px rgba(255, 43, 209, 0.45);
   pointer-events: none;
   z-index: 3;
-  transform: translateY(14px);
 }
 
 .now-line::before {
@@ -770,5 +1047,145 @@ textarea {
   }
   .page {
     padding: 16px 14px 48px;
+  }
+}
+
+.coach-widget {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 60;
+}
+
+.coach-toggle {
+  width: 64px;
+  height: 64px;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: linear-gradient(150deg, rgba(255, 43, 209, 0.95), rgba(53, 195, 255, 0.9));
+  color: #0b0a18;
+  font-weight: 800;
+  letter-spacing: 0.4px;
+  cursor: pointer;
+  box-shadow: var(--glow);
+}
+
+.coach-panel {
+  position: absolute;
+  right: 0;
+  bottom: 78px;
+  width: 360px;
+  max-height: 70vh;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 18px;
+  background: rgba(8, 10, 24, 0.98);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: var(--glow);
+}
+
+.coach-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.coach-title {
+  font-weight: 800;
+  font-size: 14px;
+}
+
+.coach-status {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.coach-close {
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  font-size: 18px;
+  cursor: pointer;
+}
+
+.coach-tools {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.coach-messages {
+  flex: 1;
+  min-height: 120px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-right: 4px;
+}
+
+.coach-message {
+  padding: 8px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  line-height: 1.4;
+  white-space: pre-wrap;
+  border: 1px solid transparent;
+  max-width: 90%;
+}
+
+.coach-message--assistant {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.12);
+  align-self: flex-start;
+}
+
+.coach-message--user {
+  background: rgba(53, 195, 255, 0.16);
+  border-color: rgba(53, 195, 255, 0.3);
+  align-self: flex-end;
+  color: #f7f9ff;
+}
+
+.coach-quick-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.coach-action-btn {
+  font-size: 11px;
+  padding: 4px 8px;
+}
+
+.coach-input {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.coach-input input {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  padding: 8px 10px;
+}
+
+@media (max-width: 700px) {
+  .coach-widget {
+    right: 16px;
+    bottom: 16px;
+  }
+  .coach-panel {
+    width: min(92vw, 360px);
+    right: -6px;
+  }
+  .coach-toggle {
+    width: 56px;
+    height: 56px;
+    border-radius: 16px;
+    font-size: 12px;
   }
 }

@@ -7,21 +7,28 @@ from ..models import (
     Project,
     Task,
     ProjectCategory,
-    TaskStatus,
     WhenBucket,
-    BlockType,
     OwnerType,
     WaitingOn,
 )
-from ..utils.rules import enforce_weekly_cap, compose_why_text, compute_resurface_on
+from ..utils.rules import enforce_weekly_cap, compose_why_text, compute_resurface_on, parse_block_type
+from ..utils.coach import build_coach_context_json, project_summary
+from ..security import csrf_protect, require_html_auth
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(require_html_auth), Depends(csrf_protect)])
 
 
 @router.get("/capture", response_class=HTMLResponse)
 def capture(request: Request, db: Session = Depends(get_db)):
     templates = request.app.state.templates
     projects = db.query(Project).order_by(Project.created_at.desc()).all()
+    coach_context_json = build_coach_context_json(
+        request_path=str(request.url.path),
+        screen_id="capture",
+        screen_title="Quick capture",
+        screen_data={"projects": [project_summary(p) for p in projects]},
+        db=db,
+    )
 
     return templates.TemplateResponse(
         "capture.html",
@@ -30,6 +37,7 @@ def capture(request: Request, db: Session = Depends(get_db)):
             "projects": projects,
             "form_error": request.query_params.get("error"),
             "form_success": request.query_params.get("success"),
+            "coach_context_json": coach_context_json,
         },
     )
 
@@ -38,9 +46,21 @@ def capture(request: Request, db: Session = Depends(get_db)):
 def capture_wizard(request: Request, db: Session = Depends(get_db)):
     templates = request.app.state.templates
     projects = db.query(Project).order_by(Project.created_at.desc()).all()
+    coach_context_json = build_coach_context_json(
+        request_path=str(request.url.path),
+        screen_id="capture_wizard",
+        screen_title="Guided capture",
+        screen_data={"projects": [project_summary(p) for p in projects]},
+        db=db,
+    )
     return templates.TemplateResponse(
         "capture_wizard.html",
-        {"request": request, "projects": projects, "form_error": request.query_params.get("error")},
+        {
+            "request": request,
+            "projects": projects,
+            "form_error": request.query_params.get("error"),
+            "coach_context_json": coach_context_json,
+        },
     )
 
 
@@ -63,7 +83,7 @@ def submit_wizard(
 ):
     active_this_week = include_this_week.lower() == "yes" or horizon == WhenBucket.WEEK
     pid = int(project_id) if project_id not in (None, "", "null") else None
-    btype = BlockType(block_type) if block_type not in (None, "", "null") else None
+    btype = parse_block_type(block_type) if block_type not in (None, "", "null") else None
 
     try:
         if item_kind == "project":

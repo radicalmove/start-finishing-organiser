@@ -6,22 +6,80 @@
   <section class="grid" style="margin-top: 18px;">
     <div class="panel">
       <h3>Blocks Planner</h3>
-      <p class="muted">Placeholder: schedule Focus/Admin/Social/Recovery blocks. Future work: drag to calendar.</p>
+      <p class="muted">Schedule focus blocks and appointments. Future work: drag to calendar.</p>
+      <form id="add-block" method="post" action="/blocks/appointment" class="form" style="margin-top: 12px;">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+        <label class="field">
+          <span>Title</span>
+          <input type="text" name="title" required placeholder="e.g. Dentist, 1:1 with Alex">
+        </label>
+        <label class="field">
+          <span>Project (optional)</span>
+          <select name="project_id">
+            <option value="">— None —</option>
+            {% for p in projects %}
+              <option value="{{ p.id }}">{{ p.title }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <div class="field two">
+          <label>
+            <span>Date</span>
+            <input type="date" name="date" required>
+          </label>
+          <label>
+            <span>Start</span>
+            <input type="time" name="start_time" required>
+          </label>
+        </div>
+        <div class="field two">
+          <label>
+            <span>Duration</span>
+            <input type="number" name="duration_minutes" value="30" min="5" step="5">
+          </label>
+          <label>
+            <span>Block type</span>
+            <select name="block_type">
+              <option value="focus">Focus</option>
+              <option value="admin">Admin</option>
+              <option value="social">Social</option>
+              <option value="recovery">Recovery</option>
+            </select>
+          </label>
+        </div>
+        <label class="field">
+          <span>Notes (optional)</span>
+          <textarea name="notes" rows="2" placeholder="Extra context"></textarea>
+        </label>
+        <button class="btn" type="submit">Add appointment</button>
+      </form>
       <div class="list">
         {% for b in blocks %}
           <div class="list-item">
-            <div>{{ b.date }} — {{ b.block_type.value|title }}</div>
+            <div>{{ b.title or b.block_type.value|title }}</div>
             <div class="muted">
+              {{ b.date }}
+              {% if b.title %} • {{ b.block_type.value|title }}{% endif %}
               {% if b.start_time and b.end_time %}
-                {{ b.start_time }} - {{ b.end_time }}
+                • {{ b.start_time }} - {{ b.end_time }}
               {% else %}
-                Time TBD
+                • Time TBD
               {% endif %}
             </div>
+            <form method="post" action="/blocks/update" class="form" style="margin-top: 8px;">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+              <input type="hidden" name="block_id" value="{{ b.id }}">
+              <label class="field">
+                <span>Title</span>
+                <input type="text" name="title" value="{{ b.title or '' }}" placeholder="What is this block for?">
+              </label>
+              <button class="btn ghost btn-sm" type="submit">Update title</button>
+            </form>
             {% if b.project %}
               <div class="task-meta"><span class="pill">{{ b.project.title }}</span></div>
             {% endif %}
             <form method="post" action="/blocks/unschedule" class="form" style="margin-top: 8px;">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
               <input type="hidden" name="block_id" value="{{ b.id }}">
               <button class="btn ghost" type="submit">Unschedule</button>
             </form>
@@ -41,13 +99,14 @@
             <div>{{ t.verb_noun }}</div>
             <div class="task-meta">
               <span class="pill">{{ t.block_type.value }}</span>
-              {% if t.duration_minutes %}<span class="pill">{{ t.duration_minutes }} min</span>{% endif %}
-              {% if t.project %}<span class="pill">{{ t.project.title }}</span>{% endif %}
-            </div>
-            <form method="post" action="/blocks/schedule" class="form" style="margin-top: 8px;">
-              <input type="hidden" name="task_id" value="{{ t.id }}">
-              <div class="field two">
-                <label>
+            {% if t.duration_minutes %}<span class="pill">{{ t.duration_minutes }} min</span>{% endif %}
+            {% if t.project %}<span class="pill">{{ t.project.title }}</span>{% endif %}
+          </div>
+          <form method="post" action="/blocks/schedule" class="form" style="margin-top: 8px;">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+            <input type="hidden" name="task_id" value="{{ t.id }}">
+            <div class="field two">
+              <label>
                   <span>Date</span>
                   <input type="date" name="date" required>
                 </label>

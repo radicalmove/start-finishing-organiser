@@ -122,34 +122,34 @@ This app exists to help Richard *live* the ideas of **Start Finishing** in his d
 The app is built around these ideas:
 
 - **Everything is a project.**  
-  Anything that takes time, energy, and attention counts. Projects can be tiny (a day) or huge (years).  [oai_citation:0‡Start Finishing Summary - All Chapters.docx](file-service://file-6GncvRBgxw4R7G4yEwECx3)  
+  Anything that takes time, energy, and attention counts. Projects can be tiny (a day) or huge (years).  
 
 - **Best work.**  
-  Best work is the work that makes Richard come alive, feels like “I get to” not “I have to”, serves both him and others, and sits at the edge of capability and courage.  [oai_citation:1‡Start Finishing Summary - All Chapters.docx](file-service://file-6GncvRBgxw4R7G4yEwECx3)  
+  Best work is the work that makes Richard come alive, feels like “I get to” not “I have to”, serves both him and others, and sits at the edge of capability and courage.  
 
 - **The project world.**  
-  Life is a series of overlapping projects; uncertainty is normal. The skill is choosing which projects to embrace now.  [oai_citation:2‡Start Finishing Summary - All Chapters.docx](file-service://file-6GncvRBgxw4R7G4yEwECx3)  
+  Life is a series of overlapping projects; uncertainty is normal. The skill is choosing which projects to embrace now.  
 
 - **Air Sandwich.**  
-  There’s a gap between big-picture vision and daily reality, filled with: competing priorities, head trash, no realistic plan, too few resources, poor team alignment.  [oai_citation:3‡Start Finishing Summary - All Chapters.docx](file-service://file-6GncvRBgxw4R7G4yEwECx3)  
+  There’s a gap between big-picture vision and daily reality, filled with: competing priorities, head trash, no realistic plan, too few resources, poor team alignment.  
 
 - **Five Keys.**  
-  Intention, Awareness, Boundaries, Courage, Discipline — the app should strengthen these, not bypass them.  [oai_citation:4‡Start Finishing Summary - All Chapters.docx](file-service://file-6GncvRBgxw4R7G4yEwECx3)  
+  Intention, Awareness, Boundaries, Courage, Discipline — the app should strengthen these, not bypass them.  
 
 - **Thrashing.**  
-  Emotional flailing around meaningful work; more thrashing usually means the work really matters.  [oai_citation:5‡Start Finishing Summary - All Chapters.docx](file-service://file-6GncvRBgxw4R7G4yEwECx3)  
+  Emotional flailing around meaningful work; more thrashing usually means the work really matters.  
 
 - **Displacement.**  
-  Every yes displaces something else; time is the ultimate constraint.  [oai_citation:6‡Start Finishing Summary - All Chapters.docx](file-service://file-6GncvRBgxw4R7G4yEwECx3)  
+  Every yes displaces something else; time is the ultimate constraint.  
 
 - **Five Projects Rule.**  
-  At any scale, you rarely finish more than ~5 active projects; weekly: 3 is often better than 5.  [oai_citation:7‡Start Finishing Summary - All Chapters.docx](file-service://file-6GncvRBgxw4R7G4yEwECx3)  
+  At any scale, you rarely finish more than ~5 active projects; weekly: 3 is often better than 5.  
 
 - **Chunking, Linking, Sequencing.**  
   Projects are made of verb–noun chunks (tasks) linked and sequenced over time.
 
 - **Focus, Social, Admin, Recovery Blocks.**  
-  Time is structured into blocks, not scattered minutes; focus blocks fuel best work.  [oai_citation:8‡Start Finishing Summary - All Chapters.docx](file-service://file-6GncvRBgxw4R7G4yEwECx3)  
+  Time is structured into blocks, not scattered minutes; focus blocks fuel best work.  
 
 - **Momentum Planning.**  
   Continual process across daily/weekly/monthly/quarterly time scales.
@@ -201,7 +201,7 @@ The cognitive architecture is the set of concepts the app is built around: how i
   Guides, peers, supporters, beneficiaries per project.
 
 - **OPP (Other People’s Priorities)**  
-  Incoming requests that may not align with Richard’s priorities.  [oai_citation:9‡Start Finishing Summary - All Chapters.docx](file-service://file-6GncvRBgxw4R7G4yEwECx3)  
+  Incoming requests that may not align with Richard’s priorities.  
 
 - **Drag Points & Head Trash**  
   Beliefs, fears, constraints, and no-win stories that create friction.
@@ -227,7 +227,7 @@ The cognitive architecture is the set of concepts the app is built around: how i
   - Offers reflection prompts and chunking support.
 
 - **Levels of Success Model**  
-  Small / Moderate / Epic success — app allows Richard to set desired level of success per project and scale commitments accordingly.  [oai_citation:10‡Start Finishing Summary - All Chapters.docx](file-service://file-6GncvRBgxw4R7G4yEwECx3)  
+  Small / Moderate / Epic success — app allows Richard to set desired level of success per project and scale commitments accordingly.  
 
 - **Five Keys Model**  
   For stuckness, the app frames issues in terms of:
@@ -606,6 +606,8 @@ This is where the app’s intelligence lives.
    - Before first focus block.
    - After each focus block (simple micro-AAR).
    - Midday reset.
+   - Context-aware Charlie coach widget available on every screen, advice-only.
+   - In-app Guide for “how to use” questions.
 
 9. **Why Alignment**
    - Per-project Why field.

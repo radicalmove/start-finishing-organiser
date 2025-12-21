@@ -42,6 +42,7 @@
               <span class="pill">{{ t.when_bucket.value }}</span>
             </div>
             <form method="post" action="/resurface/{{ t.id }}" class="form" style="margin-top: 8px;">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
               <button class="btn" type="submit">Pull into this week</button>
             </form>
           </div>

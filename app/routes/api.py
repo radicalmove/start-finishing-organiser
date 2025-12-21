@@ -19,8 +19,9 @@ from ..models import (
     TaskStatus,
     WhenBucket,
 )
+from ..security import require_api_auth
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(require_api_auth)])
 
 
 # ---------- Schemas ----------

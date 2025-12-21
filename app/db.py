@@ -54,6 +54,14 @@ def ensure_task_resurface_columns():
             )
 
 
+def ensure_block_title_column():
+    """Ensure blocks.title exists for appointment/task labels."""
+    with engine.connect() as conn:
+        cols = {row[1] for row in conn.execute(text("PRAGMA table_info(blocks);")).fetchall()}
+        if "title" not in cols:
+            conn.execute(text("ALTER TABLE blocks ADD COLUMN title VARCHAR(200) NULL"))
+
+
 def ensure_ritual_table():
     with engine.connect() as conn:
         conn.execute(
@@ -78,4 +86,13 @@ def ensure_ritual_table():
         )
 
 
-__all__ = ["engine", "SessionLocal", "Base", "get_db"]
+__all__ = [
+    "engine",
+    "SessionLocal",
+    "Base",
+    "get_db",
+    "ensure_task_owner_column",
+    "ensure_task_resurface_columns",
+    "ensure_block_title_column",
+    "ensure_ritual_table",
+]

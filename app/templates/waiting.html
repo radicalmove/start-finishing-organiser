@@ -15,6 +15,7 @@
             Created: {{ w.created_at.date() if w.created_at else "" }}
           </div>
           <form method="post" action="/waiting/resolve" class="form" style="margin-top: 8px;">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
             <input type="hidden" name="waiting_id" value="{{ w.id }}">
             <button class="btn ghost" type="submit">Resolve</button>
           </form>

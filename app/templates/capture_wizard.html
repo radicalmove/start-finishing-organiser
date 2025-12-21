@@ -10,6 +10,7 @@
     <h3>Guided Capture</h3>
     <p class="muted">One question at a time. We’ll place this safely and surface it when relevant.</p>
     <form method="post" action="/capture/wizard" id="wizardForm">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
       <div class="wizard-step" data-step="1">
         <div class="field">
           <span>What is it?</span>

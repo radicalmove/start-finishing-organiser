@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block content %}
+  {% if form_error %}
+    <div class="panel" style="margin-top: 16px; border-color: rgba(255,43,209,0.3);">
+      <div class="pill pill--limit">{{ form_error }}</div>
+    </div>
+  {% endif %}
+
+  <section class="grid" style="margin-top: 18px; max-width: 520px;">
+    <div class="panel">
+      <h3>Sign in</h3>
+      <div class="muted">Use your organiser password.</div>
+      <form method="post" action="/login" class="form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+        {% if next_url %}
+          <input type="hidden" name="next_url" value="{{ next_url }}">
+        {% endif %}
+        {% if require_username %}
+          <label class="field">
+            <span>Username</span>
+            <input type="text" name="username" autocomplete="username" required>
+          </label>
+        {% endif %}
+        <label class="field">
+          <span>Password</span>
+          <input type="password" name="password" autocomplete="current-password" required>
+        </label>
+        <button class="btn" type="submit">Log in</button>
+      </form>
+    </div>
+  </section>
+{% endblock %}
