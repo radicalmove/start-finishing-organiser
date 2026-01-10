@@ -1,0 +1,144 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <section class="health-shell">
+    {% set hero_title = "Diet + nutrition" %}
+    {% set hero_subtitle = "Fuel performance with deliberate intake and recovery habits." %}
+    {% set hero_tag = "Macros + consistency" %}
+    {% include "partials/health_nav.html" %}
+
+    {% if form_error %}
+      <div class="panel health-alert">{{ form_error }}</div>
+    {% endif %}
+
+    <div class="health-dashboard-grid">
+      <div class="panel">
+        <div class="panel-title-row">
+          <h3>Log nutrition</h3>
+          <div class="panel-actions">
+            <span class="pill">Daily intake</span>
+          </div>
+        </div>
+        <form class="form" method="post" action="/health/entry">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+          <input type="hidden" name="return_to" value="/health/diet">
+          <label class="field">
+            Metric
+            <select name="metric_id" required>
+              {% for metric in entry_metrics %}
+                <option value="{{ metric.id }}">{{ metric.name }}</option>
+              {% endfor %}
+            </select>
+          </label>
+          <div class="field two">
+            <label>
+              Value
+              <input type="text" name="value" placeholder="Enter a number" required>
+            </label>
+            <label>
+              Date
+              <input type="date" name="entry_date">
+            </label>
+          </div>
+          <label class="field">
+            Notes
+            <input type="text" name="notes" placeholder="What helped or hurt today?">
+          </label>
+          <div class="cta-row cta-row--end">
+            <button class="btn pink btn-sm" type="submit">Save nutrition</button>
+          </div>
+        </form>
+      </div>
+
+      <div class="panel">
+        <div class="panel-title-row">
+          <h3>Nutrition focus</h3>
+          <div class="panel-actions">
+            <span class="pill">Research-backed</span>
+          </div>
+        </div>
+        <div class="health-guidance-list">
+          <div class="health-guidance-item">
+            <strong>Protein distribution:</strong> 20-40g per meal supports muscle protein synthesis.
+          </div>
+          <div class="health-guidance-item">
+            <strong>Fiber target:</strong> 25-38g/day supports gut health and appetite control.
+          </div>
+          <div class="health-guidance-item">
+            <strong>Hydration:</strong> Start with 30-35ml/kg/day and adjust for training.
+          </div>
+          <div class="health-guidance-item">
+            <strong>Energy balance:</strong> Sustainable goals are built with small, consistent deltas.
+          </div>
+        </div>
+        <div class="note">Nutrition guidance is general; personalize with a qualified professional.</div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title-row">
+        <h3>Diet trends</h3>
+        <div class="panel-actions">
+          <span class="pill">Last 30 entries</span>
+        </div>
+      </div>
+      <div class="health-chart-grid">
+        {% for metric in metrics %}
+          {% set latest = metric_latest.get(metric.id) %}
+          {% set stat = metric_stats.get(metric.id) %}
+          <div class="health-metric-card">
+            <div class="health-metric-header">
+              <div>
+                <div class="health-metric-title">{{ metric.name }}</div>
+                <div class="health-metric-subtitle">{{ metric.description or "Track daily intake." }}</div>
+              </div>
+              <div class="health-metric-latest">
+                {% if latest %}
+                  {{ latest.value }}{% if metric.unit %} {{ metric.unit }}{% endif %}
+                {% else %}
+                  --
+                {% endif %}
+              </div>
+            </div>
+            <div class="health-chart" data-health-chart data-metric-id="{{ metric.id }}">
+              <canvas></canvas>
+              <div class="health-chart-empty">Add a few entries to see the trend.</div>
+            </div>
+            <div class="health-metric-meta">
+              <span>7-day avg: {% if stat and stat.avg_7d is not none %}{{ stat.avg_7d|round(2) }}{% else %}--{% endif %}</span>
+              <span>Trend: {% if stat and stat.trend is not none %}{{ stat.trend|round(2) }}{% else %}--{% endif %}</span>
+            </div>
+          </div>
+        {% else %}
+          <div class="muted">No diet metrics yet. Add a custom metric from the dashboard.</div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title-row">
+        <h3>Recent nutrition entries</h3>
+        <div class="panel-actions">
+          <span class="pill">Latest log</span>
+        </div>
+      </div>
+      <div class="health-entry-list">
+        {% for entry in recent_entries %}
+          <div class="health-entry-row">
+            <div>
+              <div class="health-entry-title">{{ entry.metric.name }}</div>
+              <div class="health-entry-meta">{{ entry.entry_date }}{% if entry.notes %} · {{ entry.notes }}{% endif %}</div>
+            </div>
+            <div class="health-entry-value">
+              {{ entry.value }}{% if entry.metric.unit %} {{ entry.metric.unit }}{% endif %}
+            </div>
+          </div>
+        {% else %}
+          <div class="muted">No nutrition entries logged yet.</div>
+        {% endfor %}
+      </div>
+    </div>
+  </section>
+
+  <script type="application/json" id="health-series">{{ health_series_json | safe }}</script>
+{% endblock %}

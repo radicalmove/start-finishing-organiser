@@ -1,0 +1,144 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <section class="health-shell">
+    {% set hero_title = "Strength + power" %}
+    {% set hero_subtitle = "Progressive overload with enough recovery to adapt." %}
+    {% set hero_tag = "Hypertrophy + performance" %}
+    {% include "partials/health_nav.html" %}
+
+    {% if form_error %}
+      <div class="panel health-alert">{{ form_error }}</div>
+    {% endif %}
+
+    <div class="health-dashboard-grid">
+      <div class="panel">
+        <div class="panel-title-row">
+          <h3>Log strength</h3>
+          <div class="panel-actions">
+            <span class="pill">Lift metrics</span>
+          </div>
+        </div>
+        <form class="form" method="post" action="/health/entry">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+          <input type="hidden" name="return_to" value="/health/strength">
+          <label class="field">
+            Metric
+            <select name="metric_id" required>
+              {% for metric in entry_metrics %}
+                <option value="{{ metric.id }}">{{ metric.name }}</option>
+              {% endfor %}
+            </select>
+          </label>
+          <div class="field two">
+            <label>
+              Value
+              <input type="text" name="value" placeholder="Enter a number" required>
+            </label>
+            <label>
+              Date
+              <input type="date" name="entry_date">
+            </label>
+          </div>
+          <label class="field">
+            Notes
+            <input type="text" name="notes" placeholder="Sets x reps x load">
+          </label>
+          <div class="cta-row cta-row--end">
+            <button class="btn pink btn-sm" type="submit">Save strength</button>
+          </div>
+        </form>
+      </div>
+
+      <div class="panel">
+        <div class="panel-title-row">
+          <h3>Strength principles</h3>
+          <div class="panel-actions">
+            <span class="pill">Best practice</span>
+          </div>
+        </div>
+        <div class="health-guidance-list">
+          <div class="health-guidance-item">
+            <strong>Progressive overload:</strong> Add load, reps, or sets gradually.
+          </div>
+          <div class="health-guidance-item">
+            <strong>Volume target:</strong> 10-20 sets per muscle group per week.
+          </div>
+          <div class="health-guidance-item">
+            <strong>Rest intervals:</strong> 1-3 minutes for hypertrophy, longer for strength.
+          </div>
+          <div class="health-guidance-item">
+            <strong>Deloads:</strong> Pull back every 4-8 weeks to keep fatigue in check.
+          </div>
+        </div>
+        <div class="note">Prioritize form and recovery when load climbs.</div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title-row">
+        <h3>Strength trends</h3>
+        <div class="panel-actions">
+          <span class="pill">Last 30 entries</span>
+        </div>
+      </div>
+      <div class="health-chart-grid">
+        {% for metric in metrics %}
+          {% set latest = metric_latest.get(metric.id) %}
+          {% set stat = metric_stats.get(metric.id) %}
+          <div class="health-metric-card">
+            <div class="health-metric-header">
+              <div>
+                <div class="health-metric-title">{{ metric.name }}</div>
+                <div class="health-metric-subtitle">{{ metric.description or "Track strength output." }}</div>
+              </div>
+              <div class="health-metric-latest">
+                {% if latest %}
+                  {{ latest.value }}{% if metric.unit %} {{ metric.unit }}{% endif %}
+                {% else %}
+                  --
+                {% endif %}
+              </div>
+            </div>
+            <div class="health-chart" data-health-chart data-metric-id="{{ metric.id }}">
+              <canvas></canvas>
+              <div class="health-chart-empty">Add a few entries to see the trend.</div>
+            </div>
+            <div class="health-metric-meta">
+              <span>7-day avg: {% if stat and stat.avg_7d is not none %}{{ stat.avg_7d|round(2) }}{% else %}--{% endif %}</span>
+              <span>Trend: {% if stat and stat.trend is not none %}{{ stat.trend|round(2) }}{% else %}--{% endif %}</span>
+            </div>
+          </div>
+        {% else %}
+          <div class="muted">No strength metrics yet. Add a custom metric from the dashboard.</div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title-row">
+        <h3>Recent entries</h3>
+        <div class="panel-actions">
+          <span class="pill">Latest log</span>
+        </div>
+      </div>
+      <div class="health-entry-list">
+        {% for entry in recent_entries %}
+          <div class="health-entry-row">
+            <div>
+              <div class="health-entry-title">{{ entry.metric.name }}</div>
+              <div class="health-entry-meta">{{ entry.entry_date }}{% if entry.notes %} · {{ entry.notes }}{% endif %}</div>
+            </div>
+            <div class="health-entry-value">
+              {{ entry.value }}{% if entry.metric.unit %} {{ entry.metric.unit }}{% endif %}
+            </div>
+          </div>
+        {% else %}
+          <div class="muted">No strength entries logged yet.</div>
+        {% endfor %}
+      </div>
+    </div>
+  </section>
+
+  <script type="application/json" id="health-series">{{ health_series_json | safe }}</script>
+{% endblock %}

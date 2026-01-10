@@ -60,6 +60,14 @@ def coach_history(db: Session = Depends(get_db)):
     return JSONResponse({"messages": [_message_payload(m) for m in messages]})
 
 
+@router.post("/coach/clear")
+def coach_clear(db: Session = Depends(get_db)):
+    convo = _get_or_create_conversation(db)
+    db.delete(convo)
+    db.commit()
+    return JSONResponse({"ok": True})
+
+
 @router.post("/coach/message")
 async def coach_message(request: Request, db: Session = Depends(get_db)):
     try:

@@ -13,9 +13,9 @@
 - **Coach**: `/coach/history` and `/coach/message` endpoints with coach-lite and optional Ollama-backed responses (`app/utils/coach.py`).
 - **UI**: Server-rendered Jinja. `home.html` shows Weekly Focus, Today tasks, and Blocks. Neon palette in `app/static/css/main.css` (Simulation Theory inspired).
 - **Calendar**: Home has a Today timeline; full-width week view at `/calendar/week`. External events can be pulled from a Cozi ICS feed.
-- **Guide**: `/guide` provides a built-in walkthrough of daily/weekly use.
+- **Long Term**: `/long-range` surfaces horizon planning, roadmaps, and momentum rhythm prompts.
 - **Config**: Environment-first; a simple `.env` loader runs at startup (repo root `.env`, see `.env.example`). Key settings: `COZI_ICS_URL`, plus optional auth/session vars (`SFO_PASSWORD`, `SFO_SESSION_SECRET`). Logging not yet wired.
-- **Entrypoint**: `main.py` exposes `app` for uvicorn and a `/health` endpoint.
+- **Entrypoint**: `main.py` exposes `app` for uvicorn and a `/healthz` endpoint (dashboard lives at `/health`).
 
 ## Stretch targets
 

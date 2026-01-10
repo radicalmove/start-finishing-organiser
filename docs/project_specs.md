@@ -773,7 +773,13 @@ This is where the app’s intelligence lives.
 - Full Weekly review flow.
 - Basic summaries of alignment and focus usage.
 
-### v0.4 – Integrations Start
+### v0.4 – Health + Fitness
+
+- Health + fitness dashboard with goals and quick logging.
+- Diet, weight, fitness, strength, flexibility tracking pages.
+- Metrics with charts and combined blood pressure logging.
+
+### v0.5 – Integrations Start
 
 - One calendar integration (read-only).
 - Simple Trello import for projects.

@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <section class="long-range-shell" data-horizon-board>
+    <div class="panel long-range-hero">
+      <div class="panel-title-row">
+        <h3>Long term planning</h3>
+        <div class="panel-actions">
+          <span class="pill">Project pyramid</span>
+        </div>
+      </div>
+      <div class="muted">
+        Stack horizons from the top down. Each lower tier should serve the layer above it.
+      </div>
+      <div class="long-range-nav">
+        <a class="btn ghost btn-sm {% if active_long_term_tab == 'horizons' %}is-active{% endif %}" href="/long-term" {% if active_long_term_tab == 'horizons' %}aria-current="page"{% endif %}>Horizon map</a>
+        <a class="btn ghost btn-sm {% if active_long_term_tab == 'pyramid' %}is-active{% endif %}" href="/long-term/pyramid" {% if active_long_term_tab == 'pyramid' %}aria-current="page"{% endif %}>Project pyramid</a>
+        <a class="btn ghost btn-sm {% if active_long_term_tab == 'roadmaps' %}is-active{% endif %}" href="/long-term/roadmaps" {% if active_long_term_tab == 'roadmaps' %}aria-current="page"{% endif %}>Project roadmaps</a>
+      </div>
+    </div>
+
+    <div id="project-pyramid" class="panel long-range-panel">
+      <div class="panel-title-row">
+        <h3>Project pyramid</h3>
+        <div class="panel-actions">
+          <span class="pill">Year → Quarter → Month → Week</span>
+        </div>
+      </div>
+      <div class="muted">
+        Stack horizons from the top down. Each lower tier should serve the layer above it.
+      </div>
+      <div class="pyramid">
+        <div class="pyramid-tier tier-year" data-horizon-column data-horizon-key="year">
+          <div class="pyramid-tier-header">
+            <span class="caps">Year +</span>
+            <span class="pill">{{ horizons["year"]|length }}</span>
+          </div>
+          <div class="pyramid-tier-body" data-horizon-list>
+            {% for project in horizons["year"] %}
+              <span class="pill" draggable="true" data-project-id="{{ project.id }}" data-project-title="{{ project.title }}">
+                {{ project.title }}
+              </span>
+            {% else %}
+              <span class="muted">No year projects yet.</span>
+            {% endfor %}
+          </div>
+        </div>
+        <div class="pyramid-tier tier-quarter" data-horizon-column data-horizon-key="quarter">
+          <div class="pyramid-tier-header">
+            <span class="caps">Quarter</span>
+            <span class="pill">{{ horizons["quarter"]|length }}</span>
+          </div>
+          <div class="pyramid-tier-body" data-horizon-list>
+            {% for project in horizons["quarter"] %}
+              <span class="pill" draggable="true" data-project-id="{{ project.id }}" data-project-title="{{ project.title }}">
+                {{ project.title }}
+              </span>
+            {% else %}
+              <span class="muted">No quarterly projects yet.</span>
+            {% endfor %}
+          </div>
+        </div>
+        <div class="pyramid-tier tier-month" data-horizon-column data-horizon-key="month">
+          <div class="pyramid-tier-header">
+            <span class="caps">Month</span>
+            <span class="pill">{{ horizons["month"]|length }}</span>
+          </div>
+          <div class="pyramid-tier-body" data-horizon-list>
+            {% for project in horizons["month"] %}
+              <span class="pill" draggable="true" data-project-id="{{ project.id }}" data-project-title="{{ project.title }}">
+                {{ project.title }}
+              </span>
+            {% else %}
+              <span class="muted">No monthly projects yet.</span>
+            {% endfor %}
+          </div>
+        </div>
+        <div class="pyramid-tier tier-week" data-horizon-column data-horizon-key="week">
+          <div class="pyramid-tier-header">
+            <span class="caps">Week</span>
+            <span class="pill">{{ horizons["week"]|length }}</span>
+          </div>
+          <div class="pyramid-tier-body" data-horizon-list>
+            {% for project in horizons["week"] %}
+              <span class="pill" draggable="true" data-project-id="{{ project.id }}" data-project-title="{{ project.title }}">
+                {{ project.title }}
+              </span>
+            {% else %}
+              <span class="muted">No weekly projects yet.</span>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+{% endblock %}

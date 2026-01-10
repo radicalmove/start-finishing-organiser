@@ -3,56 +3,229 @@
   {% if form_success %}
     <div class="toast success">{{ form_success }}</div>
   {% endif %}
-  <section class="panel" style="margin-top: 18px;">
+  <section class="panel ritual-shell">
+    {% set is_today_entry = last_entry and last_entry.entry_date == today %}
     <h3>{{ ritual_type|title }} ritual</h3>
     <form method="post" action="/ritual/save" class="form">
       <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
       <input type="hidden" name="ritual_type" value="{{ ritual_type }}">
       <label class="field">
         <span>Date</span>
-        <input type="date" name="entry_date" value="{{ (last_entry.entry_date if last_entry else none) or '' }}">
+        <input type="date" name="entry_date" value="{{ today.isoformat() }}">
       </label>
       {% if ritual_type == "morning" %}
-        <label class="field">
-          <span>Today’s One Thing</span>
-          <input type="text" name="one_thing" value="{{ last_entry.one_thing if last_entry else '' }}" placeholder="The one thing that makes today a win">
-        </label>
-        <label class="field">
-          <span>Frog (optional)</span>
-          <input type="text" name="frog" value="{{ last_entry.frog if last_entry else '' }}" placeholder="Dread-heavy task to swallow early">
-        </label>
-        <label class="field">
-          <span>Gratitude / anticipation</span>
-          <textarea name="gratitude" rows="2">{{ last_entry.gratitude if last_entry else '' }}</textarea>
-        </label>
-        <label class="field">
-          <span>Why cue</span>
-          <textarea name="why_reflection" rows="2">{{ last_entry.why_reflection if last_entry else '' }}</textarea>
-        </label>
+        <div class="prompt-grid">
+          <div class="prompt-card">
+            <strong>Today's calendar</strong>
+            {% if cozi_events %}
+              <div class="note">External calendar</div>
+              <ul class="ritual-list">
+                {% for event in cozi_events %}
+                  <li><span class="ritual-time">{{ event.time }}</span>{{ event.label }}</li>
+                {% endfor %}
+              </ul>
+            {% else %}
+              <div class="note">No external events found.</div>
+            {% endif %}
+            {% if cozi_error %}
+              <div class="note helper">{{ cozi_error }}</div>
+            {% endif %}
+            {% if focus_blocks or admin_blocks %}
+              <div class="note">Scheduled blocks</div>
+              <ul class="ritual-list">
+                {% for block in focus_blocks %}
+                  <li><span class="ritual-time">{{ block.time }}</span>{{ block.label }}</li>
+                {% endfor %}
+                {% for block in admin_blocks %}
+                  <li><span class="ritual-time">{{ block.time }}</span>{{ block.label }}</li>
+                {% endfor %}
+              </ul>
+            {% else %}
+              <div class="note">No blocks scheduled yet.</div>
+            {% endif %}
+          </div>
+          <div class="prompt-card">
+            <strong>Active projects this week</strong>
+            {% if weekly_work_projects or weekly_personal_projects %}
+              {% if weekly_work_projects %}
+                <div class="note">Work ({{ weekly_work_projects|length }}/4)</div>
+                <div class="ritual-pillset">
+                  {% for project in weekly_work_projects %}
+                    <span class="pill">{{ project.title }}</span>
+                  {% endfor %}
+                </div>
+              {% endif %}
+              {% if weekly_personal_projects %}
+                <div class="note">Personal ({{ weekly_personal_projects|length }}/3)</div>
+                <div class="ritual-pillset">
+                  {% for project in weekly_personal_projects %}
+                    <span class="pill">{{ project.title }}</span>
+                  {% endfor %}
+                </div>
+              {% endif %}
+            {% else %}
+              <div class="note">No active projects set for this week.</div>
+            {% endif %}
+          </div>
+          {% if last_evening %}
+            <div class="prompt-card">
+              <strong>Last checkout</strong>
+              {% if last_evening.wins %}
+                <div class="note">Wins: {{ last_evening.wins }}</div>
+              {% endif %}
+              {% if last_evening.adjustments %}
+                <div class="note">Adjustments: {{ last_evening.adjustments }}</div>
+              {% endif %}
+              {% if not last_evening.wins and not last_evening.adjustments %}
+                <div class="note">No notes saved.</div>
+              {% endif %}
+            </div>
+          {% endif %}
+        </div>
+
+        <div class="ritual-section">
+          <h4>Grounding</h4>
+          <div class="field two">
+            <label>
+              <span>Movement (2-5 min)</span>
+              <input type="text" name="grounding_movement" value="{{ last_entry.grounding_movement if is_today_entry else '' }}" placeholder="Walk, stretch, mobility, or breath work">
+            </label>
+            <label class="field checkbox">
+              <input type="checkbox" name="supplements_done" {% if is_today_entry and last_entry.supplements_done %}checked{% endif %}>
+              <span>Water + supplements done</span>
+            </label>
+          </div>
+        </div>
+
+        <div class="ritual-section">
+          <h4>Reality scan (10-minute check-in)</h4>
+          <div class="note">Before email: review the plan, note changes, and check focus time.</div>
+          <label class="field">
+            <span>What did you plan for today?</span>
+            <textarea name="plan_review" rows="2">{{ last_entry.plan_review if is_today_entry else '' }}</textarea>
+          </label>
+          <label class="field">
+            <span>Has anything changed since checkout?</span>
+            <textarea name="reality_scan" rows="2">{{ last_entry.reality_scan if is_today_entry else '' }}</textarea>
+          </label>
+          <label class="field">
+            <span>Focus time today</span>
+            <select name="focus_time_status">
+              <option value="">Select...</option>
+              <option value="enough" {% if is_today_entry and last_entry.focus_time_status == "enough" %}selected{% endif %}>Enough for best work</option>
+              <option value="tight" {% if is_today_entry and last_entry.focus_time_status == "tight" %}selected{% endif %}>Tight / fragmented</option>
+              <option value="overbooked" {% if is_today_entry and last_entry.focus_time_status == "overbooked" %}selected{% endif %}>Overbooked</option>
+            </select>
+          </label>
+        </div>
+
+        <div class="ritual-section">
+          <h4>Why connection</h4>
+          <label class="field">
+            <span>Micro-Why cue</span>
+            <textarea name="why_reflection" rows="2">{{ last_entry.why_reflection if is_today_entry else '' }}</textarea>
+          </label>
+          <label class="field">
+            <span>Why expansion (optional)</span>
+            <textarea name="why_expanded" rows="2">{{ last_entry.why_expanded if is_today_entry else '' }}</textarea>
+          </label>
+        </div>
+
+        <div class="ritual-section">
+          <h4>Gratitude & anticipation</h4>
+          <label class="field">
+            <span>One thing you're grateful for</span>
+            <textarea name="gratitude" rows="2">{{ last_entry.gratitude if is_today_entry else '' }}</textarea>
+          </label>
+          <label class="field">
+            <span>What are you looking forward to?</span>
+            <textarea name="anticipation" rows="2">{{ last_entry.anticipation if is_today_entry else '' }}</textarea>
+          </label>
+        </div>
+
+        <div class="ritual-section">
+          <h4>One Thing & Frog</h4>
+          <label class="field">
+            <span>Today's One Thing</span>
+            <input type="text" name="one_thing" value="{{ last_entry.one_thing if is_today_entry else '' }}" placeholder="The one thing that makes today a win">
+          </label>
+          <label class="field">
+            <span>Frog (dread-heavy task)</span>
+            <input type="text" name="frog" value="{{ last_entry.frog if is_today_entry else '' }}" placeholder="Swallow the frog early">
+          </label>
+        </div>
+
+        <div class="ritual-section">
+          <h4>Block-level planning</h4>
+          {% if focus_blocks %}
+            <div class="note">Focus blocks today</div>
+            <div class="ritual-pillset">
+              {% for block in focus_blocks %}
+                <span class="pill">{{ block.time }} · {{ block.label }}</span>
+              {% endfor %}
+            </div>
+          {% endif %}
+          {% if admin_blocks %}
+            <div class="note">Admin blocks today</div>
+            <div class="ritual-pillset">
+              {% for block in admin_blocks %}
+                <span class="pill">{{ block.time }} · {{ block.label }}</span>
+              {% endfor %}
+            </div>
+          {% endif %}
+          <label class="field">
+            <span>Focus block plan</span>
+            <textarea name="block_plan" rows="3">{{ last_entry.block_plan if is_today_entry else '' }}</textarea>
+          </label>
+          <label class="field">
+            <span>Admin block plan</span>
+            <textarea name="admin_plan" rows="3">{{ last_entry.admin_plan if is_today_entry else '' }}</textarea>
+          </label>
+        </div>
+
+        <div class="ritual-section">
+          <h4>Emotional intent</h4>
+          <label class="field">
+            <span>Who do you want to be today?</span>
+            <input type="text" name="emotional_intent" value="{{ last_entry.emotional_intent if is_today_entry else '' }}" placeholder="e.g., steady parent, curious learner, calm collaborator">
+          </label>
+          <label class="field">
+            <span>Energy tag</span>
+            <input type="text" name="energy" list="energy-tags" value="{{ last_entry.energy if is_today_entry else '' }}" placeholder="flat, wired, calm">
+          </label>
+        </div>
       {% elif ritual_type == "midday" %}
         <label class="field">
           <span>Adjustments</span>
-          <textarea name="adjustments" rows="3">{{ last_entry.adjustments if last_entry else '' }}</textarea>
+          <textarea name="adjustments" rows="3">{{ last_entry.adjustments if is_today_entry else '' }}</textarea>
         </label>
         <label class="field">
           <span>Energy check</span>
-          <input type="text" name="energy" value="{{ last_entry.energy if last_entry else '' }}" placeholder="e.g., flat, wired, calm">
+          <input type="text" name="energy" list="energy-tags" value="{{ last_entry.energy if is_today_entry else '' }}" placeholder="e.g., flat, wired, calm">
         </label>
       {% elif ritual_type == "evening" %}
         <label class="field">
           <span>Wins (include invisible work)</span>
-          <textarea name="wins" rows="3">{{ last_entry.wins if last_entry else '' }}</textarea>
+          <textarea name="wins" rows="3">{{ last_entry.wins if is_today_entry else '' }}</textarea>
         </label>
         <label class="field">
           <span>Adjustments / reassignments</span>
-          <textarea name="adjustments" rows="3">{{ last_entry.adjustments if last_entry else '' }}</textarea>
+          <textarea name="adjustments" rows="3">{{ last_entry.adjustments if is_today_entry else '' }}</textarea>
         </label>
         <label class="field">
           <span>Emotion / reflection</span>
-          <textarea name="notes" rows="3">{{ last_entry.notes if last_entry else '' }}</textarea>
+          <textarea name="notes" rows="3">{{ last_entry.notes if is_today_entry else '' }}</textarea>
         </label>
       {% endif %}
       <button class="btn" type="submit">Save</button>
+      <datalist id="energy-tags">
+        <option value="flat"></option>
+        <option value="wired"></option>
+        <option value="sad"></option>
+        <option value="anxious"></option>
+        <option value="calm"></option>
+        <option value="steady"></option>
+      </datalist>
     </form>
   </section>
 {% endblock %}

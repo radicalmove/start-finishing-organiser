@@ -6,74 +6,35 @@
     </div>
   {% endif %}
 
-  <section class="grid" style="margin-top: 18px;">
-    <div class="panel">
-      <h3>Capture Project</h3>
-      <form method="post" action="/projects/form" class="form">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
-        <label class="field">
-          <span>Title</span>
-          <input type="text" name="title" required placeholder="e.g. Finalise weekly plan">
-        </label>
-        <label class="field">
-          <span>Category</span>
-          <select name="category">
-            <option value="work">Work</option>
-            <option value="personal">Personal</option>
-          </select>
-        </label>
-        <label class="field">
-          <span>Time horizon</span>
-          <select name="time_horizon">
-            <option value="week">This week</option>
-            <option value="month">This month</option>
-            <option value="quarter">This quarter</option>
-            <option value="year">Year</option>
-          </select>
-          <div class="note">Week = auto-counted in 4+3. For longer horizons, choose if it’s part of this week’s focus.</div>
-        </label>
-        <div class="field checkbox">
-          <input type="radio" name="include_this_week" value="yes" checked>
-          <span>Include in this week’s 4+3 focus</span>
-        </div>
-        <div class="field checkbox">
-          <input type="radio" name="include_this_week" value="no">
-          <span>Park it outside this week</span>
-        </div>
-        <div class="note helper hidden" data-week-helper>
-          This is Month/Quarter/Year. Want to spotlight it this week? Toggle above.
-        </div>
-        <label class="field">
-          <span>Description (optional)</span>
-          <textarea name="description" rows="2" placeholder="Short context"></textarea>
-        </label>
-        <label class="field">
-          <span>Why alignment</span>
-          <div class="why-tags">
-            <label><input type="checkbox" name="why_tags" value="Identity"> Identity</label>
-            <label><input type="checkbox" name="why_tags" value="Contribution"> Contribution</label>
-            <label><input type="checkbox" name="why_tags" value="Growth"> Growth</label>
-            <label><input type="checkbox" name="why_tags" value="Family/Presence"> Family/Presence</label>
-            <label><input type="checkbox" name="why_tags" value="Health"> Health</label>
-            <label><input type="checkbox" name="why_tags" value="Service"> Service</label>
-          </div>
-          <textarea name="why_link_text" rows="2" placeholder="Which part of your Why does this serve? If none, consider moving to Later or letting it go."></textarea>
-        </label>
-        <button class="btn" type="submit">Save project</button>
-      </form>
-    </div>
+  <section class="panel capture-shell">
+    <h3>New capture</h3>
+    <p class="muted">Catch-all capture. Choose where it belongs and fill the details.</p>
+    <form method="post" action="/capture" class="form" data-capture-form>
+      <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+      <input type="hidden" name="displacement_ack" value="0" data-displacement-ack>
+      <label class="field">
+        <span>Name / Title</span>
+        <input type="text" name="title" required placeholder="e.g. Plan quarterly reset">
+      </label>
+      <label class="field">
+        <span>What is it?</span>
+        <select name="capture_kind" data-capture-kind>
+          <option value="decide_later" selected>Decide later</option>
+          <option value="task">Task</option>
+          <option value="project">Project</option>
+          <option value="time_block">Time block</option>
+          <option value="not_sure">Don't know</option>
+        </select>
+      </label>
 
-    <div class="panel">
-      <h3>Add Task</h3>
-      <form method="post" action="/tasks/form" class="form">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
-        <label class="field">
-          <span>Verb–noun</span>
-          <input type="text" name="verb_noun" required placeholder="Draft weekly focus list">
-        </label>
+      <div class="note" data-capture-section="decide_later">
+        We'll drop this into the Inbox for processing later.
+      </div>
+
+      <div class="capture-section hidden" data-capture-section="task">
         <label class="field">
           <span>Project (optional)</span>
-          <select name="project_id">
+          <select name="task_project_id">
             <option value="">— None —</option>
             {% for p in projects %}
               <option value="{{ p.id }}">{{ p.title }}</option>
@@ -82,12 +43,12 @@
         </label>
         <label class="field">
           <span>Description (optional)</span>
-          <textarea name="description" rows="2" placeholder="Notes"></textarea>
+          <textarea name="task_description" rows="2" placeholder="Notes"></textarea>
         </label>
         <div class="field two">
           <label>
             <span>When</span>
-            <select name="when_bucket">
+            <select name="task_when_bucket">
               <option value="today">Today</option>
               <option value="week">This week</option>
               <option value="month">This month</option>
@@ -96,7 +57,7 @@
           </label>
           <label>
             <span>Block type</span>
-            <select name="block_type">
+            <select name="task_block_type">
               <option value="">—</option>
               <option value="focus">Focus</option>
               <option value="admin">Admin</option>
@@ -107,14 +68,109 @@
         </div>
         <label class="field">
           <span>Duration (minutes, optional)</span>
-          <input type="number" name="duration_minutes" min="5" step="5" placeholder="e.g. 45">
+          <input type="number" name="task_duration_minutes" min="5" step="5" placeholder="e.g. 45">
         </label>
         <label class="field checkbox">
-          <input type="checkbox" name="frog" value="true">
+          <input type="checkbox" name="task_frog" value="true">
           <span>Mark as Frog</span>
         </label>
-        <button class="btn" type="submit">Save task</button>
-      </form>
-    </div>
+      </div>
+
+      <div class="capture-section hidden" data-capture-section="project">
+        <label class="field">
+          <span>Category</span>
+          <select name="project_category">
+            <option value="work">Work</option>
+            <option value="personal">Personal</option>
+          </select>
+        </label>
+        <label class="field">
+          <span>Time horizon</span>
+          <select name="project_time_horizon">
+            <option value="week">This week</option>
+            <option value="month">This month</option>
+            <option value="quarter">This quarter</option>
+            <option value="year">Year</option>
+          </select>
+          <div class="note">Week = auto-counted in 4+3. For longer horizons, choose if it’s part of this week’s focus.</div>
+        </label>
+        <div class="field checkbox">
+          <input type="radio" name="project_include_this_week" value="yes" checked>
+          <span>Include in this week’s 4+3 focus</span>
+        </div>
+        <div class="field checkbox">
+          <input type="radio" name="project_include_this_week" value="no">
+          <span>Park it outside this week</span>
+        </div>
+        <div class="note helper hidden" data-week-helper>
+          This is Month/Quarter/Year. Want to spotlight it this week? Toggle above.
+        </div>
+        <label class="field">
+          <span>Description (optional)</span>
+          <textarea name="project_description" rows="2" placeholder="Short context"></textarea>
+        </label>
+        <label class="field">
+          <span>Why alignment</span>
+          <div class="why-tags">
+            <label><input type="checkbox" name="project_why_tags" value="Identity"> Identity</label>
+            <label><input type="checkbox" name="project_why_tags" value="Contribution"> Contribution</label>
+            <label><input type="checkbox" name="project_why_tags" value="Growth"> Growth</label>
+            <label><input type="checkbox" name="project_why_tags" value="Family/Presence"> Family/Presence</label>
+            <label><input type="checkbox" name="project_why_tags" value="Health"> Health</label>
+            <label><input type="checkbox" name="project_why_tags" value="Service"> Service</label>
+          </div>
+          <textarea name="project_why_link_text" rows="2" placeholder="Which part of your Why does this serve? If none, consider moving to Later or letting it go."></textarea>
+        </label>
+      </div>
+
+      <div class="capture-section hidden" data-capture-section="time_block">
+        <label class="field">
+          <span>Project (optional)</span>
+          <select name="block_project_id">
+            <option value="">— None —</option>
+            {% for p in projects %}
+              <option value="{{ p.id }}">{{ p.title }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <div class="field two">
+          <label>
+            <span>Date</span>
+            <input type="date" name="block_date" required>
+          </label>
+          <label>
+            <span>Start</span>
+            <input type="time" name="block_start_time" required>
+          </label>
+        </div>
+        <div class="field two">
+          <label>
+            <span>Duration</span>
+            <input type="number" name="block_duration_minutes" value="30" min="5" step="5" required>
+          </label>
+          <label>
+            <span>Block type</span>
+            <select name="block_type" required>
+              <option value="focus">Focus</option>
+              <option value="admin">Admin</option>
+              <option value="social">Social</option>
+              <option value="recovery">Recovery</option>
+            </select>
+          </label>
+        </div>
+        <label class="field">
+          <span>Notes (optional)</span>
+          <textarea name="block_notes" rows="2" placeholder="Extra context"></textarea>
+        </label>
+      </div>
+
+      <div class="note hidden" data-capture-section="not_sure">
+        Guided Capture will open automatically.
+      </div>
+
+      <div class="cta-row cta-row--end">
+        <button class="btn" type="submit">Capture</button>
+      </div>
+    </form>
   </section>
 {% endblock %}

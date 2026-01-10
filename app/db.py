@@ -71,10 +71,20 @@ def ensure_ritual_table():
                     id INTEGER PRIMARY KEY,
                     ritual_type VARCHAR(20) NOT NULL,
                     entry_date DATE NOT NULL,
+                    grounding_movement TEXT NULL,
+                    supplements_done BOOLEAN NULL,
+                    plan_review TEXT NULL,
+                    reality_scan TEXT NULL,
+                    focus_time_status VARCHAR(40) NULL,
                     one_thing TEXT NULL,
                     frog TEXT NULL,
                     gratitude TEXT NULL,
+                    anticipation TEXT NULL,
                     why_reflection TEXT NULL,
+                    why_expanded TEXT NULL,
+                    block_plan TEXT NULL,
+                    admin_plan TEXT NULL,
+                    emotional_intent TEXT NULL,
                     wins TEXT NULL,
                     adjustments TEXT NULL,
                     energy VARCHAR(50) NULL,
@@ -86,6 +96,47 @@ def ensure_ritual_table():
         )
 
 
+def ensure_ritual_columns():
+    with engine.connect() as conn:
+        cols = {row[1] for row in conn.execute(text("PRAGMA table_info(ritual_entries);")).fetchall()}
+        if not cols:
+            return
+        if "grounding_movement" not in cols:
+            conn.execute(text("ALTER TABLE ritual_entries ADD COLUMN grounding_movement TEXT NULL"))
+        if "supplements_done" not in cols:
+            conn.execute(text("ALTER TABLE ritual_entries ADD COLUMN supplements_done BOOLEAN NULL"))
+        if "plan_review" not in cols:
+            conn.execute(text("ALTER TABLE ritual_entries ADD COLUMN plan_review TEXT NULL"))
+        if "reality_scan" not in cols:
+            conn.execute(text("ALTER TABLE ritual_entries ADD COLUMN reality_scan TEXT NULL"))
+        if "focus_time_status" not in cols:
+            conn.execute(text("ALTER TABLE ritual_entries ADD COLUMN focus_time_status VARCHAR(40) NULL"))
+        if "anticipation" not in cols:
+            conn.execute(text("ALTER TABLE ritual_entries ADD COLUMN anticipation TEXT NULL"))
+        if "why_expanded" not in cols:
+            conn.execute(text("ALTER TABLE ritual_entries ADD COLUMN why_expanded TEXT NULL"))
+        if "block_plan" not in cols:
+            conn.execute(text("ALTER TABLE ritual_entries ADD COLUMN block_plan TEXT NULL"))
+        if "admin_plan" not in cols:
+            conn.execute(text("ALTER TABLE ritual_entries ADD COLUMN admin_plan TEXT NULL"))
+        if "emotional_intent" not in cols:
+            conn.execute(text("ALTER TABLE ritual_entries ADD COLUMN emotional_intent TEXT NULL"))
+
+
+def ensure_guidance_reminder_columns():
+    with engine.connect() as conn:
+        cols = {row[1] for row in conn.execute(text("PRAGMA table_info(guidance_reminders);")).fetchall()}
+        if not cols:
+            return
+        if "snoozed_until" not in cols:
+            conn.execute(
+                text(
+                    "ALTER TABLE guidance_reminders "
+                    "ADD COLUMN snoozed_until DATETIME NULL"
+                )
+            )
+
+
 __all__ = [
     "engine",
     "SessionLocal",
@@ -95,4 +146,6 @@ __all__ = [
     "ensure_task_resurface_columns",
     "ensure_block_title_column",
     "ensure_ritual_table",
+    "ensure_ritual_columns",
+    "ensure_guidance_reminder_columns",
 ]

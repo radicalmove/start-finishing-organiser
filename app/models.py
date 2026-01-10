@@ -9,6 +9,7 @@ from sqlalchemy import (
     Date,
     DateTime,
     Enum as SAEnum,
+    Float,
     ForeignKey,
     Integer,
     String,
@@ -83,6 +84,16 @@ class RitualType(str, Enum):
     MORNING = "morning"
     MIDDAY = "midday"
     EVENING = "evening"
+
+
+class HealthMetricCategory(str, Enum):
+    DIET = "diet"
+    WEIGHT = "weight"
+    FITNESS = "fitness"
+    STRENGTH = "strength"
+    FLEXIBILITY = "flexibility"
+    VITALS = "vitals"
+    RECOVERY = "recovery"
 
 # Use Enum values (not names) in the DB to avoid casing mismatches
 ENUM_KWARGS = {"values_callable": lambda obj: [e.value for e in obj], "native_enum": False}
@@ -192,15 +203,69 @@ class RitualEntry(Base):
     id = Column(Integer, primary_key=True, index=True)
     ritual_type = Column(SAEnum(RitualType), nullable=False)
     entry_date = Column(Date, nullable=False, default=date.today)
+    grounding_movement = Column(Text, nullable=True)
+    supplements_done = Column(Boolean, nullable=True)
+    plan_review = Column(Text, nullable=True)
+    reality_scan = Column(Text, nullable=True)
+    focus_time_status = Column(String(40), nullable=True)
     one_thing = Column(Text, nullable=True)
     frog = Column(Text, nullable=True)
     gratitude = Column(Text, nullable=True)
+    anticipation = Column(Text, nullable=True)
     why_reflection = Column(Text, nullable=True)
+    why_expanded = Column(Text, nullable=True)
+    block_plan = Column(Text, nullable=True)
+    admin_plan = Column(Text, nullable=True)
+    emotional_intent = Column(Text, nullable=True)
     wins = Column(Text, nullable=True)
     adjustments = Column(Text, nullable=True)
     energy = Column(String(50), nullable=True)
     notes = Column(Text, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
+class HealthMetric(Base):
+    __tablename__ = "health_metrics"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(120), nullable=False)
+    slug = Column(String(80), nullable=False, unique=True, index=True)
+    category = Column(SAEnum(HealthMetricCategory, **ENUM_KWARGS), nullable=False)
+    unit = Column(String(24), nullable=True)
+    description = Column(Text, nullable=True)
+    target_direction = Column(String(12), nullable=True)
+    is_key = Column(Boolean, nullable=False, default=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    entries = relationship("HealthEntry", back_populates="metric", cascade="all, delete-orphan")
+    goals = relationship("HealthGoal", back_populates="metric", cascade="all, delete-orphan")
+
+
+class HealthEntry(Base):
+    __tablename__ = "health_entries"
+
+    id = Column(Integer, primary_key=True, index=True)
+    metric_id = Column(Integer, ForeignKey("health_metrics.id"), nullable=False)
+    entry_date = Column(Date, nullable=False, default=date.today)
+    value = Column(Float, nullable=False)
+    notes = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    metric = relationship("HealthMetric", back_populates="entries")
+
+
+class HealthGoal(Base):
+    __tablename__ = "health_goals"
+
+    id = Column(Integer, primary_key=True, index=True)
+    title = Column(String(160), nullable=False)
+    metric_id = Column(Integer, ForeignKey("health_metrics.id"), nullable=True)
+    target_value = Column(Float, nullable=True)
+    target_date = Column(Date, nullable=True)
+    notes = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    metric = relationship("HealthMetric", back_populates="goals")
 
 
 class CoachConversation(Base):
@@ -227,3 +292,28 @@ class CoachMessage(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
     conversation = relationship("CoachConversation", back_populates="messages")
+
+
+class GuidanceReminder(Base):
+    __tablename__ = "guidance_reminders"
+
+    id = Column(Integer, primary_key=True, index=True)
+    code = Column(String(64), nullable=False)
+    title = Column(String(160), nullable=False)
+    body = Column(Text, nullable=False)
+    period_start = Column(Date, nullable=True)
+    due_on = Column(Date, nullable=True)
+    snoozed_until = Column(DateTime(timezone=True), nullable=True)
+    completed_at = Column(DateTime(timezone=True), nullable=True)
+    acknowledged_at = Column(DateTime(timezone=True), nullable=True)
+    last_shown_at = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
+class GuidanceEvent(Base):
+    __tablename__ = "guidance_events"
+
+    id = Column(Integer, primary_key=True, index=True)
+    code = Column(String(64), nullable=False)
+    context_json = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)

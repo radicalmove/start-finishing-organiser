@@ -23,9 +23,9 @@
           {% endfor %}
         </div>
         <div class="cta-row">
-          <a class="btn pink" href="/capture">Quick capture</a>
-          <a class="btn ghost" href="/capture/wizard">Guided capture</a>
-          <a class="btn ghost" href="/waiting">Waiting On / OPP</a>
+          <a class="btn pink btn-match-header" href="/capture">Quick capture</a>
+          <a class="btn ghost btn-match-header" href="/capture/wizard">Guided capture</a>
+          <a class="btn ghost btn-match-header" href="/waiting">Waiting On / OPP</a>
         </div>
       </div>
     </div>
@@ -35,8 +35,8 @@
           <div class="panel-title-row">
             <h3>Today calendar</h3>
             <div class="panel-actions">
-              <a class="btn pink btn-sm" href="/blocks#add-block">Add time block</a>
-              <a class="btn ghost blue btn-sm" href="/calendar/week">Week view</a>
+              <a class="btn pink btn-sm btn-wide btn-match-header" href="/blocks#add-block">Add block</a>
+              <a class="btn ghost blue btn-sm btn-match-header" href="/calendar/week">Week</a>
             </div>
           </div>
           <div class="muted calendar-meta">
@@ -126,10 +126,19 @@
             {% else %}
               <div class="muted">No block active right now. Choose your One Thing and a Frog.</div>
             {% endif %}
-            <div class="cta-row">
-              <a class="btn ghost blue" href="/ritual/morning">Morning check-in</a>
-              <a class="btn ghost blue" href="/ritual/midday">Midday reset</a>
-              <a class="btn ghost blue" href="/ritual/evening">Evening check-out</a>
+            <div class="cta-row ritual-cta">
+              <a class="btn ghost blue btn-match-header ritual-btn{% if ritual_status.morning %} is-done{% elif ritual_next_key == 'morning' %} is-next{% endif %}" href="/ritual/morning">
+                Morning check-in
+                <span class="ritual-dot" aria-hidden="true"></span>
+              </a>
+              <a class="btn ghost blue btn-match-header ritual-btn{% if ritual_status.midday %} is-done{% elif ritual_next_key == 'midday' %} is-next{% endif %}" href="/ritual/midday">
+                Midday reset
+                <span class="ritual-dot" aria-hidden="true"></span>
+              </a>
+              <a class="btn ghost blue btn-match-header ritual-btn{% if ritual_status.evening %} is-done{% elif ritual_next_key == 'evening' %} is-next{% endif %}" href="/ritual/evening">
+                Evening check-out
+                <span class="ritual-dot" aria-hidden="true"></span>
+              </a>
             </div>
           </div>
           <div class="panel today-tasks-panel">
@@ -148,12 +157,8 @@
                 </div>
               {% else %}
                 <div class="muted">No tasks in Today bucket. Add via Capture.</div>
-              {% endfor %}
-            </div>
-            <div class="cta-row">
-              <a class="btn pink" href="/capture">Quick capture</a>
-              <a class="btn ghost" href="/capture/wizard">Guided capture</a>
-            </div>
+            {% endfor %}
+          </div>
           </div>
         </div>
       </div>

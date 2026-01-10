@@ -13,9 +13,12 @@ from .db import (
     ensure_task_resurface_columns,
     ensure_block_title_column,
     ensure_ritual_table,
+    ensure_ritual_columns,
+    ensure_guidance_reminder_columns,
 )
-from .routes import homepage, api, capture, blocks, resurface, weekly, waiting, ritual, auth, coach, guide
+from .routes import homepage, api, capture, blocks, resurface, weekly, waiting, ritual, auth, coach, long_range, nudges, health
 from .security import ensure_csrf_token, current_user, is_authenticated, ui_auth_enabled
+from .utils.health import ensure_health_metrics
 
 
 def _load_dotenv() -> None:
@@ -54,6 +57,9 @@ def create_app() -> FastAPI:
     ensure_task_resurface_columns()
     ensure_block_title_column()
     ensure_ritual_table()
+    ensure_ritual_columns()
+    ensure_guidance_reminder_columns()
+    ensure_health_metrics()
 
     app = FastAPI(title="Start Finishing Organiser", version="0.1")
 
@@ -94,7 +100,9 @@ def create_app() -> FastAPI:
     app.include_router(waiting.router)
     app.include_router(ritual.router)
     app.include_router(coach.router)
-    app.include_router(guide.router)
+    app.include_router(nudges.router)
+    app.include_router(long_range.router)
+    app.include_router(health.router)
     app.include_router(api.router, prefix="/api")
 
     return app

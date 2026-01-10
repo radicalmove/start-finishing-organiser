@@ -46,7 +46,7 @@ SFO_SESSION_MAX_AGE=1209600
 SFO includes a Charlie coach widget in the bottom-right of every screen after login. It will
 use a local Ollama model if available, and fall back to a coach-lite mode if not.
 
-Guide page: open `/guide` for a quick walkthrough of daily and weekly use.
+Ask Charlie for a quick walkthrough of daily and weekly use. Long term planning lives at `/long-range`.
 
 To enable Ollama:
 
@@ -77,7 +77,7 @@ SFO_COACH_HISTORY_LIMIT=120
 - Tasks with Today/Week/Month/Later buckets, frogs, alignment, block types.
 - Blocks to reserve Focus/Admin/Social/Recovery time.
 - Success Packs and Waiting On slots (models in place; UI/APIs coming next).
-- Health check at `/health`; JSON APIs under `/api`.
+- Health dashboard at `/health`; health check at `/healthz`; JSON APIs under `/api`.
 
 ## Next steps
 

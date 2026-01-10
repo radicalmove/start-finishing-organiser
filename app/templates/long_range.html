@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% from "partials/project_edit_form.html" import project_edit_form with context %}
+
+{% block content %}
+  <section class="long-range-shell" data-horizon-board>
+    <div class="panel long-range-hero">
+      <div class="panel-title-row">
+        <h3>Long term planning</h3>
+        <div class="panel-actions">
+          <span class="pill">Horizon map</span>
+        </div>
+      </div>
+      <div class="muted">
+        Place projects by horizon so you can plan from the top down. The goal is
+        clarity, not certainty.
+      </div>
+      <div class="long-range-nav">
+        <a class="btn ghost btn-sm {% if active_long_term_tab == 'horizons' %}is-active{% endif %}" href="/long-term" {% if active_long_term_tab == 'horizons' %}aria-current="page"{% endif %}>Horizon map</a>
+        <a class="btn ghost btn-sm {% if active_long_term_tab == 'pyramid' %}is-active{% endif %}" href="/long-term/pyramid" {% if active_long_term_tab == 'pyramid' %}aria-current="page"{% endif %}>Project pyramid</a>
+        <a class="btn ghost btn-sm {% if active_long_term_tab == 'roadmaps' %}is-active{% endif %}" href="/long-term/roadmaps" {% if active_long_term_tab == 'roadmaps' %}aria-current="page"{% endif %}>Project roadmaps</a>
+      </div>
+    </div>
+
+    <div id="horizon-map" class="panel long-range-panel">
+      <div class="panel-title-row">
+        <h3>Horizon map</h3>
+        <div class="panel-actions">
+          <span class="pill">Every yes displaces</span>
+        </div>
+      </div>
+      <div class="muted">
+        Place projects by horizon so you can plan from the top down. The goal is
+        clarity, not certainty.
+      </div>
+      <div class="horizon-grid">
+        {% for column in horizon_columns %}
+          {% set items = horizons[column.key] %}
+          <div class="horizon-card" data-horizon-column data-horizon-key="{{ column.key }}">
+            <div class="horizon-header">
+              <span class="caps">{{ column.label }}</span>
+              <span class="pill">{{ items|length }}</span>
+            </div>
+            <div class="horizon-hint">{{ column.hint }}</div>
+            <div class="horizon-list" data-horizon-list>
+              {% for project in items %}
+                <div class="horizon-item project-edit" draggable="true" data-project-id="{{ project.id }}" data-project-title="{{ project.title }}">
+                  <div class="project-edit-header">
+                    <div class="horizon-item-title">{{ project.title }}</div>
+                    <button class="btn ghost btn-sm project-edit-toggle" type="button">Edit</button>
+                  </div>
+                  <div class="muted">{{ project.description or "No description yet." }}</div>
+                  <div class="horizon-item-meta">
+                    <span class="pill">{{ project.category.value }}</span>
+                    {% if project.level_of_success %}
+                      <span class="pill">{{ project.level_of_success.value|title }} success</span>
+                    {% endif %}
+                    {% if project.target_date %}
+                      <span class="pill">Target: {{ project.target_date }}</span>
+                    {% endif %}
+                  </div>
+                  {{ project_edit_form(project) }}
+                </div>
+              {% else %}
+                <div class="muted">{{ column.empty }}</div>
+              {% endfor %}
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+  </section>
+{% endblock %}

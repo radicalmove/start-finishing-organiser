@@ -18,6 +18,8 @@ from ..models import (
     Task,
     WhenBucket,
     Block,
+    RitualEntry,
+    RitualType,
 )
 from ..utils.rules import enforce_weekly_cap, compose_why_text, parse_block_type
 from ..utils.coach import build_coach_context_json, block_summary, task_summary
@@ -84,6 +86,9 @@ def _fetch_cozi_calendar() -> tuple[list[dict], str]:
 
         start = dtstart.dt
         end = dtend.dt if dtend else None
+        is_all_day = isinstance(start, date) and not isinstance(start, datetime)
+        if isinstance(end, date) and not isinstance(end, datetime):
+            is_all_day = True
 
         if isinstance(start, date) and not isinstance(start, datetime):
             start_dt = datetime.combine(start, time.min)
@@ -112,6 +117,7 @@ def _fetch_cozi_calendar() -> tuple[list[dict], str]:
                 "label_suffix": label_suffix,
                 "start": start_dt,
                 "end": end_dt,
+                "is_all_day": is_all_day,
             }
         )
 
@@ -192,16 +198,23 @@ def _build_week_calendar(
         for ev in cozi_by_day[d]:
             start_dt = ev["start"]
             end_dt = ev["end"]
-            start_min = start_dt.hour * 60 + start_dt.minute
-            end_min = end_dt.hour * 60 + end_dt.minute
-            start_display = start_dt.strftime("%-I:%M %p")
-            end_display = end_dt.strftime("%-I:%M %p")
-            if d > start_dt.date():
-                start_min = 0
-                start_display = "12:00 AM"
-            if d < end_dt.date():
-                end_min = 24 * 60
-                end_display = "11:59 PM"
+            is_all_day = bool(ev.get("is_all_day"))
+            if is_all_day:
+                start_min = window_start
+                end_min = min(window_start + 60, window_end)
+                start_display = "All Day event"
+                end_display = ""
+            else:
+                start_min = start_dt.hour * 60 + start_dt.minute
+                end_min = end_dt.hour * 60 + end_dt.minute
+                start_display = start_dt.strftime("%-I:%M %p")
+                end_display = end_dt.strftime("%-I:%M %p")
+                if d > start_dt.date():
+                    start_min = 0
+                    start_display = "12:00 AM"
+                if d < end_dt.date():
+                    end_min = 24 * 60
+                    end_display = "11:59 PM"
             effective_start = max(window_start, start_min)
             effective_end = min(window_end, end_min)
             if effective_end <= window_start or effective_start >= window_end:
@@ -209,11 +222,11 @@ def _build_week_calendar(
             top_pct = max(0, (effective_start - window_start) / day_total_minutes * 100)
             height_pct = max(5, (effective_end - effective_start) / day_total_minutes * 100)
             name_prefix = (ev["label"] or "").lower()
-            extra_class = None
+            extra_class = "event-block--all-day" if is_all_day else None
             if name_prefix.startswith("brynlee"):
-                extra_class = "cozi-brynlee"
+                extra_class = f"{extra_class} cozi-brynlee" if extra_class else "cozi-brynlee"
             elif name_prefix.startswith("jessica"):
-                extra_class = "cozi-jessica"
+                extra_class = f"{extra_class} cozi-jessica" if extra_class else "cozi-jessica"
             day_events.append(
                 {
                     "label": ev["label"],
@@ -305,6 +318,47 @@ def landing(request: Request, db: Session = Depends(get_db)):
         .order_by(Task.when_bucket.asc(), Task.created_at.desc())
         .all()
     )
+    ritual_entries = (
+        db.query(RitualEntry)
+        .filter(RitualEntry.entry_date == today)
+        .order_by(RitualEntry.created_at.desc())
+        .all()
+    )
+    ritual_by_type: dict[str, RitualEntry] = {}
+    for entry in ritual_entries:
+        key = entry.ritual_type.value if isinstance(entry.ritual_type, RitualType) else str(entry.ritual_type)
+        if key not in ritual_by_type:
+            ritual_by_type[key] = entry
+
+    ritual_status = {
+        "morning": "morning" in ritual_by_type,
+        "midday": "midday" in ritual_by_type,
+        "evening": "evening" in ritual_by_type,
+    }
+    ritual_labels = {
+        "morning": "Morning check-in",
+        "midday": "Midday reset",
+        "evening": "Evening check-out",
+    }
+    hour = now.hour
+    if hour < 11:
+        time_bucket = "morning"
+    elif hour < 16:
+        time_bucket = "midday"
+    else:
+        time_bucket = "evening"
+
+    ritual_next_key = None
+    if not ritual_status.get(time_bucket):
+        ritual_next_key = time_bucket
+    else:
+        order = ["morning", "midday", "evening"]
+        start_index = order.index(time_bucket)
+        for key in order[start_index + 1 :]:
+            if not ritual_status.get(key):
+                ritual_next_key = key
+                break
+    ritual_next_label = ritual_labels.get(ritual_next_key) if ritual_next_key else None
     todays_blocks = [b for b in week_blocks if b.date == today]
     cozi_all_events, cozi_status = _fetch_cozi_calendar()
     cozi_events_today = _cozi_events_touching_day(cozi_all_events, today)
@@ -375,16 +429,23 @@ def landing(request: Request, db: Session = Depends(get_db)):
     for ev in cozi_events_today:
         start_dt = ev["start"]
         end_dt = ev["end"]
-        start_min = start_dt.hour * 60 + start_dt.minute
-        end_min = end_dt.hour * 60 + end_dt.minute
-        start_display = start_dt.strftime("%-I:%M %p")
-        end_display = end_dt.strftime("%-I:%M %p")
-        if today > start_dt.date():
-            start_min = 0
-            start_display = "12:00 AM"
-        if today < end_dt.date():
-            end_min = 24 * 60
-            end_display = "11:59 PM"
+        is_all_day = bool(ev.get("is_all_day"))
+        if is_all_day:
+            start_min = day_start_minutes
+            end_min = min(day_start_minutes + 60, day_start_minutes + day_total_minutes)
+            start_display = "All Day event"
+            end_display = ""
+        else:
+            start_min = start_dt.hour * 60 + start_dt.minute
+            end_min = end_dt.hour * 60 + end_dt.minute
+            start_display = start_dt.strftime("%-I:%M %p")
+            end_display = end_dt.strftime("%-I:%M %p")
+            if today > start_dt.date():
+                start_min = 0
+                start_display = "12:00 AM"
+            if today < end_dt.date():
+                end_min = 24 * 60
+                end_display = "11:59 PM"
         window_start = day_start_minutes
         window_end = day_start_minutes + day_total_minutes
         effective_start = max(window_start, start_min)
@@ -395,11 +456,11 @@ def landing(request: Request, db: Session = Depends(get_db)):
         height_pct = max(5, (effective_end - effective_start) / day_total_minutes * 100)
         # Color-code Cozi events by label prefix if desired (e.g., Brynlee/Jessica)
         name_prefix = (ev["label"] or "").lower()
-        extra_class = None
+        extra_class = "event-block--all-day" if is_all_day else None
         if name_prefix.startswith("brynlee"):
-            extra_class = "cozi-brynlee"
+            extra_class = f"{extra_class} cozi-brynlee" if extra_class else "cozi-brynlee"
         elif name_prefix.startswith("jessica"):
-            extra_class = "cozi-jessica"
+            extra_class = f"{extra_class} cozi-jessica" if extra_class else "cozi-jessica"
 
         calendar_events.append(
             {
@@ -467,6 +528,10 @@ def landing(request: Request, db: Session = Depends(get_db)):
             "calendar_end_hour": CALENDAR_END_HOUR,
             "calendar_hours": CALENDAR_HOURS,
             "calendar_hour_height": CALENDAR_HOUR_HEIGHT_PX,
+            "ritual_status": ritual_status,
+            "ritual_next_key": ritual_next_key,
+            "ritual_next_label": ritual_next_label,
+            "ritual_labels": ritual_labels,
             "coach_context_json": coach_context_json,
         },
     )

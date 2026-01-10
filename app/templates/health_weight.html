@@ -1,0 +1,180 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <section class="health-shell">
+    {% set hero_title = "Weight + body composition" %}
+    {% set hero_subtitle = "Track the signals that reflect how you feel and perform." %}
+    {% set hero_tag = "Composition + vitals" %}
+    {% include "partials/health_nav.html" %}
+
+    {% if form_error %}
+      <div class="panel health-alert">{{ form_error }}</div>
+    {% endif %}
+
+    <div class="health-dashboard-grid">
+      <div class="panel">
+        <div class="panel-title-row">
+          <h3>Log blood pressure</h3>
+          <div class="panel-actions">
+            <span class="pill">Systolic + diastolic</span>
+          </div>
+        </div>
+        <form class="form" method="post" action="/health/blood-pressure">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+          <input type="hidden" name="return_to" value="/health/weight">
+          <div class="field two">
+            <label>
+              Systolic (mmHg)
+              <input type="text" name="systolic" placeholder="120" required>
+            </label>
+            <label>
+              Diastolic (mmHg)
+              <input type="text" name="diastolic" placeholder="80" required>
+            </label>
+          </div>
+          <div class="field two">
+            <label>
+              Date
+              <input type="date" name="entry_date">
+            </label>
+            <label>
+              Notes
+              <input type="text" name="notes" placeholder="Resting, seated, etc.">
+            </label>
+          </div>
+          <div class="cta-row cta-row--end">
+            <button class="btn pink btn-sm" type="submit">Save blood pressure</button>
+          </div>
+        </form>
+      </div>
+
+      <div class="panel">
+        <div class="panel-title-row">
+          <h3>Log body metrics</h3>
+          <div class="panel-actions">
+            <span class="pill">Weekly snapshot</span>
+          </div>
+        </div>
+        <form class="form" method="post" action="/health/entry">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+          <input type="hidden" name="return_to" value="/health/weight">
+          <label class="field">
+            Metric
+            <select name="metric_id" required>
+              {% for metric in entry_metrics %}
+                <option value="{{ metric.id }}">{{ metric.name }}</option>
+              {% endfor %}
+            </select>
+          </label>
+          <div class="field two">
+            <label>
+              Value
+              <input type="text" name="value" placeholder="Enter a number" required>
+            </label>
+            <label>
+              Date
+              <input type="date" name="entry_date">
+            </label>
+          </div>
+          <label class="field">
+            Notes
+            <input type="text" name="notes" placeholder="Context: sleep, travel, stress">
+          </label>
+          <div class="cta-row cta-row--end">
+            <button class="btn pink btn-sm" type="submit">Save body metric</button>
+          </div>
+        </form>
+      </div>
+
+      <div class="panel">
+        <div class="panel-title-row">
+          <h3>Body composition notes</h3>
+          <div class="panel-actions">
+            <span class="pill">Consistency wins</span>
+          </div>
+        </div>
+        <div class="health-guidance-list">
+          <div class="health-guidance-item">
+            <strong>Weigh-in cadence:</strong> 3-7x/week and use a rolling average to smooth noise.
+          </div>
+          <div class="health-guidance-item">
+            <strong>Measurements:</strong> Waist and arm measurements capture changes the scale misses.
+          </div>
+          <div class="health-guidance-item">
+            <strong>Blood pressure:</strong> Measure seated, rested, and at similar times.
+          </div>
+          <div class="health-guidance-item">
+            <strong>Strength anchor:</strong> Maintain resistance training to protect lean mass.
+          </div>
+        </div>
+        <div class="note">Talk with a clinician if blood pressure remains elevated.</div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title-row">
+        <h3>Weight trends</h3>
+        <div class="panel-actions">
+          <span class="pill">Last 30 entries</span>
+        </div>
+      </div>
+      <div class="health-chart-grid">
+        {% for metric in metrics %}
+          {% set latest = metric_latest.get(metric.id) %}
+          {% set stat = metric_stats.get(metric.id) %}
+          <div class="health-metric-card">
+            <div class="health-metric-header">
+              <div>
+                <div class="health-metric-title">{{ metric.name }}</div>
+                <div class="health-metric-subtitle">{{ metric.description or "Track your baseline." }}</div>
+              </div>
+              <div class="health-metric-latest">
+                {% if latest %}
+                  {{ latest.value }}{% if metric.unit %} {{ metric.unit }}{% endif %}
+                {% else %}
+                  --
+                {% endif %}
+              </div>
+            </div>
+            <div class="health-chart" data-health-chart data-metric-id="{{ metric.id }}">
+              <canvas></canvas>
+              <div class="health-chart-empty">Add a few entries to see the trend.</div>
+            </div>
+            <div class="health-metric-meta">
+              <span>7-day avg: {% if stat and stat.avg_7d is not none %}{{ stat.avg_7d|round(2) }}{% else %}--{% endif %}</span>
+              <span>Trend: {% if stat and stat.trend is not none %}{{ stat.trend|round(2) }}{% else %}--{% endif %}</span>
+            </div>
+          </div>
+        {% else %}
+          <div class="muted">No weight metrics yet. Add a custom metric from the dashboard.</div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title-row">
+        <h3>Recent entries</h3>
+        <div class="panel-actions">
+          <span class="pill">Latest log</span>
+        </div>
+      </div>
+      <div class="health-entry-list">
+        {% for entry in recent_entries %}
+          <div class="health-entry-row">
+            <div>
+              <div class="health-entry-title">{{ entry.metric.name }}</div>
+              <div class="health-entry-meta">{{ entry.entry_date }}{% if entry.notes %} · {{ entry.notes }}{% endif %}</div>
+            </div>
+            <div class="health-entry-value">
+              {{ entry.value }}{% if entry.metric.unit %} {{ entry.metric.unit }}{% endif %}
+            </div>
+          </div>
+        {% else %}
+          <div class="muted">No body metrics logged yet.</div>
+        {% endfor %}
+      </div>
+    </div>
+  </section>
+
+  <script type="application/json" id="health-series">{{ health_series_json | safe }}</script>
+{% endblock %}

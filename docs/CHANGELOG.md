@@ -1,6 +1,19 @@
 # Changelog
 
-## 0.2.0 (planned)
+## 0.4.0 (in progress)
+- Added health + fitness dashboard with goals, quick log, and trend board.
+- Added diet, weight, fitness, strength, and flexibility tracking pages.
+- Added combined blood pressure logging for systolic + diastolic.
+- Moved the health check to `/healthz` to make `/health` the dashboard.
+
+## 0.3.0
+- Full Weekly review flow.
+- Basic summaries of alignment and focus usage.
+- Removed the Guide page and header button.
+- Added long term planning page at `/long-range` with horizon and roadmap views.
+- Added inline project editing and project pyramid view on the long term page.
+
+## 0.2.0
 - Added Charlie coach widget with optional local Ollama integration and coach-lite fallback.
 - Added in-app Guide page at `/guide` plus coach responses for “how to use” questions.
 - Added Cozi ICS integration (`COZI_ICS_URL`) and calendar error surfacing in the UI.

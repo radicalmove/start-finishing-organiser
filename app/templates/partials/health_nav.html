@@ -1,0 +1,21 @@
+<div class="panel health-hero">
+  <div class="panel-title-row">
+    <h3>{{ hero_title }}</h3>
+    {% if hero_tag %}
+      <div class="panel-actions">
+        <span class="pill">{{ hero_tag }}</span>
+      </div>
+    {% endif %}
+  </div>
+  {% if hero_subtitle %}
+    <div class="muted">{{ hero_subtitle }}</div>
+  {% endif %}
+  <div class="health-nav">
+    <a class="btn ghost btn-sm {% if active_health_tab == 'dashboard' %}is-active{% endif %}" href="/health" {% if active_health_tab == 'dashboard' %}aria-current="page"{% endif %}>Dashboard</a>
+    <a class="btn ghost btn-sm {% if active_health_tab == 'diet' %}is-active{% endif %}" href="/health/diet" {% if active_health_tab == 'diet' %}aria-current="page"{% endif %}>Diet</a>
+    <a class="btn ghost btn-sm {% if active_health_tab == 'weight' %}is-active{% endif %}" href="/health/weight" {% if active_health_tab == 'weight' %}aria-current="page"{% endif %}>Weight</a>
+    <a class="btn ghost btn-sm {% if active_health_tab == 'fitness' %}is-active{% endif %}" href="/health/fitness" {% if active_health_tab == 'fitness' %}aria-current="page"{% endif %}>Fitness</a>
+    <a class="btn ghost btn-sm {% if active_health_tab == 'strength' %}is-active{% endif %}" href="/health/strength" {% if active_health_tab == 'strength' %}aria-current="page"{% endif %}>Strength</a>
+    <a class="btn ghost btn-sm {% if active_health_tab == 'flexibility' %}is-active{% endif %}" href="/health/flexibility" {% if active_health_tab == 'flexibility' %}aria-current="page"{% endif %}>Flexibility</a>
+  </div>
+</div>

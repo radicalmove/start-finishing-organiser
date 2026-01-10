@@ -1,0 +1,310 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <section class="health-shell">
+    {% set hero_title = "Health + fitness HQ" %}
+    {% set hero_subtitle = "Track your numbers, protect your energy, and build strength that lasts." %}
+    {% set hero_tag = "Current status + goals" %}
+    {% include "partials/health_nav.html" %}
+
+    {% if form_error %}
+      <div class="panel health-alert">{{ form_error }}</div>
+    {% endif %}
+
+    <div class="health-dashboard-grid">
+      <div class="panel">
+        <div class="panel-title-row">
+          <h3>Current state</h3>
+          <div class="panel-actions">
+            <span class="pill">Latest entries</span>
+          </div>
+        </div>
+        <div class="health-state-grid">
+          {% for metric in key_metrics %}
+            {% set latest = metric_latest.get(metric.id) %}
+            <div class="health-state-card">
+              <div class="health-state-label">{{ metric.name }}</div>
+              <div class="health-state-value">
+                {% if latest %}
+                  {{ latest.value }}
+                  {% if metric.unit %}<span class="health-state-unit">{{ metric.unit }}</span>{% endif %}
+                {% else %}
+                  --
+                {% endif %}
+              </div>
+              <div class="health-state-meta">
+                {% if latest %}
+                  Updated {{ latest.entry_date }}
+                {% else %}
+                  No data yet
+                {% endif %}
+              </div>
+            </div>
+          {% endfor %}
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-title-row">
+          <h3>Current goals</h3>
+          <div class="panel-actions">
+            <span class="pill">Make it measurable</span>
+          </div>
+        </div>
+        <div class="health-goals">
+          {% for goal in goals %}
+            <div class="health-goal-card">
+              <div class="health-goal-title">{{ goal.title }}</div>
+              <div class="health-goal-meta">
+                {% if goal.metric %}
+                  <span class="pill">{{ goal.metric.name }}</span>
+                {% endif %}
+                {% if goal.target_value %}
+                  <span class="pill">Target {{ goal.target_value }}{% if goal.metric and goal.metric.unit %} {{ goal.metric.unit }}{% endif %}</span>
+                {% endif %}
+                {% if goal.target_date %}
+                  <span class="pill">By {{ goal.target_date }}</span>
+                {% endif %}
+              </div>
+              {% if goal.notes %}
+                <div class="muted">{{ goal.notes }}</div>
+              {% endif %}
+            </div>
+          {% else %}
+            <div class="muted">No goals yet. Add one below to focus your plan.</div>
+          {% endfor %}
+        </div>
+        <form class="form" method="post" action="/health/goals">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+          <input type="hidden" name="return_to" value="/health">
+          <label class="field">
+            Goal title
+            <input type="text" name="title" placeholder="Example: Drop resting HR to 60 bpm" required>
+          </label>
+          <div class="field two">
+            <label>
+              Metric (optional)
+              <select name="metric_id">
+                <option value="">No metric</option>
+                {% for metric in all_metrics %}
+                  <option value="{{ metric.id }}">{{ metric.name }}</option>
+                {% endfor %}
+              </select>
+            </label>
+            <label>
+              Target value
+              <input type="text" name="target_value" placeholder="60">
+            </label>
+          </div>
+          <div class="field two">
+            <label>
+              Target date
+              <input type="date" name="target_date">
+            </label>
+            <label>
+              Notes
+              <input type="text" name="notes" placeholder="Why it matters, constraints, etc.">
+            </label>
+          </div>
+          <div class="cta-row cta-row--end">
+            <button class="btn pink btn-sm" type="submit">Add goal</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <div class="health-dashboard-grid">
+      <div class="panel">
+        <div class="panel-title-row">
+          <h3>Blood pressure</h3>
+          <div class="panel-actions">
+            <span class="pill">Systolic + diastolic</span>
+          </div>
+        </div>
+        <form class="form" method="post" action="/health/blood-pressure">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+          <input type="hidden" name="return_to" value="/health">
+          <div class="field two">
+            <label>
+              Systolic (mmHg)
+              <input type="text" name="systolic" placeholder="120" required>
+            </label>
+            <label>
+              Diastolic (mmHg)
+              <input type="text" name="diastolic" placeholder="80" required>
+            </label>
+          </div>
+          <div class="field two">
+            <label>
+              Date
+              <input type="date" name="entry_date">
+            </label>
+            <label>
+              Notes
+              <input type="text" name="notes" placeholder="Resting, seated, etc.">
+            </label>
+          </div>
+          <div class="cta-row cta-row--end">
+            <button class="btn pink btn-sm" type="submit">Save blood pressure</button>
+          </div>
+        </form>
+      </div>
+
+      <div class="panel">
+        <div class="panel-title-row">
+          <h3>Quick log</h3>
+          <div class="panel-actions">
+            <span class="pill">One measurement at a time</span>
+          </div>
+        </div>
+        <form class="form" method="post" action="/health/entry">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+          <input type="hidden" name="return_to" value="/health">
+          <label class="field">
+            Metric
+            <select name="metric_id" required>
+              {% for metric in entry_metrics %}
+                <option value="{{ metric.id }}">{{ metric.name }}</option>
+              {% endfor %}
+            </select>
+          </label>
+          <div class="field two">
+            <label>
+              Value
+              <input type="text" name="value" placeholder="Enter a number" required>
+            </label>
+            <label>
+              Date
+              <input type="date" name="entry_date">
+            </label>
+          </div>
+          <label class="field">
+            Notes
+            <input type="text" name="notes" placeholder="Optional context">
+          </label>
+          <div class="cta-row cta-row--end">
+            <button class="btn pink btn-sm" type="submit">Save entry</button>
+          </div>
+        </form>
+      </div>
+
+      <div class="panel">
+        <div class="panel-title-row">
+          <h3>Add a custom metric</h3>
+          <div class="panel-actions">
+            <span class="pill">Make it yours</span>
+          </div>
+        </div>
+        <form class="form" method="post" action="/health/metrics">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+          <input type="hidden" name="return_to" value="/health">
+          <label class="field">
+            Metric name
+            <input type="text" name="name" placeholder="Example: 5k time" required>
+          </label>
+          <div class="field two">
+            <label>
+              Unit
+              <input type="text" name="unit" placeholder="min, kg, bpm">
+            </label>
+            <label>
+              Category
+              <select name="category">
+                <option value="diet">Diet</option>
+                <option value="weight">Weight</option>
+                <option value="fitness">Fitness</option>
+                <option value="strength">Strength</option>
+                <option value="flexibility">Flexibility</option>
+                <option value="vitals">Vitals</option>
+                <option value="recovery">Recovery</option>
+              </select>
+            </label>
+          </div>
+          <label class="field">
+            Description
+            <input type="text" name="description" placeholder="Optional details">
+          </label>
+          <div class="cta-row cta-row--end">
+            <button class="btn ghost btn-sm" type="submit">Add metric</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title-row">
+        <h3>Trend board</h3>
+        <div class="panel-actions">
+          <span class="pill">Last 30 entries</span>
+        </div>
+      </div>
+      <div class="health-chart-grid">
+        {% for metric in key_metrics %}
+          {% set latest = metric_latest.get(metric.id) %}
+          {% set stat = metric_stats.get(metric.id) %}
+          <div class="health-metric-card">
+            <div class="health-metric-header">
+              <div>
+                <div class="health-metric-title">{{ metric.name }}</div>
+                <div class="health-metric-subtitle">{{ metric.description or "Tracking progress." }}</div>
+              </div>
+              <div class="health-metric-latest">
+                {% if latest %}
+                  {{ latest.value }}{% if metric.unit %} {{ metric.unit }}{% endif %}
+                {% else %}
+                  --
+                {% endif %}
+              </div>
+            </div>
+            <div class="health-chart" data-health-chart data-metric-id="{{ metric.id }}">
+              <canvas></canvas>
+              <div class="health-chart-empty">Add a few entries to see the trend.</div>
+            </div>
+            <div class="health-metric-meta">
+              <span>7-day avg: {% if stat and stat.avg_7d is not none %}{{ stat.avg_7d|round(2) }}{% else %}--{% endif %}</span>
+              <span>Trend: {% if stat and stat.trend is not none %}{{ stat.trend|round(2) }}{% else %}--{% endif %}</span>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title-row">
+        <h3>Research-backed guidance</h3>
+        <div class="panel-actions">
+          <span class="pill">Evidence snapshots</span>
+        </div>
+      </div>
+      <div class="health-guidance-grid">
+        <div class="health-guidance-card">
+          <h4>Protein anchors</h4>
+          <p>Most evidence supports 1.6-2.2 g/kg/day for muscle gain and retention. Spread intake across 3-5 meals.</p>
+        </div>
+        <div class="health-guidance-card">
+          <h4>Zone 2 volume</h4>
+          <p>150-300 minutes of moderate cardio per week improves endurance and heart health. Keep intensity conversational.</p>
+        </div>
+        <div class="health-guidance-card">
+          <h4>Strength minimums</h4>
+          <p>2-4 strength sessions per week, hitting each muscle group 2x, drives hypertrophy and resilience.</p>
+        </div>
+        <div class="health-guidance-card">
+          <h4>Sleep lever</h4>
+          <p>Consistent 7-9 hours supports performance, appetite regulation, and recovery. Protect the same bedtime.</p>
+        </div>
+        <div class="health-guidance-card">
+          <h4>Blood pressure basics</h4>
+          <p>Lower sodium, add potassium-rich foods, and prioritize aerobic activity to support healthy pressure trends.</p>
+        </div>
+        <div class="health-guidance-card">
+          <h4>Mobility micro-doses</h4>
+          <p>5-10 minutes daily beats one long session. Pair mobility with warm-ups and post-workout resets.</p>
+        </div>
+      </div>
+      <div class="note">This is general information, not medical advice. Use your clinician for personalized guidance.</div>
+    </div>
+  </section>
+
+  <script type="application/json" id="health-series">{{ health_series_json | safe }}</script>
+{% endblock %}

@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+{% from "partials/project_edit_form.html" import project_edit_form with context %}
+
+{% block content %}
+  <section class="long-range-shell">
+    <div class="panel long-range-hero">
+      <div class="panel-title-row">
+        <h3>Long term planning</h3>
+        <div class="panel-actions">
+          <span class="pill">Project roadmaps</span>
+        </div>
+      </div>
+      <div class="muted">
+        Roadmaps are capacity-first plans. Focus on year and quarter projects that deserve
+        real focus blocks and clear support.
+      </div>
+      <div class="long-range-nav">
+        <a class="btn ghost btn-sm {% if active_long_term_tab == 'horizons' %}is-active{% endif %}" href="/long-term" {% if active_long_term_tab == 'horizons' %}aria-current="page"{% endif %}>Horizon map</a>
+        <a class="btn ghost btn-sm {% if active_long_term_tab == 'pyramid' %}is-active{% endif %}" href="/long-term/pyramid" {% if active_long_term_tab == 'pyramid' %}aria-current="page"{% endif %}>Project pyramid</a>
+        <a class="btn ghost btn-sm {% if active_long_term_tab == 'roadmaps' %}is-active{% endif %}" href="/long-term/roadmaps" {% if active_long_term_tab == 'roadmaps' %}aria-current="page"{% endif %}>Project roadmaps</a>
+      </div>
+    </div>
+
+    <div id="project-roadmaps" class="panel long-range-panel">
+      <div class="panel-title-row">
+        <h3>Project roadmaps</h3>
+        <div class="panel-actions">
+          <span class="pill">Chunk - link - sequence</span>
+        </div>
+      </div>
+      <div class="muted">
+        Roadmaps are capacity-first plans. Focus on year and quarter projects that deserve
+        real focus blocks and clear support.
+      </div>
+      {% if roadmap_projects %}
+        <div class="roadmap-grid">
+          {% for project in roadmap_projects %}
+            <div class="roadmap-card project-edit">
+              <div class="roadmap-title-row">
+                <div>
+                  <div class="roadmap-title">{{ project.title }}</div>
+                  <div class="roadmap-meta">
+                    <span class="pill">{{ project.category.value }}</span>
+                    {% if project.time_horizon %}
+                      <span class="pill">{{ project.time_horizon|title }}</span>
+                    {% endif %}
+                    {% if project.size %}
+                      <span class="pill">{{ project.size.value|title }}</span>
+                    {% endif %}
+                  </div>
+                </div>
+                <div class="roadmap-side">
+                  <div class="roadmap-date">
+                    {% if project.target_date %}
+                      Target {{ project.target_date }}
+                    {% else %}
+                      No target date
+                    {% endif %}
+                  </div>
+                  <button class="btn ghost btn-sm project-edit-toggle" type="button">Edit</button>
+                </div>
+              </div>
+              <div class="roadmap-why">
+                {{ project.why_link_text or "Add a Why so this project stays anchored to your best work." }}
+              </div>
+              <div class="roadmap-detail-grid">
+                <div class="roadmap-detail">
+                  <div class="caps">Success level</div>
+                  <div class="roadmap-detail-value">
+                    {{ project.level_of_success.value|title if project.level_of_success else "Set level" }}
+                  </div>
+                </div>
+                <div class="roadmap-detail">
+                  <div class="caps">Drag points</div>
+                  <div class="roadmap-detail-value">
+                    {{ project.drag_points_notes or "Name the friction early." }}
+                  </div>
+                </div>
+              </div>
+              <div class="roadmap-pack">
+                <div class="caps">Success pack</div>
+                <div class="roadmap-pack-tags">
+                  {% if project.success_pack %}
+                    {% if project.success_pack.guides %}<span class="pill">Guides</span>{% endif %}
+                    {% if project.success_pack.peers %}<span class="pill">Peers</span>{% endif %}
+                    {% if project.success_pack.supporters %}<span class="pill">Supporters</span>{% endif %}
+                    {% if project.success_pack.beneficiaries %}<span class="pill">Beneficiaries</span>{% endif %}
+                    {% if not (project.success_pack.guides or project.success_pack.peers or project.success_pack.supporters or project.success_pack.beneficiaries) %}
+                      <span class="muted">No success pack set.</span>
+                    {% endif %}
+                  {% else %}
+                    <span class="muted">No success pack set.</span>
+                  {% endif %}
+                </div>
+              </div>
+              {{ project_edit_form(project) }}
+            </div>
+          {% endfor %}
+        </div>
+      {% else %}
+        <div class="muted">No year or quarter projects yet. Set a horizon to see them here.</div>
+      {% endif %}
+    </div>
+  </section>
+{% endblock %}

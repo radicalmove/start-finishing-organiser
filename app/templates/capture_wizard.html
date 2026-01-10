@@ -6,15 +6,16 @@
     </div>
   {% endif %}
 
-  <section class="panel" style="margin-top: 18px;">
+  <section class="panel capture-shell">
     <h3>Guided Capture</h3>
     <p class="muted">One question at a time. We’ll place this safely and surface it when relevant.</p>
     <form method="post" action="/capture/wizard" id="wizardForm">
       <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+      <input type="hidden" name="displacement_ack" value="0" data-displacement-ack>
       <div class="wizard-step" data-step="1">
         <div class="field">
           <span>What is it?</span>
-          <input type="text" name="capture_text" required placeholder="Type the thing you’re capturing">
+          <input type="text" name="capture_text" required placeholder="Type the thing you’re capturing" value="{{ prefill or '' }}">
         </div>
       </div>
 

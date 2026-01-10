@@ -1,0 +1,66 @@
+{% macro project_edit_form(project) %}
+  <form method="post" action="/long-term/projects/{{ project.id }}/update" class="project-edit-form hidden">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+    <div class="project-edit-grid">
+      <div class="project-edit-field">
+        <div class="caps">Title</div>
+        <input type="text" name="title" value="{{ project.title }}">
+      </div>
+      <div class="project-edit-field">
+        <div class="caps">Category</div>
+        <select name="category">
+          <option value="work" {% if project.category.value == "work" %}selected{% endif %}>Work</option>
+          <option value="personal" {% if project.category.value == "personal" %}selected{% endif %}>Personal</option>
+        </select>
+      </div>
+      <div class="project-edit-field">
+        <div class="caps">Horizon</div>
+        <select name="time_horizon">
+          <option value="" {% if not project.time_horizon %}selected{% endif %}>Unspecified</option>
+          <option value="week" {% if project.time_horizon == "week" %}selected{% endif %}>Week</option>
+          <option value="month" {% if project.time_horizon == "month" %}selected{% endif %}>Month</option>
+          <option value="quarter" {% if project.time_horizon == "quarter" %}selected{% endif %}>Quarter</option>
+          <option value="year" {% if project.time_horizon == "year" %}selected{% endif %}>Year</option>
+          <option value="later" {% if project.time_horizon == "later" %}selected{% endif %}>Later</option>
+        </select>
+      </div>
+      <div class="project-edit-field">
+        <div class="caps">Target date</div>
+        <input type="date" name="target_date" value="{{ project.target_date or '' }}">
+      </div>
+      <div class="project-edit-field">
+        <div class="caps">Size</div>
+        <select name="size">
+          <option value="" {% if not project.size %}selected{% endif %}>Unspecified</option>
+          <option value="light" {% if project.size and project.size.value == "light" %}selected{% endif %}>Light</option>
+          <option value="moderate" {% if project.size and project.size.value == "moderate" %}selected{% endif %}>Moderate</option>
+          <option value="heavy" {% if project.size and project.size.value == "heavy" %}selected{% endif %}>Heavy</option>
+        </select>
+      </div>
+      <div class="project-edit-field">
+        <div class="caps">Success level</div>
+        <select name="level_of_success">
+          <option value="" {% if not project.level_of_success %}selected{% endif %}>Unspecified</option>
+          <option value="small" {% if project.level_of_success and project.level_of_success.value == "small" %}selected{% endif %}>Small</option>
+          <option value="moderate" {% if project.level_of_success and project.level_of_success.value == "moderate" %}selected{% endif %}>Moderate</option>
+          <option value="epic" {% if project.level_of_success and project.level_of_success.value == "epic" %}selected{% endif %}>Epic</option>
+        </select>
+      </div>
+      <div class="project-edit-field full">
+        <div class="caps">Why</div>
+        <textarea name="why_link_text" rows="2">{{ project.why_link_text or "" }}</textarea>
+      </div>
+      <div class="project-edit-field full">
+        <div class="caps">Drag points</div>
+        <textarea name="drag_points_notes" rows="2">{{ project.drag_points_notes or "" }}</textarea>
+      </div>
+      <div class="project-edit-field full">
+        <div class="caps">Description</div>
+        <textarea name="description" rows="2">{{ project.description or "" }}</textarea>
+      </div>
+    </div>
+    <div class="project-edit-actions">
+      <button class="btn btn-sm" type="submit">Save</button>
+    </div>
+  </form>
+{% endmacro %}

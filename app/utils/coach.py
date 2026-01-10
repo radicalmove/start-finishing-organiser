@@ -101,10 +101,20 @@ def ritual_summary(entry: RitualEntry) -> dict[str, Any]:
         "id": entry.id,
         "ritual_type": entry.ritual_type.value if entry.ritual_type else None,
         "entry_date": _to_iso(entry.entry_date),
+        "grounding_movement": entry.grounding_movement,
+        "supplements_done": entry.supplements_done,
+        "plan_review": entry.plan_review,
+        "reality_scan": entry.reality_scan,
+        "focus_time_status": entry.focus_time_status,
         "one_thing": entry.one_thing,
         "frog": entry.frog,
         "gratitude": entry.gratitude,
+        "anticipation": entry.anticipation,
         "why_reflection": entry.why_reflection,
+        "why_expanded": entry.why_expanded,
+        "block_plan": entry.block_plan,
+        "admin_plan": entry.admin_plan,
+        "emotional_intent": entry.emotional_intent,
         "wins": entry.wins,
         "adjustments": entry.adjustments,
         "energy": entry.energy,
@@ -218,11 +228,40 @@ def _is_guide_request(text: str) -> bool:
         "how does this work",
         "getting started",
         "guide",
+        "where should i start",
+        "where do i start",
+        "how do i start",
+        "just starting",
+        "just started",
+        "i'm new",
+        "im new",
+        "new here",
+        "no idea what i'm doing",
+        "no idea what im doing",
+        "don't know what i'm doing",
+        "dont know what im doing",
+        "not sure where to start",
+        "i'm lost",
+        "im lost",
+        "confused",
+        "overwhelmed",
         "walk me through",
         "show me how",
-        "how do i start",
     )
     return any(phrase in lowered for phrase in guide_phrases)
+
+
+def _is_goal_request(text: str) -> bool:
+    lowered = (text or "").lower()
+    goal_phrases = (
+        "quarterly",
+        "monthly goals",
+        "weekly goals",
+        "yearly goals",
+        "annual goals",
+        "goal setting",
+    )
+    return any(phrase in lowered for phrase in goal_phrases)
 
 
 def coach_guide_reply() -> str:
@@ -232,21 +271,8 @@ def coach_guide_reply() -> str:
         "- Pick your weekly focus (4 work + 3 personal) in Weekly Review.\n"
         "- Schedule Focus/Admin/Social/Recovery blocks on the calendar.\n"
         "- Do a morning check-in, a midday reset, and an evening check-out.\n\n"
-        "Open the Guide page for the full walkthrough, or tell me what you want to do and I’ll walk you through it."
+        "Tell me what you want to do and I’ll walk you through it."
     )
-
-
-def _merge_actions(
-    base: list[dict[str, str]], extra: list[dict[str, str]]
-) -> list[dict[str, str]]:
-    seen = {(item.get("label"), item.get("url")) for item in base}
-    for item in extra:
-        key = (item.get("label"), item.get("url"))
-        if key in seen:
-            continue
-        base.append(item)
-        seen.add(key)
-    return base
 
 
 def _summarize_counts(context: dict[str, Any]) -> dict[str, int]:
@@ -281,6 +307,12 @@ def coach_lite_reply(message: str, context: dict[str, Any] | None) -> str:
     counts = _summarize_counts(context or {})
     message_lower = (message or "").lower()
 
+    if _is_goal_request(message):
+        return (
+            "You do not need quarterly goals to start. Pick one weekly focus and protect a Focus block, "
+            "then refine the bigger goals as you go. What is one outcome you want by Friday?"
+        )
+
     observations = []
     if counts["projects_active"] > 7:
         observations.append(
@@ -309,7 +341,16 @@ def coach_lite_reply(message: str, context: dict[str, Any] | None) -> str:
     if screen_id == "blocks":
         suggestion = "Would you put one real block on the calendar, even if it's just 45 minutes?"
     elif screen_id in {"home", "week_calendar"}:
-        suggestion = "How about protecting one Focus block first, then let admin fill the gaps?"
+        home_suggestions = []
+        if counts["tasks_total"] == 0 and counts["projects_total"] == 0:
+            home_suggestions.append("Start with Quick capture to dump what's on your mind.")
+        if counts["unscheduled_ready"] > 0:
+            home_suggestions.append("Schedule one ready task into a Focus block so it has time.")
+        if counts["blocks_total"] == 0:
+            home_suggestions.append("Protect one Focus block first, then let admin fill the gaps.")
+        suggestion = random.choice(home_suggestions) if home_suggestions else (
+            "Protect one Focus block first, then let admin fill the gaps."
+        )
     elif screen_id == "waiting":
         suggestion = "Would you schedule the next follow-up so it doesn't keep rattling around?"
     elif screen_id.startswith("ritual_"):
@@ -414,7 +455,7 @@ def _system_prompt() -> str:
         "Focus on 1-2 salient details; do not list everything. "
         "Keep replies concise: 2-4 sentences, single paragraph, ~70 words max. "
         "Avoid lists unless the user explicitly asks for steps. "
-        "If the user asks how to use the app, give a brief 3-5 step guide and mention /guide. "
+        "If the user asks how to use the app, give a brief 3-5 step guide and offer to walk them through it. "
         "Ask one grounding question at the end. "
         "Use contractions and vary sentence length. "
         "If you include a quote, format it exactly as: Like I said in Start Finishing, \"...\""
@@ -451,7 +492,6 @@ def generate_coach_reply(
     actions = suggest_quick_actions(context)
 
     if _is_guide_request(message):
-        actions = _merge_actions(actions, [{"label": "Open guide", "url": "/guide"}])
         return coach_guide_reply(), actions, "coach-lite"
 
     if provider == "off":
@@ -528,10 +568,10 @@ def suggest_quick_actions(context: dict[str, Any] | None) -> list[dict[str, str]
             {"label": "Morning check-in", "url": "/ritual/morning"},
             {"label": "Back to Today", "url": "/"},
         ]
-    elif screen_id == "guide":
+    elif screen_id == "long_range":
         actions = [
-            {"label": "Back to Today", "url": "/"},
+            {"label": "Weekly review", "url": "/weekly"},
             {"label": "Quick capture", "url": "/capture"},
-            {"label": "Add time block", "url": "/blocks#add-block"},
+            {"label": "Back to Today", "url": "/"},
         ]
     return actions
