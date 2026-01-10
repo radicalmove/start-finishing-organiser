@@ -5,7 +5,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from sqlalchemy.orm import Session, selectinload
 
 from ..db import get_db
-from ..models import Project, ProjectStatus, ProjectCategory, ProjectSize, SuccessLevel
+from ..models import Project, ProjectStatus, ProjectCategory, ProjectSize, SuccessLevel, SuccessPack
 from ..security import csrf_protect, require_html_auth
 from ..utils.coach import build_coach_context_json, project_summary
 from ..utils.rules import enforce_weekly_cap
@@ -136,6 +136,10 @@ def update_long_range_project(
     level_of_success: str | None = Form(None),
     why_link_text: str | None = Form(None),
     drag_points_notes: str | None = Form(None),
+    success_pack_guides: str | None = Form(None),
+    success_pack_peers: str | None = Form(None),
+    success_pack_supporters: str | None = Form(None),
+    success_pack_beneficiaries: str | None = Form(None),
     db: Session = Depends(get_db),
 ):
     project = db.get(Project, project_id)
@@ -173,6 +177,26 @@ def update_long_range_project(
 
     if drag_points_notes is not None:
         project.drag_points_notes = drag_points_notes.strip() or None
+
+    if any(
+        value is not None
+        for value in (
+            success_pack_guides,
+            success_pack_peers,
+            success_pack_supporters,
+            success_pack_beneficiaries,
+        )
+    ):
+        if project.success_pack is None:
+            project.success_pack = SuccessPack(project_id=project.id)
+        project.success_pack.guides = success_pack_guides.strip() if success_pack_guides else None
+        project.success_pack.peers = success_pack_peers.strip() if success_pack_peers else None
+        project.success_pack.supporters = (
+            success_pack_supporters.strip() if success_pack_supporters else None
+        )
+        project.success_pack.beneficiaries = (
+            success_pack_beneficiaries.strip() if success_pack_beneficiaries else None
+        )
 
     db.add(project)
     db.commit()
@@ -256,4 +280,3 @@ def long_range_roadmaps(request: Request, db: Session = Depends(get_db)):
         "long_range_roadmaps.html",
         context,
     )
-

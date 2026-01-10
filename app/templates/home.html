@@ -3,6 +3,21 @@
   {% if form_success %}
     <div class="toast success">{{ form_success }}</div>
   {% endif %}
+  {% if profile_missing %}
+    <div class="panel" style="margin-top: 12px;">
+      <div class="panel-title-row">
+        <h3>Welcome</h3>
+        <div class="panel-actions">
+          <span class="pill">First run</span>
+        </div>
+      </div>
+      <div class="muted">Add your Why and weekly focus so Charlie can guide you better.</div>
+      <div class="cta-row" style="margin-top: 10px;">
+        <a class="btn pink btn-sm" href="/onboarding">Start setup</a>
+        <a class="btn ghost btn-sm" href="/profile">Edit profile</a>
+      </div>
+    </div>
+  {% endif %}
 
   <section class="main-shell">
     <div class="left-col">
@@ -125,6 +140,19 @@
               </div>
             {% else %}
               <div class="muted">No block active right now. Choose your One Thing and a Frog.</div>
+            {% endif %}
+            {% if today_one_thing or today_frog %}
+              <div class="list-item" style="margin-top: 10px;">
+                {% if today_one_thing %}
+                  <div><strong>One Thing:</strong> {{ today_one_thing }}</div>
+                {% endif %}
+                {% if today_frog %}
+                  <div class="muted"><strong>Frog:</strong> {{ today_frog }}</div>
+                {% endif %}
+              </div>
+            {% endif %}
+            {% if profile_why %}
+              <div class="note" style="margin-top: 8px;">Why cue: {{ profile_why }}</div>
             {% endif %}
             <div class="cta-row ritual-cta">
               <a class="btn ghost blue btn-match-header ritual-btn{% if ritual_status.morning %} is-done{% elif ritual_next_key == 'morning' %} is-next{% endif %}" href="/ritual/morning">

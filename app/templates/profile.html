@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% block content %}
+  {% if form_success %}
+    <div class="toast success">{{ form_success }}</div>
+  {% endif %}
+  <section class="panel" style="margin-top: 18px;">
+    <div class="panel-title-row">
+      <h3>Profile</h3>
+      <div class="panel-actions">
+        <span class="pill">Why + energy</span>
+      </div>
+    </div>
+    <div class="muted">Keep this short. It helps Charlie and your planning screens stay aligned.</div>
+    <form method="post" action="/profile" class="form" style="margin-top: 12px;">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+      <div class="field two">
+        <label>
+          <span>Name</span>
+          <input type="text" name="name" value="{{ profile.name if profile else '' }}" placeholder="Your name">
+        </label>
+        <label>
+          <span>Energy profile</span>
+          <select name="energy_profile">
+            <option value="">Select...</option>
+            <option value="morning" {% if profile and profile.energy_profile == 'morning' %}selected{% endif %}>Morning</option>
+            <option value="afternoon" {% if profile and profile.energy_profile == 'afternoon' %}selected{% endif %}>Afternoon</option>
+            <option value="evening" {% if profile and profile.energy_profile == 'evening' %}selected{% endif %}>Evening</option>
+          </select>
+        </label>
+      </div>
+      <label class="field">
+        <span>Why (primary)</span>
+        <textarea name="why_primary" rows="2" placeholder="The sentence that anchors you.">{{ profile.why_primary if profile else '' }}</textarea>
+      </label>
+      <label class="field">
+        <span>Why (expanded)</span>
+        <textarea name="why_expanded" rows="3" placeholder="Optional expansion, keep it human.">{{ profile.why_expanded if profile else '' }}</textarea>
+      </label>
+      <label class="field">
+        <span>Values (comma separated)</span>
+        <input type="text" name="values_text" value="{{ profile.values_text if profile else '' }}" placeholder="e.g., Presence, Courage, Craft">
+      </label>
+      <div class="field two">
+        <label>
+          <span>Workday start</span>
+          <input type="time" name="workday_start" value="{{ profile.workday_start if profile and profile.workday_start else '' }}">
+        </label>
+        <label>
+          <span>Workday end</span>
+          <input type="time" name="workday_end" value="{{ profile.workday_end if profile and profile.workday_end else '' }}">
+        </label>
+      </div>
+      <div class="field two">
+        <label>
+          <span>Weekly review day</span>
+          <select name="weekly_review_day">
+            <option value="">Select...</option>
+            {% for day in ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"] %}
+              <option value="{{ day|lower }}" {% if profile and profile.weekly_review_day == day|lower %}selected{% endif %}>{{ day }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label>
+          <span>Focus block preference</span>
+          <select name="focus_block_preference">
+            <option value="">Select...</option>
+            <option value="90" {% if profile and profile.focus_block_preference == '90' %}selected{% endif %}>90 minutes</option>
+            <option value="105" {% if profile and profile.focus_block_preference == '105' %}selected{% endif %}>105 minutes</option>
+            <option value="120" {% if profile and profile.focus_block_preference == '120' %}selected{% endif %}>120 minutes</option>
+          </select>
+        </label>
+      </div>
+      <div class="cta-row cta-row--end">
+        <button class="btn pink btn-sm" type="submit">Save profile</button>
+      </div>
+    </form>
+  </section>
+{% endblock %}

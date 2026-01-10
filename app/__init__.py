@@ -16,7 +16,7 @@ from .db import (
     ensure_ritual_columns,
     ensure_guidance_reminder_columns,
 )
-from .routes import homepage, api, capture, blocks, resurface, weekly, waiting, ritual, auth, coach, long_range, nudges, health
+from .routes import homepage, api, capture, blocks, resurface, weekly, waiting, ritual, auth, coach, long_range, nudges, health, profile, onboarding, tasks, export
 from .security import ensure_csrf_token, current_user, is_authenticated, ui_auth_enabled
 from .utils.health import ensure_health_metrics
 
@@ -61,7 +61,7 @@ def create_app() -> FastAPI:
     ensure_guidance_reminder_columns()
     ensure_health_metrics()
 
-    app = FastAPI(title="Start Finishing Organiser", version="0.1")
+    app = FastAPI(title="Start Finishing Organiser", version="0.5")
 
     def _parse_bool(value: str | None) -> bool:
         return bool(value) and value.strip().lower() in ("1", "true", "yes", "on")
@@ -103,6 +103,10 @@ def create_app() -> FastAPI:
     app.include_router(nudges.router)
     app.include_router(long_range.router)
     app.include_router(health.router)
+    app.include_router(profile.router)
+    app.include_router(onboarding.router)
+    app.include_router(tasks.router)
+    app.include_router(export.router)
     app.include_router(api.router, prefix="/api")
 
     return app

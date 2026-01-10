@@ -1,0 +1,415 @@
+{% extends "base.html" %}
+{% block content %}
+  {% if form_success %}
+    <div class="toast success">{{ form_success }}</div>
+  {% endif %}
+
+  <section class="tasks-shell">
+    <div class="panel tasks-panel">
+      <div class="panel-title-row">
+        <h3>Tasks</h3>
+        <div class="panel-actions">
+          <span class="pill">Active {{ active_tasks|length }}</span>
+          <span class="pill">Completed {{ completed_tasks|length }}</span>
+        </div>
+      </div>
+      <div class="muted">Switch perspectives to stay light. Every task can move from multiple views.</div>
+      <div class="tasks-toggle" data-task-toggle>
+        <button class="btn ghost btn-sm is-active" type="button" data-view="time">By time</button>
+        <button class="btn ghost btn-sm" type="button" data-view="project">By project</button>
+      </div>
+      <div class="tasks-board" data-task-board data-view="time">
+        <div class="tasks-view tasks-view--time">
+          {% for bucket, items in buckets.items() %}
+            <div class="tasks-column">
+              <div class="tasks-column-header">
+                <span class="caps">{{ bucket.value|title }}</span>
+                <span class="pill">{{ items|length }}</span>
+              </div>
+              <div class="tasks-column-body">
+                {% for task in items %}
+                  <div class="task-card" data-task-card>
+                    <div class="task-card-header">
+                      <div class="task-card-title">{{ task.verb_noun }}</div>
+                      <div class="task-card-actions">
+                        <form method="post" action="/tasks/complete">
+                          <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+                          <input type="hidden" name="task_id" value="{{ task.id }}">
+                          <button class="btn ghost btn-sm" type="submit">Done</button>
+                        </form>
+                        <button class="btn ghost btn-sm task-edit-toggle" type="button">Edit</button>
+                      </div>
+                    </div>
+                    {% if task.description %}
+                      <div class="muted">{{ task.description }}</div>
+                    {% endif %}
+                    <div class="task-meta">
+                      <span class="pill">{{ task.when_bucket.value|title }}</span>
+                      {% if task.block_type %}<span class="pill">{{ task.block_type.value }}</span>{% endif %}
+                      {% if task.frog %}<span class="pill pill--warn">Frog</span>{% endif %}
+                      {% if task.alignment %}<span class="pill">{{ task.alignment.value }}</span>{% endif %}
+                      {% if task.project %}<span class="pill">{{ task.project.title }}</span>{% endif %}
+                    </div>
+                    <form method="post" action="/tasks/update" class="task-edit-form hidden">
+                      <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+                      <input type="hidden" name="task_id" value="{{ task.id }}">
+                      <label class="field">
+                        <span>Task</span>
+                        <input type="text" name="verb_noun" value="{{ task.verb_noun }}">
+                      </label>
+                      <label class="field">
+                        <span>Description</span>
+                        <textarea name="description" rows="2">{{ task.description or '' }}</textarea>
+                      </label>
+                      <div class="field two">
+                        <label>
+                          <span>Project</span>
+                          <select name="project_id">
+                            <option value="">— None —</option>
+                            {% for p in projects %}
+                              <option value="{{ p.id }}" {% if task.project_id == p.id %}selected{% endif %}>{{ p.title }}</option>
+                            {% endfor %}
+                          </select>
+                        </label>
+                        <label>
+                          <span>When</span>
+                          <select name="when_bucket">
+                            {% for key in ['today','week','month','quarter','later'] %}
+                              <option value="{{ key }}" {% if task.when_bucket.value == key %}selected{% endif %}>{{ key|title }}</option>
+                            {% endfor %}
+                          </select>
+                        </label>
+                      </div>
+                      <div class="field two">
+                        <label>
+                          <span>Block type</span>
+                          <select name="block_type">
+                            <option value="">—</option>
+                            {% for block in block_types %}
+                              <option value="{{ block }}" {% if task.block_type and task.block_type.value == block %}selected{% endif %}>{{ block|title }}</option>
+                            {% endfor %}
+                          </select>
+                        </label>
+                        <label>
+                          <span>Duration (min)</span>
+                          <input type="number" name="duration_minutes" value="{{ task.duration_minutes or '' }}" min="5" step="5">
+                        </label>
+                      </div>
+                      <div class="field two">
+                        <label>
+                          <span>Alignment</span>
+                          <select name="alignment">
+                            <option value="">—</option>
+                            {% for align in alignments %}
+                              <option value="{{ align }}" {% if task.alignment and task.alignment.value == align %}selected{% endif %}>{{ align|title }}</option>
+                            {% endfor %}
+                          </select>
+                        </label>
+                        <label class="field checkbox">
+                          <input type="checkbox" name="frog" value="true" {% if task.frog %}checked{% endif %}>
+                          <span>Frog</span>
+                        </label>
+                      </div>
+                      <div class="cta-row cta-row--end">
+                        <button class="btn btn-sm" type="submit">Save</button>
+                      </div>
+                    </form>
+                  </div>
+                {% else %}
+                  <div class="muted">No tasks here yet.</div>
+                {% endfor %}
+              </div>
+            </div>
+          {% endfor %}
+        </div>
+
+        <div class="tasks-view tasks-view--project">
+          {% for project in projects %}
+            {% set items = by_project.get(project.id, []) %}
+            <div class="tasks-column">
+              <div class="tasks-column-header">
+                <span class="caps">{{ project.title }}</span>
+                <span class="pill">{{ items|length }}</span>
+              </div>
+              <div class="tasks-column-body">
+                {% for task in items %}
+                  <div class="task-card" data-task-card>
+                    <div class="task-card-header">
+                      <div class="task-card-title">{{ task.verb_noun }}</div>
+                      <div class="task-card-actions">
+                        <form method="post" action="/tasks/complete">
+                          <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+                          <input type="hidden" name="task_id" value="{{ task.id }}">
+                          <button class="btn ghost btn-sm" type="submit">Done</button>
+                        </form>
+                        <button class="btn ghost btn-sm task-edit-toggle" type="button">Edit</button>
+                      </div>
+                    </div>
+                    {% if task.description %}
+                      <div class="muted">{{ task.description }}</div>
+                    {% endif %}
+                    <div class="task-meta">
+                      <span class="pill">{{ task.when_bucket.value|title }}</span>
+                      {% if task.block_type %}<span class="pill">{{ task.block_type.value }}</span>{% endif %}
+                      {% if task.frog %}<span class="pill pill--warn">Frog</span>{% endif %}
+                      {% if task.alignment %}<span class="pill">{{ task.alignment.value }}</span>{% endif %}
+                    </div>
+                    <form method="post" action="/tasks/update" class="task-edit-form hidden">
+                      <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+                      <input type="hidden" name="task_id" value="{{ task.id }}">
+                      <label class="field">
+                        <span>Task</span>
+                        <input type="text" name="verb_noun" value="{{ task.verb_noun }}">
+                      </label>
+                      <label class="field">
+                        <span>Description</span>
+                        <textarea name="description" rows="2">{{ task.description or '' }}</textarea>
+                      </label>
+                      <div class="field two">
+                        <label>
+                          <span>Project</span>
+                          <select name="project_id">
+                            <option value="">— None —</option>
+                            {% for p in projects %}
+                              <option value="{{ p.id }}" {% if task.project_id == p.id %}selected{% endif %}>{{ p.title }}</option>
+                            {% endfor %}
+                          </select>
+                        </label>
+                        <label>
+                          <span>When</span>
+                          <select name="when_bucket">
+                            {% for key in ['today','week','month','quarter','later'] %}
+                              <option value="{{ key }}" {% if task.when_bucket.value == key %}selected{% endif %}>{{ key|title }}</option>
+                            {% endfor %}
+                          </select>
+                        </label>
+                      </div>
+                      <div class="field two">
+                        <label>
+                          <span>Block type</span>
+                          <select name="block_type">
+                            <option value="">—</option>
+                            {% for block in block_types %}
+                              <option value="{{ block }}" {% if task.block_type and task.block_type.value == block %}selected{% endif %}>{{ block|title }}</option>
+                            {% endfor %}
+                          </select>
+                        </label>
+                        <label>
+                          <span>Duration (min)</span>
+                          <input type="number" name="duration_minutes" value="{{ task.duration_minutes or '' }}" min="5" step="5">
+                        </label>
+                      </div>
+                      <div class="field two">
+                        <label>
+                          <span>Alignment</span>
+                          <select name="alignment">
+                            <option value="">—</option>
+                            {% for align in alignments %}
+                              <option value="{{ align }}" {% if task.alignment and task.alignment.value == align %}selected{% endif %}>{{ align|title }}</option>
+                            {% endfor %}
+                          </select>
+                        </label>
+                        <label class="field checkbox">
+                          <input type="checkbox" name="frog" value="true" {% if task.frog %}checked{% endif %}>
+                          <span>Frog</span>
+                        </label>
+                      </div>
+                      <div class="cta-row cta-row--end">
+                        <button class="btn btn-sm" type="submit">Save</button>
+                      </div>
+                    </form>
+                  </div>
+                {% else %}
+                  <div class="muted">No active tasks yet.</div>
+                {% endfor %}
+              </div>
+            </div>
+          {% endfor %}
+          {% set no_project_items = by_project.get(None, []) %}
+          <div class="tasks-column">
+            <div class="tasks-column-header">
+              <span class="caps">No project</span>
+              <span class="pill">{{ no_project_items|length }}</span>
+            </div>
+            <div class="tasks-column-body">
+              {% for task in no_project_items %}
+                <div class="task-card" data-task-card>
+                  <div class="task-card-header">
+                    <div class="task-card-title">{{ task.verb_noun }}</div>
+                    <div class="task-card-actions">
+                      <form method="post" action="/tasks/complete">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+                        <input type="hidden" name="task_id" value="{{ task.id }}">
+                        <button class="btn ghost btn-sm" type="submit">Done</button>
+                      </form>
+                      <button class="btn ghost btn-sm task-edit-toggle" type="button">Edit</button>
+                    </div>
+                  </div>
+                  {% if task.description %}
+                    <div class="muted">{{ task.description }}</div>
+                  {% endif %}
+                  <div class="task-meta">
+                    <span class="pill">{{ task.when_bucket.value|title }}</span>
+                    {% if task.block_type %}<span class="pill">{{ task.block_type.value }}</span>{% endif %}
+                    {% if task.frog %}<span class="pill pill--warn">Frog</span>{% endif %}
+                    {% if task.alignment %}<span class="pill">{{ task.alignment.value }}</span>{% endif %}
+                  </div>
+                  <form method="post" action="/tasks/update" class="task-edit-form hidden">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+                    <input type="hidden" name="task_id" value="{{ task.id }}">
+                    <label class="field">
+                      <span>Task</span>
+                      <input type="text" name="verb_noun" value="{{ task.verb_noun }}">
+                    </label>
+                    <label class="field">
+                      <span>Description</span>
+                      <textarea name="description" rows="2">{{ task.description or '' }}</textarea>
+                    </label>
+                    <div class="field two">
+                      <label>
+                        <span>Project</span>
+                        <select name="project_id">
+                          <option value="">— None —</option>
+                          {% for p in projects %}
+                            <option value="{{ p.id }}" {% if task.project_id == p.id %}selected{% endif %}>{{ p.title }}</option>
+                          {% endfor %}
+                        </select>
+                      </label>
+                      <label>
+                        <span>When</span>
+                        <select name="when_bucket">
+                          {% for key in ['today','week','month','quarter','later'] %}
+                            <option value="{{ key }}" {% if task.when_bucket.value == key %}selected{% endif %}>{{ key|title }}</option>
+                          {% endfor %}
+                        </select>
+                      </label>
+                    </div>
+                    <div class="field two">
+                      <label>
+                        <span>Block type</span>
+                        <select name="block_type">
+                          <option value="">—</option>
+                          {% for block in block_types %}
+                            <option value="{{ block }}" {% if task.block_type and task.block_type.value == block %}selected{% endif %}>{{ block|title }}</option>
+                          {% endfor %}
+                        </select>
+                      </label>
+                      <label>
+                        <span>Duration (min)</span>
+                        <input type="number" name="duration_minutes" value="{{ task.duration_minutes or '' }}" min="5" step="5">
+                      </label>
+                    </div>
+                    <div class="field two">
+                      <label>
+                        <span>Alignment</span>
+                        <select name="alignment">
+                          <option value="">—</option>
+                          {% for align in alignments %}
+                            <option value="{{ align }}" {% if task.alignment and task.alignment.value == align %}selected{% endif %}>{{ align|title }}</option>
+                          {% endfor %}
+                        </select>
+                      </label>
+                      <label class="field checkbox">
+                        <input type="checkbox" name="frog" value="true" {% if task.frog %}checked{% endif %}>
+                        <span>Frog</span>
+                      </label>
+                    </div>
+                    <div class="cta-row cta-row--end">
+                      <button class="btn btn-sm" type="submit">Save</button>
+                    </div>
+                  </form>
+                </div>
+              {% else %}
+                <div class="muted">No active tasks yet.</div>
+              {% endfor %}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title-row">
+        <h3>Completed this week</h3>
+        <div class="panel-actions">
+          <span class="pill">{{ completed_this_week|length }} ready to archive</span>
+        </div>
+      </div>
+      <div class="muted">Review completed tasks and archive what’s done so it doesn’t clutter next week.</div>
+      <form method="post" action="/tasks/archive/bulk" class="form" style="margin-top: 12px;">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+        <div class="tasks-checklist">
+          {% for task in completed_this_week %}
+            <label class="task-check">
+              <input type="checkbox" name="task_ids" value="{{ task.id }}">
+              <span>{{ task.verb_noun }}</span>
+            </label>
+          {% else %}
+            <div class="muted">No completed tasks this week.</div>
+          {% endfor %}
+        </div>
+        <div class="cta-row cta-row--end">
+          <button class="btn btn-sm" type="submit">Archive reviewed</button>
+        </div>
+      </form>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title-row">
+        <h3>Completed tasks</h3>
+        <div class="panel-actions">
+          <span class="pill">Keep them tidy</span>
+        </div>
+      </div>
+      <div class="tasks-list">
+        {% for task in completed_tasks %}
+          <div class="task-card">
+            <div class="task-card-header">
+              <div class="task-card-title">{{ task.verb_noun }}</div>
+              <div class="task-card-actions">
+                <form method="post" action="/tasks/reopen">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+                  <input type="hidden" name="task_id" value="{{ task.id }}">
+                  <button class="btn ghost btn-sm" type="submit">Reopen</button>
+                </form>
+                <form method="post" action="/tasks/archive">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+                  <input type="hidden" name="task_id" value="{{ task.id }}">
+                  <button class="btn ghost btn-sm" type="submit">Archive</button>
+                </form>
+              </div>
+            </div>
+            <div class="task-meta">
+              {% if task.project %}<span class="pill">{{ task.project.title }}</span>{% endif %}
+              {% if task.completed_at %}<span class="pill">Completed {{ task.completed_at.date() }}</span>{% endif %}
+            </div>
+          </div>
+        {% else %}
+          <div class="muted">No completed tasks yet.</div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title-row">
+        <h3>Archived</h3>
+        <div class="panel-actions">
+          <span class="pill">{{ archived_tasks|length }}</span>
+        </div>
+      </div>
+      <div class="tasks-list">
+        {% for task in archived_tasks %}
+          <div class="task-card">
+            <div class="task-card-title">{{ task.verb_noun }}</div>
+            <div class="task-meta">
+              {% if task.project %}<span class="pill">{{ task.project.title }}</span>{% endif %}
+              <span class="pill">Archived</span>
+            </div>
+          </div>
+        {% else %}
+          <div class="muted">No archived tasks yet.</div>
+        {% endfor %}
+      </div>
+    </div>
+  </section>
+{% endblock %}

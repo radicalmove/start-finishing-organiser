@@ -58,6 +58,29 @@
         <div class="caps">Description</div>
         <textarea name="description" rows="2">{{ project.description or "" }}</textarea>
       </div>
+      <div class="project-edit-field full">
+        <div class="caps">Success Pack</div>
+        <div class="field two">
+          <label>
+            Guides
+            <textarea name="success_pack_guides" rows="2">{{ project.success_pack.guides if project.success_pack else "" }}</textarea>
+          </label>
+          <label>
+            Peers
+            <textarea name="success_pack_peers" rows="2">{{ project.success_pack.peers if project.success_pack else "" }}</textarea>
+          </label>
+        </div>
+        <div class="field two">
+          <label>
+            Supporters
+            <textarea name="success_pack_supporters" rows="2">{{ project.success_pack.supporters if project.success_pack else "" }}</textarea>
+          </label>
+          <label>
+            Beneficiaries
+            <textarea name="success_pack_beneficiaries" rows="2">{{ project.success_pack.beneficiaries if project.success_pack else "" }}</textarea>
+          </label>
+        </div>
+      </div>
     </div>
     <div class="project-edit-actions">
       <button class="btn btn-sm" type="submit">Save</button>

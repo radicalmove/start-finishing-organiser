@@ -10,7 +10,7 @@ from urllib.request import Request as UrlRequest, urlopen
 
 from sqlalchemy.orm import Session, selectinload
 
-from ..models import Block, CoachMessage, Project, RitualEntry, Task, WaitingOn
+from ..models import Block, CoachMessage, Profile, Project, RitualEntry, Task, WaitingOn
 
 _DEFAULT_QUOTE_CHANCE = 0.12
 _DEFAULT_HISTORY_LIMIT = 120
@@ -123,7 +123,24 @@ def ritual_summary(entry: RitualEntry) -> dict[str, Any]:
     }
 
 
+def profile_summary(profile: Profile | None) -> dict[str, Any] | None:
+    if not profile:
+        return None
+    return {
+        "name": profile.name,
+        "why_primary": profile.why_primary,
+        "why_expanded": profile.why_expanded,
+        "values_text": profile.values_text,
+        "energy_profile": profile.energy_profile,
+        "workday_start": _to_iso(profile.workday_start),
+        "workday_end": _to_iso(profile.workday_end),
+        "weekly_review_day": profile.weekly_review_day,
+        "focus_block_preference": profile.focus_block_preference,
+    }
+
+
 def collect_global_context(db: Session) -> dict[str, Any]:
+    profile = db.query(Profile).order_by(Profile.id.asc()).first()
     projects = db.query(Project).order_by(Project.created_at.desc()).all()
     tasks = (
         db.query(Task)
@@ -146,6 +163,7 @@ def collect_global_context(db: Session) -> dict[str, Any]:
     rituals = db.query(RitualEntry).order_by(RitualEntry.created_at.desc()).all()
 
     return {
+        "profile": profile_summary(profile),
         "projects": [project_summary(p) for p in projects],
         "tasks": [task_summary(t) for t in tasks],
         "blocks": [block_summary(b) for b in blocks],
@@ -222,6 +240,12 @@ def _cozi_screen_hint(screen_id: str) -> str | None:
 def _is_guide_request(text: str) -> bool:
     lowered = (text or "").lower()
     guide_phrases = (
+        "help me with what i'm looking at",
+        "help me with what im looking at",
+        "help me",
+        "help with this",
+        "what should i do",
+        "what do i do",
         "how do i use",
         "how to use",
         "how does this app work",
@@ -264,15 +288,105 @@ def _is_goal_request(text: str) -> bool:
     return any(phrase in lowered for phrase in goal_phrases)
 
 
+def _screen_playbook(screen_id: str) -> str | None:
+    if screen_id == "home":
+        return (
+            "Let's keep it simple: first capture what's on your mind, then choose your One Thing, "
+            "then protect one Focus block on the calendar. Want me to help pick the One Thing?"
+        )
+    if screen_id == "week_calendar":
+        return (
+            "Scan the week, protect one Focus block for your top project, then let admin fill the gaps. "
+            "Which day should we lock in first?"
+        )
+    if screen_id in {"capture", "capture_wizard"}:
+        return (
+            "Capture in one pass: name the thing, decide task vs project, then set its time horizon. "
+            "Do you want to capture a project or a task right now?"
+        )
+    if screen_id == "blocks":
+        return (
+            "Start with one Focus block, then assign a task, then add an admin block around it. "
+            "What time window should we protect?"
+        )
+    if screen_id == "resurface":
+        return (
+            "Pull anything due into this week, reset dates for the rest, then pick one to schedule. "
+            "Which item feels ready now?"
+        )
+    if screen_id == "weekly_review":
+        return (
+            "Use this to pick your 4+3 weekly focus and resurface tasks; if you want a guided flow, open the wizard. "
+            "Want to start with focus projects or resurfacing?"
+        )
+    if screen_id == "weekly_wizard":
+        return (
+            "Follow the steps in order: note wins, pick weekly focus, resurface, plan blocks, then archive + reflect. "
+            "Ready for step one?"
+        )
+    if screen_id == "waiting":
+        return (
+            "Set a follow-up date for each OPP, then capture anything new waiting on others. "
+            "Who needs a follow-up first?"
+        )
+    if screen_id.startswith("ritual_"):
+        return (
+            "Keep it light: answer the prompts honestly, then choose one small adjustment. "
+            "Want to do that now?"
+        )
+    if screen_id == "long_range":
+        return (
+            "Touch the pyramid, confirm horizons, then refine one project. "
+            "Which horizon needs attention?"
+        )
+    if screen_id == "tasks":
+        return (
+            "Switch between time and project views, edit one task to set when + block type, then mark done and archive weekly. "
+            "Which task should we tighten first?"
+        )
+    if screen_id == "profile":
+        return (
+            "Keep it short: update your Why and energy profile, then save. "
+            "Want help drafting the Why in one sentence?"
+        )
+    if screen_id == "onboarding":
+        return (
+            "Go step by step: name + Why, values, energy/workday, then seed weekly projects. "
+            "Ready for step one?"
+        )
+    if screen_id == "export":
+        return (
+            "Pick a time range, tick the data sets you want (defaults exclude some), then export to download JSON + CSV. "
+            "Which time window do you want?"
+        )
+    if screen_id == "health_dashboard":
+        return (
+            "Log a quick metric or blood pressure, set a goal, then open a focus area for deeper tracking. "
+            "Want to start with a quick log or a goal?"
+        )
+    if screen_id.startswith("health_"):
+        return (
+            "Log today's measurement, scan the trend cards, then adjust your next small goal. "
+            "Want to log a data point now?"
+        )
+    return None
+
+
 def coach_guide_reply() -> str:
     return (
-        "Quick guide:\n"
-        "- Capture tasks or projects (Quick capture or Guided capture).\n"
-        "- Pick your weekly focus (4 work + 3 personal) in Weekly Review.\n"
-        "- Schedule Focus/Admin/Social/Recovery blocks on the calendar.\n"
-        "- Do a morning check-in, a midday reset, and an evening check-out.\n\n"
-        "Tell me what you want to do and I’ll walk you through it."
+        "Quick guide: capture tasks or projects, pick weekly focus (4 work + 3 personal), "
+        "schedule Focus/Admin/Social/Recovery blocks, and close the day with a ritual. "
+        "Tell me what you want to do and I'll walk you through it."
     )
+
+
+def coach_help_reply(context: dict[str, Any] | None) -> str:
+    screen = (context or {}).get("screen", {})
+    screen_id = screen.get("id", "home")
+    playbook = _screen_playbook(screen_id)
+    if playbook:
+        return playbook
+    return coach_guide_reply()
 
 
 def _summarize_counts(context: dict[str, Any]) -> dict[str, int]:
@@ -340,6 +454,22 @@ def coach_lite_reply(message: str, context: dict[str, Any] | None) -> str:
     suggestion = None
     if screen_id == "blocks":
         suggestion = "Would you put one real block on the calendar, even if it's just 45 minutes?"
+    elif screen_id == "tasks":
+        suggestion = "Pick one task to tighten: set when + block type so it can get time."
+    elif screen_id == "weekly_wizard":
+        suggestion = "Stay with step one: name the wins that actually moved the week."
+    elif screen_id == "weekly_review":
+        suggestion = "Pick 4 work + 3 personal projects to keep the week honest."
+    elif screen_id == "profile":
+        suggestion = "Short Why, clear energy profile, then save. Keep it human."
+    elif screen_id == "onboarding":
+        suggestion = "Step one only: name + Why. We'll handle the rest after."
+    elif screen_id == "export":
+        suggestion = "Choose a time window, tick the data sets you want, then export."
+    elif screen_id == "health_dashboard":
+        suggestion = "Log one data point to keep momentum, then set a single goal."
+    elif screen_id.startswith("health_"):
+        suggestion = "Log today's measurement, then glance at the trend card."
     elif screen_id in {"home", "week_calendar"}:
         home_suggestions = []
         if counts["tasks_total"] == 0 and counts["projects_total"] == 0:
@@ -355,6 +485,8 @@ def coach_lite_reply(message: str, context: dict[str, Any] | None) -> str:
         suggestion = "Would you schedule the next follow-up so it doesn't keep rattling around?"
     elif screen_id.startswith("ritual_"):
         suggestion = "Name the one thing that makes today a win. Keep it small and real."
+    elif screen_id == "long_range":
+        suggestion = "Focus one horizon at a time. Which level matters most right now?"
     else:
         suggestion = "What is the next concrete step you can attach to time?"
 
@@ -452,6 +584,7 @@ def _system_prompt() -> str:
         "Use curiosity and invitations, not commands. "
         "You give advice only; do not claim to take actions or change data. "
         "Use the provided context to comment on what the user is viewing. "
+        "When the user asks for help on the current screen, guide them step-by-step and keep it light. "
         "Focus on 1-2 salient details; do not list everything. "
         "Keep replies concise: 2-4 sentences, single paragraph, ~70 words max. "
         "Avoid lists unless the user explicitly asks for steps. "
@@ -492,7 +625,7 @@ def generate_coach_reply(
     actions = suggest_quick_actions(context)
 
     if _is_guide_request(message):
-        return coach_guide_reply(), actions, "coach-lite"
+        return coach_help_reply(context), actions, "coach-lite"
 
     if provider == "off":
         return coach_lite_reply(message, context), actions, "coach-lite"
@@ -545,7 +678,48 @@ def suggest_quick_actions(context: dict[str, Any] | None) -> list[dict[str, str]
         ]
     elif screen_id == "weekly_review":
         actions = [
+            {"label": "Start wizard", "url": "/weekly/wizard"},
             {"label": "Resurface list", "url": "/resurface"},
+            {"label": "Back to Today", "url": "/"},
+        ]
+    elif screen_id == "weekly_wizard":
+        actions = [
+            {"label": "Add focus block", "url": "/blocks#add-block"},
+            {"label": "Tasks board", "url": "/tasks"},
+            {"label": "Back to Today", "url": "/"},
+        ]
+    elif screen_id == "tasks":
+        actions = [
+            {"label": "Weekly review", "url": "/weekly/wizard"},
+            {"label": "Quick capture", "url": "/capture"},
+            {"label": "Add time block", "url": "/blocks#add-block"},
+        ]
+    elif screen_id == "profile":
+        actions = [
+            {"label": "Onboarding wizard", "url": "/onboarding"},
+            {"label": "Back to Today", "url": "/"},
+        ]
+    elif screen_id == "onboarding":
+        actions = [
+            {"label": "Profile", "url": "/profile"},
+            {"label": "Back to Today", "url": "/"},
+        ]
+    elif screen_id == "export":
+        actions = [
+            {"label": "Health dashboard", "url": "/health"},
+            {"label": "Tasks board", "url": "/tasks"},
+            {"label": "Back to Today", "url": "/"},
+        ]
+    elif screen_id == "health_dashboard":
+        actions = [
+            {"label": "Diet page", "url": "/health/diet"},
+            {"label": "Fitness page", "url": "/health/fitness"},
+            {"label": "Export data", "url": "/export"},
+        ]
+    elif screen_id and screen_id.startswith("health_"):
+        actions = [
+            {"label": "Health dashboard", "url": "/health"},
+            {"label": "Export data", "url": "/export"},
             {"label": "Back to Today", "url": "/"},
         ]
     elif screen_id == "waiting":

@@ -1,6 +1,14 @@
 # Changelog
 
-## 0.4.0 (in progress)
+## 0.5.0 - 2026-01-11
+- Added export center with time windows, data filters, and ZIP JSON/CSV output.
+- Added profile page and onboarding wizard to anchor Why and weekly focus.
+- Added tasks board with time/project views, weekly archive flow, and task editing.
+- Added weekly review wizard with completion logging and follow-up nudges.
+- Improved Charlie with screen-aware guidance and quick actions.
+- Refined header navigation sizing and color accents (export + profile).
+
+## 0.4.0 - 2026-01-11
 - Added health + fitness dashboard with goals, quick log, and trend board.
 - Added diet, weight, fitness, strength, and flexibility tracking pages.
 - Added combined blood pressure logging for systolic + diastolic.

@@ -7,7 +7,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from ..db import get_db
-from ..models import GuidanceEvent, GuidanceReminder, Project, ProjectStatus, RitualEntry
+from ..models import GuidanceEvent, GuidanceReminder, Project, ProjectStatus, RitualEntry, WaitingOn
 from ..security import csrf_protect, require_html_auth
 
 router = APIRouter(dependencies=[Depends(require_html_auth), Depends(csrf_protect)])
@@ -56,6 +56,13 @@ def _project_updated_since(db: Session, since: date, horizon: str | None = None)
 
 def _weekly_review_done(db: Session, period_start: date) -> bool:
     since_dt = datetime.combine(period_start, time.min)
+    event = (
+        db.query(GuidanceEvent)
+        .filter(GuidanceEvent.code == "weekly_review_done", GuidanceEvent.created_at >= since_dt)
+        .first()
+    )
+    if event:
+        return True
     query = (
         db.query(Project)
         .filter(Project.status != ProjectStatus.ARCHIVED)
@@ -69,6 +76,17 @@ def _daily_checkin_done(db: Session, today: date) -> bool:
     return (
         db.query(RitualEntry)
         .filter(RitualEntry.entry_date == today)
+        .first()
+        is not None
+    )
+
+
+def _waiting_followup_due(db: Session, today: date) -> bool:
+    return (
+        db.query(WaitingOn)
+        .filter(
+            (WaitingOn.last_followup.is_(None)) | (WaitingOn.last_followup <= today)
+        )
         .first()
         is not None
     )
@@ -131,6 +149,15 @@ REMINDER_DEFS = [
         "link_url": "/ritual/morning",
         "period_start": lambda today: today,
         "done_check": lambda db, period_start, today: _daily_checkin_done(db, today),
+    },
+    {
+        "code": "waiting_followup",
+        "title": "Waiting on follow-ups",
+        "body": "You have OPPs waiting on someone. Set a follow-up date so it doesn’t drift.",
+        "link_label": "Open Waiting On",
+        "link_url": "/waiting",
+        "period_start": lambda today: today,
+        "done_check": lambda db, period_start, today: not _waiting_followup_due(db, today),
     },
 ]
 

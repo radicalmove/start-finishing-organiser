@@ -1,6 +1,6 @@
 ---
 app_name: "Meaningful Work Organiser"
-version: "0.1-prototype"
+version: "0.5"
 author: "Richard Davies"
 created_for: "Personal use, extensible to others later"
 primary_reference: "Start Finishing – Charlie Gilkey"
@@ -95,7 +95,7 @@ constraints_and_rules:
 
 ---
 
-# Meaningful Work Organiser — Massive Blueprint (v0.1)
+# Meaningful Work Organiser — Massive Blueprint (v0.5)
 
 ## Table of Contents
 
@@ -779,7 +779,15 @@ This is where the app’s intelligence lives.
 - Diet, weight, fitness, strength, flexibility tracking pages.
 - Metrics with charts and combined blood pressure logging.
 
-### v0.5 – Integrations Start
+### v0.5 – Exports + Guidance
+
+- Export center with time windows and filtered data output.
+- Profile and onboarding flow to anchor Why and weekly focus.
+- Tasks board with time/project perspectives and weekly archive flow.
+- Weekly review wizard with completion logging and follow-up nudges.
+- Screen-aware coach guidance for key pages.
+
+### v0.6 – Integrations Start
 
 - One calendar integration (read-only).
 - Simple Trello import for projects.
@@ -805,4 +813,4 @@ This is where the app’s intelligence lives.
 - **Why**: Core purpose, identity, and values that the app keeps front and centre.
 
 ---
-# End of Massive Blueprint (v0.1)
+# End of Massive Blueprint (v0.5)

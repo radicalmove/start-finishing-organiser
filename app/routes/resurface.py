@@ -4,7 +4,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy.orm import Session, selectinload
 
 from ..db import get_db
-from ..models import Task, WhenBucket
+from ..models import Task, TaskStatus, WhenBucket
 from ..utils.coach import build_coach_context_json, task_summary
 from ..security import csrf_protect, require_html_auth
 
@@ -19,7 +19,11 @@ def resurface(request: Request, db: Session = Depends(get_db)):
     due = (
         db.query(Task)
         .options(selectinload(Task.project))
-        .filter(Task.resurface_on.isnot(None), Task.resurface_on <= upcoming)
+        .filter(
+            Task.resurface_on.isnot(None),
+            Task.resurface_on <= upcoming,
+            Task.status.notin_([TaskStatus.DONE, TaskStatus.ARCHIVED, TaskStatus.CANCELLED]),
+        )
         .order_by(Task.resurface_on.asc(), Task.created_at.desc())
         .all()
     )

@@ -1,0 +1,156 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <section class="export-shell">
+    <div class="panel">
+      <div class="panel-title-row">
+        <h3>Export data</h3>
+        <div class="panel-actions">
+          <span class="pill">Human + machine readable</span>
+        </div>
+      </div>
+      <div class="muted">
+        Download a ZIP that includes JSON + CSV snapshots. Defaults keep sensitive logs excluded unless you opt in.
+      </div>
+      <div class="export-tags">
+        <span class="pill">JSON</span>
+        <span class="pill">CSV</span>
+        <span class="pill">ZIP</span>
+      </div>
+    </div>
+
+    <form method="post" action="/export" class="form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+      <div class="export-grid">
+        <div class="panel">
+          <div class="panel-title-row">
+            <h3>Time window</h3>
+            <div class="panel-actions">
+              <span class="pill">By entry date</span>
+            </div>
+          </div>
+          <div class="export-options">
+            <label class="export-option">
+              <input type="radio" name="range_choice" value="all" checked>
+              <div>
+                <div class="export-option-title">All data</div>
+                <div class="muted">Full history snapshot.</div>
+              </div>
+            </label>
+            <label class="export-option">
+              <input type="radio" name="range_choice" value="year">
+              <div>
+                <div class="export-option-title">Last year</div>
+                <div class="muted">Past 365 days.</div>
+              </div>
+            </label>
+            <label class="export-option">
+              <input type="radio" name="range_choice" value="quarter">
+              <div>
+                <div class="export-option-title">Last 3 months</div>
+                <div class="muted">Past 90 days.</div>
+              </div>
+            </label>
+            <label class="export-option">
+              <input type="radio" name="range_choice" value="month">
+              <div>
+                <div class="export-option-title">Last month</div>
+                <div class="muted">Past 30 days.</div>
+              </div>
+            </label>
+            <label class="export-option">
+              <input type="radio" name="range_choice" value="week">
+              <div>
+                <div class="export-option-title">Last week</div>
+                <div class="muted">Past 7 days.</div>
+              </div>
+            </label>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-title-row">
+            <h3>Include data sets</h3>
+            <div class="panel-actions">
+              <span class="pill">Tick to include</span>
+            </div>
+          </div>
+          <div class="export-options">
+            <label class="export-option">
+              <input type="checkbox" name="include_profile" checked>
+              <div>
+                <div class="export-option-title">Profile</div>
+                <div class="muted">Why, values, energy, preferences.</div>
+              </div>
+            </label>
+            <label class="export-option">
+              <input type="checkbox" name="include_projects" checked>
+              <div>
+                <div class="export-option-title">Projects</div>
+                <div class="muted">Active projects + created in range.</div>
+              </div>
+            </label>
+            <label class="export-option">
+              <input type="checkbox" name="include_tasks" checked>
+              <div>
+                <div class="export-option-title">Tasks</div>
+                <div class="muted">Active tasks + created in range.</div>
+              </div>
+            </label>
+            <label class="export-option">
+              <input type="checkbox" name="include_health" checked>
+              <div>
+                <div class="export-option-title">Health</div>
+                <div class="muted">Metrics, entries, and goals.</div>
+              </div>
+            </label>
+            <label class="export-option">
+              <input type="checkbox" name="include_blocks">
+              <div>
+                <div class="export-option-title">Time blocks</div>
+                <div class="muted">Scheduled Focus/Admin/Social/Recovery blocks.</div>
+              </div>
+            </label>
+            <label class="export-option">
+              <input type="checkbox" name="include_rituals">
+              <div>
+                <div class="export-option-title">Ritual entries</div>
+                <div class="muted">Morning, midday, evening check-ins.</div>
+              </div>
+            </label>
+            <label class="export-option">
+              <input type="checkbox" name="include_waiting">
+              <div>
+                <div class="export-option-title">Waiting on</div>
+                <div class="muted">OPPs and follow-up dates.</div>
+              </div>
+            </label>
+            <label class="export-option">
+              <input type="checkbox" name="include_coach">
+              <div>
+                <div class="export-option-title">Coach chat</div>
+                <div class="muted">Messages and context snapshots.</div>
+              </div>
+            </label>
+            <label class="export-option">
+              <input type="checkbox" name="include_guidance">
+              <div>
+                <div class="export-option-title">Guidance logs</div>
+                <div class="muted">Nudges and weekly review events.</div>
+              </div>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel export-footer">
+        <div class="muted">
+          Completed tasks and archived projects are excluded by default. Goals are included when created or targeted in range.
+        </div>
+        <div class="cta-row cta-row--end">
+          <button class="btn pink btn-sm" type="submit">Download export</button>
+        </div>
+      </div>
+    </form>
+  </section>
+{% endblock %}

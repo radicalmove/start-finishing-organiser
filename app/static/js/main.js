@@ -134,6 +134,85 @@ document.addEventListener("DOMContentLoaded", () => {
     showStep(0);
   }
 
+  const onboardingForm = document.querySelector("[data-onboarding-wizard]");
+  if (onboardingForm) {
+    const steps = Array.from(onboardingForm.querySelectorAll(".wizard-step"));
+    const nextBtn = onboardingForm.querySelector("[data-next]");
+    const prevBtn = onboardingForm.querySelector("[data-prev]");
+    const submitBtn = onboardingForm.querySelector("[data-submit]");
+    let current = 0;
+
+    const showStep = (index) => {
+      steps.forEach((step, i) => step.classList.toggle("hidden", i !== index));
+      prevBtn?.classList.toggle("hidden", index === 0);
+      nextBtn?.classList.toggle("hidden", index === steps.length - 1);
+      submitBtn?.classList.toggle("hidden", index !== steps.length - 1);
+    };
+
+    nextBtn?.addEventListener("click", () => {
+      if (current < steps.length - 1) {
+        current += 1;
+        showStep(current);
+      }
+    });
+
+    prevBtn?.addEventListener("click", () => {
+      if (current > 0) {
+        current -= 1;
+        showStep(current);
+      }
+    });
+
+    showStep(0);
+  }
+
+  const tasksToggle = document.querySelector("[data-task-toggle]");
+  const tasksBoard = document.querySelector("[data-task-board]");
+  if (tasksToggle && tasksBoard) {
+    tasksToggle.querySelectorAll("[data-view]").forEach((button) => {
+      button.addEventListener("click", () => {
+        const view = button.dataset.view;
+        if (!view || tasksBoard.dataset.view === view) return;
+        tasksBoard.dataset.view = view;
+        tasksToggle
+          .querySelectorAll("[data-view]")
+          .forEach((btn) => btn.classList.toggle("is-active", btn.dataset.view === view));
+      });
+    });
+  }
+
+  const weeklyWizard = document.querySelector("[data-weekly-wizard]");
+  if (weeklyWizard) {
+    const steps = Array.from(weeklyWizard.querySelectorAll(".wizard-step"));
+    const nextBtn = weeklyWizard.querySelector("[data-next]");
+    const prevBtn = weeklyWizard.querySelector("[data-prev]");
+    const submitBtn = weeklyWizard.querySelector("[data-submit]");
+    let current = 0;
+
+    const showStep = (index) => {
+      steps.forEach((step, i) => step.classList.toggle("hidden", i !== index));
+      prevBtn?.classList.toggle("hidden", index === 0);
+      nextBtn?.classList.toggle("hidden", index === steps.length - 1);
+      submitBtn?.classList.toggle("hidden", index !== steps.length - 1);
+    };
+
+    nextBtn?.addEventListener("click", () => {
+      if (current < steps.length - 1) {
+        current += 1;
+        showStep(current);
+      }
+    });
+
+    prevBtn?.addEventListener("click", () => {
+      if (current > 0) {
+        current -= 1;
+        showStep(current);
+      }
+    });
+
+    showStep(0);
+  }
+
   // Digital clock
   const clockTime = document.querySelector("#clock-time");
   const clockDate = document.querySelector("#clock-date");
@@ -201,6 +280,20 @@ document.addEventListener("DOMContentLoaded", () => {
     form.classList.toggle("hidden");
     if (!form.classList.contains("hidden")) {
       const input = form.querySelector('input[name="title"]');
+      input?.focus();
+      input?.select();
+    }
+  });
+
+  document.addEventListener("click", (event) => {
+    const toggle = event.target.closest(".task-edit-toggle");
+    if (!toggle) return;
+    const container = toggle.closest(".task-card");
+    const form = container?.querySelector(".task-edit-form");
+    if (!form) return;
+    form.classList.toggle("hidden");
+    if (!form.classList.contains("hidden")) {
+      const input = form.querySelector('input[name="verb_noun"]');
       input?.focus();
       input?.select();
     }

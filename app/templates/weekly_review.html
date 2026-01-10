@@ -11,6 +11,7 @@
         <span class="pill">Work: {{ weekly_work_count }} / 4</span>
         <span class="pill">Personal: {{ weekly_personal_count }} / 3</span>
         <a class="btn ghost" href="/capture?tab=project">Adjust focus</a>
+        <a class="btn pink" href="/weekly/wizard">Start weekly review</a>
       </div>
       <div class="list" style="margin-top: 10px;">
         {% for p in projects if p.active_this_week %}

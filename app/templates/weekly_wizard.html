@@ -1,0 +1,137 @@
+{% extends "base.html" %}
+{% block content %}
+  <section class="panel" style="margin-top: 18px;">
+    <div class="panel-title-row">
+      <h3>Weekly review</h3>
+      <div class="panel-actions">
+        <span class="pill">Step-by-step</span>
+      </div>
+    </div>
+    <div class="muted">Move through this one step at a time. No rush.</div>
+
+    <div class="weekly-wizard" data-weekly-wizard>
+      <div class="wizard-step" data-step="1">
+        <h4>Step 1: Wins + movement</h4>
+        <div class="muted">What got finished? What actually moved?</div>
+        <div class="list" style="margin-top: 10px;">
+          {% for task in completed_this_week %}
+            <div class="list-item">
+              <div>{{ task.verb_noun }}</div>
+              <div class="muted">
+                Completed {{ task.completed_at.date() if task.completed_at else '' }}
+                {% if task.project %} • {{ task.project.title }}{% endif %}
+              </div>
+            </div>
+          {% else %}
+            <div class="muted">No completed tasks yet this week.</div>
+          {% endfor %}
+        </div>
+      </div>
+
+      <div class="wizard-step hidden" data-step="2">
+        <h4>Step 2: Weekly focus (4+3)</h4>
+        <div class="muted">Choose the projects that deserve focus blocks.</div>
+        <div class="cta-row">
+          <span class="pill">Work {{ weekly_work_count }}/4</span>
+          <span class="pill">Personal {{ weekly_personal_count }}/3</span>
+        </div>
+        <div class="list" style="margin-top: 10px;">
+          {% for project in projects %}
+            <div class="list-item">
+              <div>{{ project.title }}</div>
+              <div class="muted">{{ project.description or "No description yet." }}</div>
+              <div class="task-meta">
+                <span class="pill">{{ project.category.value }}</span>
+                {% if project.active_this_week %}
+                  <span class="pill pill--good">Active</span>
+                {% else %}
+                  <span class="pill">Inactive</span>
+                {% endif %}
+              </div>
+              <form method="post" action="/weekly/projects/{{ project.id }}/toggle" class="form" style="margin-top: 8px;">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+                <input type="hidden" name="make_active" value="{{ 'no' if project.active_this_week else 'yes' }}">
+                <button class="btn ghost btn-sm" type="submit">
+                  {% if project.active_this_week %}Remove from focus{% else %}Add to focus{% endif %}
+                </button>
+              </form>
+            </div>
+          {% else %}
+            <div class="muted">No projects yet. Capture one to get started.</div>
+          {% endfor %}
+        </div>
+      </div>
+
+      <div class="wizard-step hidden" data-step="3">
+        <h4>Step 3: Resurface</h4>
+        <div class="muted">Items parked for later that are due now.</div>
+        <div class="list" style="margin-top: 10px;">
+          {% for task in due_resurface %}
+            <div class="list-item">
+              <div>{{ task.verb_noun }}</div>
+              <div class="muted">
+                Resurface on: {{ task.resurface_on }}
+                {% if task.project %} • {{ task.project.title }}{% endif %}
+              </div>
+              <form method="post" action="/resurface/{{ task.id }}" class="form" style="margin-top: 8px;">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+                <button class="btn ghost btn-sm" type="submit">Pull into this week</button>
+              </form>
+            </div>
+          {% else %}
+            <div class="muted">Nothing due to resurface.</div>
+          {% endfor %}
+        </div>
+      </div>
+
+      <div class="wizard-step hidden" data-step="4">
+        <h4>Step 4: Plan focus blocks</h4>
+        <div class="muted">Protect the time before the week fills itself.</div>
+        <div class="cta-row" style="margin-top: 12px;">
+          <a class="btn pink btn-sm" href="/blocks#add-block">Add focus block</a>
+          <a class="btn ghost btn-sm" href="/tasks">Review tasks</a>
+        </div>
+      </div>
+
+      <div class="wizard-step hidden" data-step="5">
+        <h4>Step 5: Close the loop</h4>
+        <div class="muted">Archive what’s done and write a short reflection.</div>
+        <form method="post" action="/tasks/archive/bulk" class="form" style="margin-top: 12px;">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+          <div class="tasks-checklist">
+            {% for task in completed_this_week %}
+              <label class="task-check">
+                <input type="checkbox" name="task_ids" value="{{ task.id }}">
+                <span>{{ task.verb_noun }}</span>
+              </label>
+            {% else %}
+              <div class="muted">No completed tasks to archive.</div>
+            {% endfor %}
+          </div>
+          <div class="cta-row cta-row--end">
+            <button class="btn ghost btn-sm" type="submit">Archive reviewed</button>
+          </div>
+        </form>
+        <form method="post" action="/weekly/complete" class="form" data-submit>
+          <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+          <label class="field">
+            <span>Wins (short list)</span>
+            <textarea name="wins" rows="2" placeholder="What mattered most this week?"></textarea>
+          </label>
+          <label class="field">
+            <span>Adjustments for next week</span>
+            <textarea name="notes" rows="3" placeholder="What will you do differently?"></textarea>
+          </label>
+          <div class="cta-row cta-row--end">
+            <button class="btn pink btn-sm" type="submit">Finish weekly review</button>
+          </div>
+        </form>
+      </div>
+
+      <div class="wizard-actions">
+        <button type="button" class="btn ghost" data-prev>Back</button>
+        <button type="button" class="btn" data-next>Next</button>
+      </div>
+    </div>
+  </section>
+{% endblock %}

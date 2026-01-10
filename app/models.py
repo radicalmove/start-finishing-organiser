@@ -51,6 +51,7 @@ class TaskStatus(str, Enum):
     IN_PROGRESS = "in_progress"
     DONE = "done"
     CANCELLED = "cancelled"
+    ARCHIVED = "archived"
 
 
 class WhenBucket(str, Enum):
@@ -222,6 +223,23 @@ class RitualEntry(Base):
     energy = Column(String(50), nullable=True)
     notes = Column(Text, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
+class Profile(Base):
+    __tablename__ = "profiles"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(120), nullable=True)
+    why_primary = Column(Text, nullable=True)
+    why_expanded = Column(Text, nullable=True)
+    values_text = Column(Text, nullable=True)
+    energy_profile = Column(String(20), nullable=True)
+    workday_start = Column(Time, nullable=True)
+    workday_end = Column(Time, nullable=True)
+    weekly_review_day = Column(String(12), nullable=True)
+    focus_block_preference = Column(String(40), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
 
 class HealthMetric(Base):

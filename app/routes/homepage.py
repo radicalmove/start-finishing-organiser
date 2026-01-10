@@ -16,6 +16,7 @@ from ..models import (
     ProjectStatus,
     ProjectCategory,
     Task,
+    TaskStatus,
     WhenBucket,
     Block,
     RitualEntry,
@@ -23,6 +24,7 @@ from ..models import (
 )
 from ..utils.rules import enforce_weekly_cap, compose_why_text, parse_block_type
 from ..utils.coach import build_coach_context_json, block_summary, task_summary
+from ..utils.profile import get_profile
 from ..security import csrf_protect, require_html_auth
 
 router = APIRouter(dependencies=[Depends(require_html_auth), Depends(csrf_protect)])
@@ -288,14 +290,20 @@ def landing(request: Request, db: Session = Depends(get_db)):
     today_tasks = (
         db.query(Task)
         .options(selectinload(Task.project))
-        .filter(Task.when_bucket == WhenBucket.TODAY)
+        .filter(
+            Task.when_bucket == WhenBucket.TODAY,
+            Task.status.notin_([TaskStatus.DONE, TaskStatus.ARCHIVED, TaskStatus.CANCELLED]),
+        )
         .order_by(Task.block_type.asc().nulls_last(), Task.priority.asc().nulls_last())
         .all()
     )
     inbox_tasks = (
         db.query(Task)
         .options(selectinload(Task.project))
-        .filter(Task.when_bucket.in_([WhenBucket.LATER, WhenBucket.MONTH, WhenBucket.QUARTER]))
+        .filter(
+            Task.when_bucket.in_([WhenBucket.LATER, WhenBucket.MONTH, WhenBucket.QUARTER]),
+            Task.status.notin_([TaskStatus.DONE, TaskStatus.ARCHIVED, TaskStatus.CANCELLED]),
+        )
         .order_by(Task.created_at.desc())
         .all()
     )
@@ -314,7 +322,12 @@ def landing(request: Request, db: Session = Depends(get_db)):
     sched_ready = (
         db.query(Task)
         .options(selectinload(Task.project))
-        .filter(Task.block_type.isnot(None), Task.duration_minutes.isnot(None), Task.scheduled_for.is_(None))
+        .filter(
+            Task.block_type.isnot(None),
+            Task.duration_minutes.isnot(None),
+            Task.scheduled_for.is_(None),
+            Task.status.notin_([TaskStatus.DONE, TaskStatus.ARCHIVED, TaskStatus.CANCELLED]),
+        )
         .order_by(Task.when_bucket.asc(), Task.created_at.desc())
         .all()
     )
@@ -359,6 +372,12 @@ def landing(request: Request, db: Session = Depends(get_db)):
                 ritual_next_key = key
                 break
     ritual_next_label = ritual_labels.get(ritual_next_key) if ritual_next_key else None
+    profile = get_profile(db)
+    profile_why = profile.why_primary if profile else None
+    profile_missing = profile is None or not profile.why_primary
+    morning_entry = ritual_by_type.get("morning")
+    today_one_thing = morning_entry.one_thing if morning_entry else None
+    today_frog = morning_entry.frog if morning_entry else None
     todays_blocks = [b for b in week_blocks if b.date == today]
     cozi_all_events, cozi_status = _fetch_cozi_calendar()
     cozi_events_today = _cozi_events_touching_day(cozi_all_events, today)
@@ -492,6 +511,9 @@ def landing(request: Request, db: Session = Depends(get_db)):
             "cozi_status": cozi_status,
             "cozi_event_count": len(cozi_events_today),
             "cozi_error": cozi_error,
+            "why_primary": profile_why,
+            "one_thing": today_one_thing,
+            "frog": today_frog,
         },
         db=db,
     )
@@ -532,6 +554,10 @@ def landing(request: Request, db: Session = Depends(get_db)):
             "ritual_next_key": ritual_next_key,
             "ritual_next_label": ritual_next_label,
             "ritual_labels": ritual_labels,
+            "profile_why": profile_why,
+            "today_one_thing": today_one_thing,
+            "today_frog": today_frog,
+            "profile_missing": profile_missing,
             "coach_context_json": coach_context_json,
         },
     )

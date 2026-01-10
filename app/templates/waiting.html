@@ -14,6 +14,15 @@
             {% if w.person %}Person: {{ w.person }} | {% endif %}
             Created: {{ w.created_at.date() if w.created_at else "" }}
           </div>
+          <form method="post" action="/waiting/followup" class="form" style="margin-top: 8px;">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+            <input type="hidden" name="waiting_id" value="{{ w.id }}">
+            <label class="field">
+              <span>Next follow-up</span>
+              <input type="date" name="followup_date" value="{{ w.last_followup if w.last_followup else '' }}">
+            </label>
+            <button class="btn ghost btn-sm" type="submit">Save follow-up</button>
+          </form>
           <form method="post" action="/waiting/resolve" class="form" style="margin-top: 8px;">
             <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
             <input type="hidden" name="waiting_id" value="{{ w.id }}">
