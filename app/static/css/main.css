@@ -96,11 +96,12 @@ h4 {
   grid-area: center;
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
   gap: 16px;
   flex-wrap: nowrap;
   width: 100%;
   min-width: 0;
+  padding-left: 20px;
 }
 
 .brand-link h1 {
@@ -138,9 +139,9 @@ h4 {
 }
 
 .header-action-sm {
-  min-width: 100px;
-  width: 100px;
-  height: 32px;
+  min-width: 96px;
+  width: 96px;
+  height: 36px;
   padding: 0 8px;
   border-radius: 12px;
   font-size: 13px;
@@ -1292,7 +1293,7 @@ button:hover,
 
 .tbar {
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   gap: 16px;
   grid-area: tbar;
   justify-self: end;
@@ -2103,6 +2104,7 @@ textarea {
     width: 100%;
     flex-direction: column;
     gap: 10px;
+    padding-left: 0;
   }
   .tbar {
     justify-self: start;
@@ -2125,9 +2127,9 @@ textarea {
   }
 
   .header-action-sm {
-    min-width: 100px;
-    width: 100px;
-    height: 32px;
+    min-width: 96px;
+    width: 96px;
+    height: 36px;
     padding: 0 8px;
     font-size: 13px;
     gap: 5px;
@@ -2279,9 +2281,9 @@ textarea {
 }
 
 .coach-toggle.header-action-sm {
-  min-width: 100px;
-  width: 100px;
-  height: 32px;
+  min-width: 96px;
+  width: 96px;
+  height: 36px;
   font-size: 13px;
   padding: 0 8px;
   gap: 5px;
@@ -2463,9 +2465,9 @@ textarea {
   }
 
   .coach-toggle.header-action-sm {
-    min-width: 100px;
-    width: 100px;
-    height: 32px;
+    min-width: 96px;
+    width: 96px;
+    height: 36px;
     border-radius: 10px;
     font-size: 13px;
     padding: 0 8px;
