@@ -1,0 +1,193 @@
+<div class="app-modal{% if not guided_modal_open %} hidden{% endif %}" id="guided-capture-modal" role="dialog" aria-modal="true" aria-labelledby="guided-capture-title">
+  <div class="app-modal-card guided-capture-card">
+    <div class="quick-capture-header">
+      <h3 class="app-modal-title" id="guided-capture-title">Guided capture</h3>
+      <button class="quick-capture-close" type="button" data-guided-capture-close aria-label="Close">&times;</button>
+    </div>
+    {% if guided_form_error %}
+      <div class="pill pill--limit guided-capture-error">{{ guided_form_error }}</div>
+    {% endif %}
+    <section class="capture-shell guided-capture-shell">
+      <form method="post" action="/capture/wizard" id="wizardForm">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+        <input type="hidden" name="displacement_ack" value="0" data-displacement-ack>
+        <input type="hidden" name="source_task_id" value="{{ source_task_id or '' }}"{% if not source_task_id %} disabled{% endif %}>
+        <div class="wizard-step" data-step="1">
+          <div class="field">
+            <span>What is it?</span>
+            <input type="text" name="capture_text" required placeholder="Type the thing you’re capturing" value="{{ prefill or '' }}">
+          </div>
+          <label class="field">
+            <span>Details (optional)</span>
+            <textarea name="capture_description" rows="3" placeholder="Context, email notes, or links.">{{ prefill_details|default('')|e }}</textarea>
+          </label>
+          <div class="field">
+            <span>Whose priority is this?</span>
+            <div class="why-tags why-tags--owner">
+              <label><input type="radio" name="owner_type" value="mine" checked> Mine</label>
+              <label><input type="radio" name="owner_type" value="shared"> Shared</label>
+              <label><input type="radio" name="owner_type" value="opp"> Other People’s Priority (OPP)</label>
+            </div>
+          </div>
+          <div class="field hidden" data-waiting-person>
+            <span>Who are you waiting on? (optional)</span>
+            <input type="text" name="waiting_person" placeholder="Name or team">
+          </div>
+        </div>
+
+        <div class="wizard-step hidden" data-step="2">
+          <div class="field">
+            <span>Is this a task or a project?</span>
+            <div class="why-tags why-tags--stack">
+              <label><input type="radio" name="item_kind" value="task" checked> Task (15–120 min)</label>
+              <label><input type="radio" name="item_kind" value="project"> Project (bigger than a task)</label>
+              <label><input type="radio" name="item_kind" value="not_sure"> Not sure yet</label>
+            </div>
+          </div>
+          <div class="field hidden" data-attach-project>
+            <span>Attach to an existing project (optional)</span>
+            <select name="project_id">
+              <option value="">— None —</option>
+              {% for p in projects|default([]) %}
+                <option value="{{ p.id }}">{{ p.title }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="field" data-project-category>
+            <span>Category (for new project)</span>
+            <select name="category">
+              <option value="work">Work</option>
+              <option value="personal">Personal</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="wizard-step hidden" data-step="2a" data-not-sure-step>
+          <div class="field">
+            <span>Quick clarity check</span>
+            <div class="why-tags why-tags--stack">
+              <label><input type="radio" name="not_sure_size" value="single"> Single sitting (15–120 min)</label>
+              <label><input type="radio" name="not_sure_size" value="multi"> Multiple sessions or moving parts</label>
+            </div>
+          </div>
+          <div class="field">
+            <span>Do you already know the next action?</span>
+            <div class="why-tags why-tags--stack">
+              <label><input type="radio" name="not_sure_next" value="yes"> Yes, clear next step</label>
+              <label><input type="radio" name="not_sure_next" value="no"> Not yet</label>
+            </div>
+          </div>
+          <label class="field">
+            <span>Tell me more about what you want to accomplish</span>
+            <textarea name="not_sure_details" rows="3" data-required="true" placeholder="Outcome, scope, dependencies, or steps you can see."></textarea>
+          </label>
+          <div class="wizard-suggest-row">
+            <button type="button" class="btn ghost btn-sm" data-not-sure-suggest>Get suggestion</button>
+            <span class="muted" data-not-sure-status></span>
+          </div>
+          <div class="wizard-suggestion hidden" data-not-sure-suggestion>
+            <div class="wizard-suggestion-title">Suggestion: <span data-not-sure-suggestion-kind></span></div>
+            <div class="wizard-suggestion-body" data-not-sure-suggestion-text></div>
+            <button type="button" class="btn ghost btn-sm" data-not-sure-use>Use suggestion</button>
+          </div>
+          <div class="note">If it is multi-step or unclear, it often behaves like a project.</div>
+        </div>
+
+        <div class="wizard-step hidden" data-step="2b" data-not-sure-step>
+          <div class="field">
+            <span>Best fit for now</span>
+            <div class="why-tags why-tags--stack">
+              <label><input type="radio" name="not_sure_decision" value="task" required> This is a task</label>
+              <label><input type="radio" name="not_sure_decision" value="project" required> This is a project</label>
+            </div>
+            <div class="note">You can adjust later.</div>
+          </div>
+        </div>
+
+        <div class="wizard-step hidden" data-step="3">
+          <div class="field">
+            <span data-horizon-label>Time horizon</span>
+            <select name="horizon">
+              <option value="today">Today</option>
+              <option value="week" selected>This week</option>
+              <option value="month">This month</option>
+              <option value="quarter">This quarter</option>
+              <option value="later">Later/Someday</option>
+            </select>
+            <div class="note" data-horizon-note-task>
+              For tasks: Today/Week keeps it active. Month/Quarter/Later parks it for resurfacing.
+            </div>
+            <div class="note hidden" data-horizon-note-project>
+              Week auto-counts in 4+3. Month/Quarter/Later parks it; you can pull it forward.
+            </div>
+          </div>
+          <div class="field" data-project-color>
+            <span>Project color (optional)</span>
+            <select name="project_color_scheme">
+              <option value="">Default</option>
+              <option value="slate">Slate</option>
+              <option value="rose">Rose</option>
+              <option value="sky">Sky</option>
+              <option value="mint">Mint</option>
+              <option value="amber">Amber</option>
+              <option value="violet">Violet</option>
+            </select>
+          </div>
+          <div class="field checkbox" data-include-week>
+            <input type="radio" name="include_this_week" value="yes" checked>
+            <span>Include in this week’s 4+3 focus</span>
+          </div>
+          <div class="field checkbox" data-include-week>
+            <input type="radio" name="include_this_week" value="no">
+            <span>Park it outside this week</span>
+          </div>
+          <div class="note helper hidden" data-week-helper>
+            Month/Quarter/Later selected. Want to spotlight it this week? Toggle above.
+          </div>
+        </div>
+
+        <div class="wizard-step hidden" data-step="4">
+          <div class="field">
+            <span>Why alignment</span>
+            <div class="why-tags why-tags--stack">
+              <label><input type="checkbox" name="why_tags" value="Identity"> Identity</label>
+              <label><input type="checkbox" name="why_tags" value="Contribution"> Contribution</label>
+              <label><input type="checkbox" name="why_tags" value="Growth"> Growth</label>
+              <label><input type="checkbox" name="why_tags" value="Family/Presence"> Family/Presence</label>
+              <label><input type="checkbox" name="why_tags" value="Health"> Health</label>
+              <label><input type="checkbox" name="why_tags" value="Service"> Service</label>
+            </div>
+            <textarea name="why_link_text" rows="2" placeholder="How does this serve your Why? If unclear, consider parking it."></textarea>
+          </div>
+        </div>
+
+        <div class="wizard-step hidden" data-step="5">
+          <div class="field">
+            <span>Block type / energy fit</span>
+            <select name="block_type">
+              <option value="">—</option>
+              <option value="focus">Focus</option>
+              <option value="admin">Admin</option>
+              <option value="social">Social</option>
+              <option value="recovery">Recovery</option>
+            </select>
+          </div>
+          <label class="field">
+            <span>Duration (minutes, optional)</span>
+            <input type="number" name="duration_minutes" min="5" step="5" placeholder="e.g. 45">
+          </label>
+          <div class="field checkbox">
+            <input type="checkbox" name="frog" value="true">
+            <span>Mark as Frog (dread-heavy)</span>
+          </div>
+        </div>
+
+        <div class="wizard-actions">
+          <button type="button" class="btn ghost" data-prev>Back</button>
+          <button type="button" class="btn" data-next>Next</button>
+          <button type="submit" class="btn hidden" data-submit>Save</button>
+        </div>
+      </form>
+    </section>
+  </div>
+</div>

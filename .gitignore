@@ -42,3 +42,4 @@ uploads/
 
 # dotenv / secrets
 .env
+client_secret*.json

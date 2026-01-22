@@ -39,7 +39,9 @@
             <div>{{ t.verb_noun }}</div>
             <div class="muted">Resurface on: {{ t.resurface_on }}</div>
             <div class="task-meta">
-              {% if t.project %}<span class="pill">{{ t.project.title }}</span>{% endif %}
+              {% if t.project %}
+                <span class="pill pill--project project-color-{{ t.project.color_scheme or 'slate' }}">{{ t.project.title }}</span>
+              {% endif %}
               <span class="pill">{{ t.when_bucket.value }}</span>
             </div>
             <form method="post" action="/resurface/{{ t.id }}" class="form" style="margin-top: 8px;">

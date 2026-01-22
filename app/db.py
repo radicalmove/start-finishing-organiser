@@ -1,15 +1,29 @@
 # Database configuration for Start Finishing Organiser
+import os
+
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import declarative_base, sessionmaker
 
-SQLALCHEMY_DATABASE_URL = "sqlite:///./sfo.db"
+DEFAULT_DATABASE_URL = "sqlite:///./sfo.db"
+SQLALCHEMY_DATABASE_URL = os.getenv("SFO_DATABASE_URL", DEFAULT_DATABASE_URL)
 
-engine = create_engine(
-    SQLALCHEMY_DATABASE_URL,
-    connect_args={"check_same_thread": False},
-)
 
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+def _connect_args(url: str) -> dict:
+    if url.startswith("sqlite"):
+        return {"check_same_thread": False}
+    return {}
+
+
+def init_engine(db_url: str | None = None):
+    """Initialize the SQLAlchemy engine and sessionmaker (used by tests)."""
+    global engine, SessionLocal
+    url = db_url or os.getenv("SFO_DATABASE_URL", DEFAULT_DATABASE_URL)
+    engine = create_engine(url, connect_args=_connect_args(url))
+    SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+    return engine
+
+
+engine = init_engine(SQLALCHEMY_DATABASE_URL)
 Base = declarative_base()
 
 
@@ -137,15 +151,48 @@ def ensure_guidance_reminder_columns():
             )
 
 
+def ensure_task_inbox_column():
+    """Ensure tasks.in_inbox exists for inbox processing flow."""
+    with engine.connect() as conn:
+        cols = {row[1] for row in conn.execute(text("PRAGMA table_info(tasks);")).fetchall()}
+        if "in_inbox" not in cols:
+            conn.execute(text("ALTER TABLE tasks ADD COLUMN in_inbox BOOLEAN NOT NULL DEFAULT 0"))
+
+
+def ensure_task_archived_from_inbox_column():
+    """Ensure tasks.archived_from_inbox exists for inbox recycle bin restores."""
+    with engine.connect() as conn:
+        cols = {row[1] for row in conn.execute(text("PRAGMA table_info(tasks);")).fetchall()}
+        if "archived_from_inbox" not in cols:
+            conn.execute(
+                text(
+                    "ALTER TABLE tasks "
+                    "ADD COLUMN archived_from_inbox BOOLEAN NOT NULL DEFAULT 0"
+                )
+            )
+
+
+def ensure_project_color_column():
+    """Ensure projects.color_scheme exists for optional color tagging."""
+    with engine.connect() as conn:
+        cols = {row[1] for row in conn.execute(text("PRAGMA table_info(projects);")).fetchall()}
+        if "color_scheme" not in cols:
+            conn.execute(text("ALTER TABLE projects ADD COLUMN color_scheme VARCHAR(24) NULL"))
+
+
 __all__ = [
     "engine",
     "SessionLocal",
     "Base",
     "get_db",
+    "init_engine",
     "ensure_task_owner_column",
     "ensure_task_resurface_columns",
     "ensure_block_title_column",
     "ensure_ritual_table",
     "ensure_ritual_columns",
     "ensure_guidance_reminder_columns",
+    "ensure_task_inbox_column",
+    "ensure_task_archived_from_inbox_column",
+    "ensure_project_color_column",
 ]

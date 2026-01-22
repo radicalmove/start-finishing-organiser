@@ -54,6 +54,7 @@ class TaskCreate(BaseModel):
     verb_noun: str
     project_id: Optional[int] = None
     description: Optional[str] = None
+    in_inbox: bool = False
     when_bucket: WhenBucket = WhenBucket.LATER
     block_type: Optional[BlockType] = None
     priority: Optional[int] = Field(None, ge=1, le=5)
@@ -66,6 +67,7 @@ class TaskCreate(BaseModel):
 class TaskUpdate(BaseModel):
     verb_noun: Optional[str] = None
     description: Optional[str] = None
+    in_inbox: Optional[bool] = None
     when_bucket: Optional[WhenBucket] = None
     block_type: Optional[BlockType] = None
     priority: Optional[int] = Field(None, ge=1, le=5)

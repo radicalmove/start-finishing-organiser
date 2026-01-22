@@ -7,7 +7,6 @@ from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
 
 from .db import (
-    engine,
     Base,
     ensure_task_owner_column,
     ensure_task_resurface_columns,
@@ -15,10 +14,14 @@ from .db import (
     ensure_ritual_table,
     ensure_ritual_columns,
     ensure_guidance_reminder_columns,
+    ensure_task_inbox_column,
+    ensure_task_archived_from_inbox_column,
+    ensure_project_color_column,
 )
 from .routes import homepage, api, capture, blocks, resurface, weekly, waiting, ritual, auth, coach, long_range, nudges, health, profile, onboarding, tasks, export
 from .security import ensure_csrf_token, current_user, is_authenticated, ui_auth_enabled
 from .utils.health import ensure_health_metrics
+from .utils.gmail import start_gmail_sync_loop
 
 
 def _load_dotenv() -> None:
@@ -52,13 +55,19 @@ def create_app() -> FastAPI:
     Keeps startup logic tidy and makes testing easier.
     """
     _load_dotenv()
-    Base.metadata.create_all(bind=engine)
+    from . import models  # noqa: F401
+    from . import db as db_module
+
+    Base.metadata.create_all(bind=db_module.engine)
     ensure_task_owner_column()
     ensure_task_resurface_columns()
     ensure_block_title_column()
     ensure_ritual_table()
     ensure_ritual_columns()
     ensure_guidance_reminder_columns()
+    ensure_task_inbox_column()
+    ensure_task_archived_from_inbox_column()
+    ensure_project_color_column()
     ensure_health_metrics()
 
     app = FastAPI(title="Start Finishing Organiser", version="0.5")
@@ -108,5 +117,7 @@ def create_app() -> FastAPI:
     app.include_router(tasks.router)
     app.include_router(export.router)
     app.include_router(api.router, prefix="/api")
+
+    start_gmail_sync_loop()
 
     return app

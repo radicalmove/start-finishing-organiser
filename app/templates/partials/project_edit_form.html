@@ -29,6 +29,18 @@
         <input type="date" name="target_date" value="{{ project.target_date or '' }}">
       </div>
       <div class="project-edit-field">
+        <div class="caps">Color</div>
+        <select name="color_scheme">
+          <option value="" {% if not project.color_scheme %}selected{% endif %}>Default</option>
+          <option value="slate" {% if project.color_scheme == "slate" %}selected{% endif %}>Slate</option>
+          <option value="rose" {% if project.color_scheme == "rose" %}selected{% endif %}>Rose</option>
+          <option value="sky" {% if project.color_scheme == "sky" %}selected{% endif %}>Sky</option>
+          <option value="mint" {% if project.color_scheme == "mint" %}selected{% endif %}>Mint</option>
+          <option value="amber" {% if project.color_scheme == "amber" %}selected{% endif %}>Amber</option>
+          <option value="violet" {% if project.color_scheme == "violet" %}selected{% endif %}>Violet</option>
+        </select>
+      </div>
+      <div class="project-edit-field">
         <div class="caps">Size</div>
         <select name="size">
           <option value="" {% if not project.size %}selected{% endif %}>Unspecified</option>

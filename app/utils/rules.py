@@ -56,3 +56,15 @@ def parse_block_type(value: str | None) -> BlockType | None:
         return BlockType(value)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail="Invalid block type") from exc
+
+
+def parse_optional_int(value: str | None) -> int | None:
+    if value is None:
+        return None
+    cleaned = value.strip()
+    if not cleaned:
+        return None
+    try:
+        return int(cleaned)
+    except ValueError:
+        return None

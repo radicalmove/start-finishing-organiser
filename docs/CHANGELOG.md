@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.6.0 - 2026-01-22
+- Added Gmail sync with OAuth auth, background polling, and email-to-inbox import.
+- Added inbox detail modal with editable description, linkified preview, and recycle bin actions.
+- Split Tasks into separate Active/Completed/Archived pages with dedicated Time/Project views.
+- Refined inbox/task UI layout, hover states, and pill styling.
+
 ## 0.5.0 - 2026-01-11
 - Added export center with time windows, data filters, and ZIP JSON/CSV output.
 - Added profile page and onboarding wizard to anchor Why and weekly focus.

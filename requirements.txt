@@ -6,3 +6,7 @@ python-multipart==0.0.9
 icalendar==5.0.12
 certifi==2024.12.14
 itsdangerous==2.2.0
+google-api-python-client==2.154.0
+google-auth==2.35.0
+google-auth-httplib2==0.2.0
+google-auth-oauthlib==1.2.1

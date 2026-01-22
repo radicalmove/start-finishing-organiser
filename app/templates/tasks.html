@@ -5,20 +5,25 @@
   {% endif %}
 
   <section class="tasks-shell">
-    <div class="panel tasks-panel">
+    <div class="panel tasks-panel{% if page_mode in ['completed', 'archived'] %} tasks-panel--stacked{% endif %}">
+      {% set is_active_page = page_mode in ['active_time', 'active_project'] %}
       <div class="panel-title-row">
-        <h3>Tasks</h3>
-        <div class="panel-actions">
-          <span class="pill">Active {{ active_tasks|length }}</span>
-          <span class="pill">Completed {{ completed_tasks|length }}</span>
+        <div class="tasks-header-group">
+          <h3>Tasks</h3>
+          <div class="tasks-view-nav">
+            <a class="btn ghost btn-sm{% if view_mode == 'time' %} is-active{% endif %}" href="/tasks/time">By time</a>
+            <a class="btn ghost btn-sm{% if view_mode == 'project' %} is-active{% endif %}" href="/tasks/project">By project</a>
+          </div>
+        </div>
+        <div class="panel-actions tasks-page-nav">
+          <a class="btn ghost btn-sm{% if is_active_page %} is-active{% endif %}" href="/tasks/time">Active {{ active_tasks|length }}</a>
+          <a class="btn ghost btn-sm{% if page_mode == 'completed' %} is-active{% endif %}" href="/tasks/completed">Completed {{ completed_tasks|length }}</a>
+          <a class="btn ghost btn-sm{% if page_mode == 'archived' %} is-active{% endif %}" href="/tasks/archived">Archived {{ archived_tasks|length }}</a>
         </div>
       </div>
-      <div class="muted">Switch perspectives to stay light. Every task can move from multiple views.</div>
-      <div class="tasks-toggle" data-task-toggle>
-        <button class="btn ghost btn-sm is-active" type="button" data-view="time">By time</button>
-        <button class="btn ghost btn-sm" type="button" data-view="project">By project</button>
-      </div>
-      <div class="tasks-board" data-task-board data-view="time">
+      {% if is_active_page %}
+      <div class="tasks-board" data-view="{{ view_mode or 'time' }}">
+        {% if view_mode == 'time' %}
         <div class="tasks-view tasks-view--time">
           {% for bucket, items in buckets.items() %}
             <div class="tasks-column">
@@ -35,6 +40,7 @@
                         <form method="post" action="/tasks/complete">
                           <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
                           <input type="hidden" name="task_id" value="{{ task.id }}">
+                          <input type="hidden" name="next_url" value="{{ request.url.path }}">
                           <button class="btn ghost btn-sm" type="submit">Done</button>
                         </form>
                         <button class="btn ghost btn-sm task-edit-toggle" type="button">Edit</button>
@@ -45,14 +51,17 @@
                     {% endif %}
                     <div class="task-meta">
                       <span class="pill">{{ task.when_bucket.value|title }}</span>
-                      {% if task.block_type %}<span class="pill">{{ task.block_type.value }}</span>{% endif %}
-                      {% if task.frog %}<span class="pill pill--warn">Frog</span>{% endif %}
-                      {% if task.alignment %}<span class="pill">{{ task.alignment.value }}</span>{% endif %}
-                      {% if task.project %}<span class="pill">{{ task.project.title }}</span>{% endif %}
+                      {% if task.block_type %}<span class="pill pill--block pill--block-{{ task.block_type.value }}">{{ task.block_type.value }}</span>{% endif %}
+                      {% if task.frog %}<span class="pill pill--frog pill--warn">Frog</span>{% endif %}
+                      {% if task.alignment %}<span class="pill pill--alignment pill--alignment-{{ task.alignment.value }}">{{ task.alignment.value }}</span>{% endif %}
+                      {% if task.project %}
+                        <span class="pill pill--project project-color-{{ task.project.color_scheme or 'slate' }}">{{ task.project.title }}</span>
+                      {% endif %}
                     </div>
                     <form method="post" action="/tasks/update" class="task-edit-form hidden">
                       <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
                       <input type="hidden" name="task_id" value="{{ task.id }}">
+                      <input type="hidden" name="next_url" value="{{ request.url.path }}">
                       <label class="field">
                         <span>Task</span>
                         <input type="text" name="verb_noun" value="{{ task.verb_noun }}">
@@ -122,7 +131,7 @@
             </div>
           {% endfor %}
         </div>
-
+        {% elif view_mode == 'project' %}
         <div class="tasks-view tasks-view--project">
           {% for project in projects %}
             {% set items = by_project.get(project.id, []) %}
@@ -140,6 +149,7 @@
                         <form method="post" action="/tasks/complete">
                           <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
                           <input type="hidden" name="task_id" value="{{ task.id }}">
+                          <input type="hidden" name="next_url" value="{{ request.url.path }}">
                           <button class="btn ghost btn-sm" type="submit">Done</button>
                         </form>
                         <button class="btn ghost btn-sm task-edit-toggle" type="button">Edit</button>
@@ -150,13 +160,14 @@
                     {% endif %}
                     <div class="task-meta">
                       <span class="pill">{{ task.when_bucket.value|title }}</span>
-                      {% if task.block_type %}<span class="pill">{{ task.block_type.value }}</span>{% endif %}
-                      {% if task.frog %}<span class="pill pill--warn">Frog</span>{% endif %}
-                      {% if task.alignment %}<span class="pill">{{ task.alignment.value }}</span>{% endif %}
+                      {% if task.block_type %}<span class="pill pill--block pill--block-{{ task.block_type.value }}">{{ task.block_type.value }}</span>{% endif %}
+                      {% if task.frog %}<span class="pill pill--frog pill--warn">Frog</span>{% endif %}
+                      {% if task.alignment %}<span class="pill pill--alignment pill--alignment-{{ task.alignment.value }}">{{ task.alignment.value }}</span>{% endif %}
                     </div>
                     <form method="post" action="/tasks/update" class="task-edit-form hidden">
                       <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
                       <input type="hidden" name="task_id" value="{{ task.id }}">
+                      <input type="hidden" name="next_url" value="{{ request.url.path }}">
                       <label class="field">
                         <span>Task</span>
                         <input type="text" name="verb_noun" value="{{ task.verb_noun }}">
@@ -240,6 +251,7 @@
                       <form method="post" action="/tasks/complete">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
                         <input type="hidden" name="task_id" value="{{ task.id }}">
+                        <input type="hidden" name="next_url" value="{{ request.url.path }}">
                         <button class="btn ghost btn-sm" type="submit">Done</button>
                       </form>
                       <button class="btn ghost btn-sm task-edit-toggle" type="button">Edit</button>
@@ -250,13 +262,14 @@
                   {% endif %}
                   <div class="task-meta">
                     <span class="pill">{{ task.when_bucket.value|title }}</span>
-                    {% if task.block_type %}<span class="pill">{{ task.block_type.value }}</span>{% endif %}
-                    {% if task.frog %}<span class="pill pill--warn">Frog</span>{% endif %}
-                    {% if task.alignment %}<span class="pill">{{ task.alignment.value }}</span>{% endif %}
+                    {% if task.block_type %}<span class="pill pill--block pill--block-{{ task.block_type.value }}">{{ task.block_type.value }}</span>{% endif %}
+                    {% if task.frog %}<span class="pill pill--frog pill--warn">Frog</span>{% endif %}
+                    {% if task.alignment %}<span class="pill pill--alignment pill--alignment-{{ task.alignment.value }}">{{ task.alignment.value }}</span>{% endif %}
                   </div>
                   <form method="post" action="/tasks/update" class="task-edit-form hidden">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
                     <input type="hidden" name="task_id" value="{{ task.id }}">
+                    <input type="hidden" name="next_url" value="{{ request.url.path }}">
                     <label class="field">
                       <span>Task</span>
                       <input type="text" name="verb_noun" value="{{ task.verb_noun }}">
@@ -325,9 +338,12 @@
             </div>
           </div>
         </div>
+        {% endif %}
       </div>
     </div>
+    {% endif %}
 
+    {% if page_mode == 'completed' %}
     <div class="panel">
       <div class="panel-title-row">
         <h3>Completed this week</h3>
@@ -338,6 +354,7 @@
       <div class="muted">Review completed tasks and archive what’s done so it doesn’t clutter next week.</div>
       <form method="post" action="/tasks/archive/bulk" class="form" style="margin-top: 12px;">
         <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+        <input type="hidden" name="next_url" value="{{ request.url.path }}">
         <div class="tasks-checklist">
           {% for task in completed_this_week %}
             <label class="task-check">
@@ -370,17 +387,21 @@
                 <form method="post" action="/tasks/reopen">
                   <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
                   <input type="hidden" name="task_id" value="{{ task.id }}">
+                  <input type="hidden" name="next_url" value="{{ request.url.path }}">
                   <button class="btn ghost btn-sm" type="submit">Reopen</button>
                 </form>
                 <form method="post" action="/tasks/archive">
                   <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
                   <input type="hidden" name="task_id" value="{{ task.id }}">
+                  <input type="hidden" name="next_url" value="{{ request.url.path }}">
                   <button class="btn ghost btn-sm" type="submit">Archive</button>
                 </form>
               </div>
             </div>
             <div class="task-meta">
-              {% if task.project %}<span class="pill">{{ task.project.title }}</span>{% endif %}
+              {% if task.project %}
+                <span class="pill pill--project project-color-{{ task.project.color_scheme or 'slate' }}">{{ task.project.title }}</span>
+              {% endif %}
               {% if task.completed_at %}<span class="pill">Completed {{ task.completed_at.date() }}</span>{% endif %}
             </div>
           </div>
@@ -389,8 +410,10 @@
         {% endfor %}
       </div>
     </div>
+    {% endif %}
 
-    <div class="panel">
+    {% if page_mode == 'archived' %}
+    <div class="panel" id="archived">
       <div class="panel-title-row">
         <h3>Archived</h3>
         <div class="panel-actions">
@@ -400,9 +423,26 @@
       <div class="tasks-list">
         {% for task in archived_tasks %}
           <div class="task-card">
-            <div class="task-card-title">{{ task.verb_noun }}</div>
+            <div class="task-card-header">
+              <div class="task-card-title">{{ task.verb_noun }}</div>
+              <div class="task-card-actions">
+                <form method="post" action="/tasks/restore">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+                  <input type="hidden" name="task_id" value="{{ task.id }}">
+                  <input type="hidden" name="next_url" value="{{ request.url.path }}">
+                  <button class="btn ghost btn-sm" type="submit">
+                    {% if task.archived_from_inbox %}Restore to Inbox{% else %}Restore{% endif %}
+                  </button>
+                </form>
+              </div>
+            </div>
             <div class="task-meta">
-              {% if task.project %}<span class="pill">{{ task.project.title }}</span>{% endif %}
+              {% if task.project %}
+                <span class="pill pill--project project-color-{{ task.project.color_scheme or 'slate' }}">{{ task.project.title }}</span>
+              {% endif %}
+              {% if task.archived_from_inbox %}
+                <span class="pill">Inbox</span>
+              {% endif %}
               <span class="pill">Archived</span>
             </div>
           </div>
@@ -411,5 +451,6 @@
         {% endfor %}
       </div>
     </div>
+    {% endif %}
   </section>
 {% endblock %}

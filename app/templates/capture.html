@@ -94,6 +94,18 @@
           </select>
           <div class="note">Week = auto-counted in 4+3. For longer horizons, choose if it’s part of this week’s focus.</div>
         </label>
+        <label class="field">
+          <span>Project color</span>
+          <select name="project_color_scheme">
+            <option value="">Default</option>
+            <option value="slate">Slate</option>
+            <option value="rose">Rose</option>
+            <option value="sky">Sky</option>
+            <option value="mint">Mint</option>
+            <option value="amber">Amber</option>
+            <option value="violet">Violet</option>
+          </select>
+        </label>
         <div class="field checkbox">
           <input type="radio" name="project_include_this_week" value="yes" checked>
           <span>Include in this week’s 4+3 focus</span>
@@ -165,7 +177,7 @@
       </div>
 
       <div class="note hidden" data-capture-section="not_sure">
-        Guided Capture will open automatically.
+        Guided Capture will open in a modal.
       </div>
 
       <div class="cta-row cta-row--end">
@@ -173,4 +185,5 @@
       </div>
     </form>
   </section>
+  {% include "partials/guided_capture_modal.html" %}
 {% endblock %}

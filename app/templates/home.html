@@ -22,25 +22,44 @@
   <section class="main-shell">
     <div class="left-col">
       <div class="panel inbox-panel">
-        <h3>Inbox</h3>
-        <div class="muted">New/parked items. Process when you have a moment.</div>
-        <div class="list" style="margin-top: 10px;">
+        <div class="panel-title-row">
+          <div class="panel-title-group">
+            <h3>Inbox</h3>
+          </div>
+          <div class="panel-actions">
+            <button class="btn pink btn-sm btn-match-header" type="button" data-quick-capture-open>Quick</button>
+            <a class="btn ghost btn-sm btn-match-header" href="/capture/wizard" data-guided-capture-open>Guided</a>
+            <a class="btn ghost btn-sm btn-match-header" href="/waiting">Waiting</a>
+            <a class="btn ghost btn-icon btn-match-header inbox-bin-btn" href="/tasks#archived" aria-label="Recycle bin" title="Recycle bin">
+              <span class="recycle-icon" aria-hidden="true">&#x267B;&#xFE0E;</span>
+            </a>
+          </div>
+        </div>
+        <div class="list" style="margin-top: 10px;" data-draggable-list>
           {% for t in inbox_tasks %}
-            <div class="list-item">
-              <div>{{ t.verb_noun }}</div>
+            <div class="list-item inbox-item" data-inbox-item data-task-id="{{ t.id }}" data-inbox-title="{{ t.verb_noun|e }}">
+              <div class="hidden" data-inbox-desc>{{ t.description or '' }}</div>
+              <div class="task-card-header">
+                <div class="task-card-title">{{ t.verb_noun }}</div>
+                <div class="task-card-actions inbox-item-actions">
+                  <form method="post" action="/inbox/archive" class="inbox-trash-form">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+                    <input type="hidden" name="task_id" value="{{ t.id }}">
+                    <button class="btn ghost btn-sm btn-icon btn-icon--tiny inbox-trash-btn" type="submit" data-inbox-action aria-label="Move to recycle bin" title="Move to recycle bin">🗑</button>
+                  </form>
+                  <a class="btn ghost btn-sm inbox-process-btn" href="/capture/process/{{ t.id }}" data-inbox-action data-guided-capture-open data-guided-prefill="{{ t.verb_noun|e }}" data-guided-source="{{ t.id }}">Process</a>
+                </div>
+              </div>
               <div class="muted">{{ t.when_bucket.value|title }}</div>
               <div class="task-meta">
-                {% if t.project %}<span class="pill">{{ t.project.title }}</span>{% endif %}
+                {% if t.project %}
+                  <span class="pill pill--project project-color-{{ t.project.color_scheme or 'slate' }}">{{ t.project.title }}</span>
+                {% endif %}
               </div>
             </div>
           {% else %}
             <div class="muted">Inbox clear.</div>
           {% endfor %}
-        </div>
-        <div class="cta-row">
-          <a class="btn pink btn-match-header" href="/capture">Quick capture</a>
-          <a class="btn ghost btn-match-header" href="/capture/wizard">Guided capture</a>
-          <a class="btn ghost btn-match-header" href="/waiting">Waiting On / OPP</a>
         </div>
       </div>
     </div>
@@ -89,7 +108,10 @@
                     {% set label_suffix = parts[1] | trim %}
                   {% endif %}
                   <div class="event-block {{ ev.type }}{% if ev.extra_class %} {{ ev.extra_class }}{% endif %}" style="top: {{ ev.top }}%; height: {{ ev.height }}%;">
-                    <div class="event-time">{{ ev.start_display }}{% if ev.end_display %} – {{ ev.end_display }}{% endif %}</div>
+                    <div class="event-top">
+                      <div class="event-time">{{ ev.start_display }}{% if ev.end_display %} – {{ ev.end_display }}{% endif %}</div>
+                      {% if ev.project %}<div class="event-project">{{ ev.project }}</div>{% endif %}
+                    </div>
                     {% if ev.type == "external" and label_prefix %}
                       <div class="event-label event-label--split">
                         <span class="event-label-strong">{{ label_prefix }}</span>
@@ -111,7 +133,6 @@
                         </form>
                       </div>
                     {% endif %}
-                    {% if ev.project %}<div class="event-project">{{ ev.project }}</div>{% endif %}
                   </div>
               {% endfor %}
             </div>
@@ -135,7 +156,9 @@
                   </div>
                 {% endif %}
                 {% if current_block.project %}
-                  <div class="task-meta"><span class="pill">{{ current_block.project.title }}</span></div>
+                  <div class="task-meta">
+                    <span class="pill pill--project project-color-{{ current_block.project.color_scheme or 'slate' }}">{{ current_block.project.title }}</span>
+                  </div>
                 {% endif %}
               </div>
             {% else %}
@@ -172,15 +195,15 @@
           <div class="panel today-tasks-panel">
             <h3>Today tasks</h3>
             <div class="muted">Focus/Frog tasks for Today.</div>
-            <div class="list" style="margin-top: 12px;">
+            <div class="list" style="margin-top: 12px;" data-draggable-list>
               {% for t in today_tasks %}
                 <div class="list-item">
                   <div>{{ t.verb_noun }}</div>
                   <div class="muted">{{ t.description or "No notes yet." }}</div>
                   <div class="task-meta">
-                    {% if t.block_type %}<span class="pill">{{ t.block_type.value }}</span>{% endif %}
-                    {% if t.frog %}<span class="pill pill--warn">Frog</span>{% endif %}
-                    {% if t.alignment %}<span class="pill">{{ t.alignment.value }}</span>{% endif %}
+                    {% if t.block_type %}<span class="pill pill--block pill--block-{{ t.block_type.value }}">{{ t.block_type.value }}</span>{% endif %}
+                    {% if t.frog %}<span class="pill pill--frog pill--warn">Frog</span>{% endif %}
+                    {% if t.alignment %}<span class="pill pill--alignment pill--alignment-{{ t.alignment.value }}">{{ t.alignment.value }}</span>{% endif %}
                   </div>
                 </div>
               {% else %}
@@ -192,4 +215,34 @@
       </div>
     </div>
   </section>
+  <div class="app-modal hidden" id="inbox-detail-modal" role="dialog" aria-modal="true" aria-labelledby="inbox-detail-title">
+    <div class="app-modal-card inbox-detail-card">
+      <div class="quick-capture-header inbox-detail-header">
+        <div class="inbox-detail-title-group">
+          <form method="post" action="/inbox/archive" data-inbox-detail-archive-form class="inbox-detail-trash">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+            <input type="hidden" name="task_id" value="">
+            <button class="btn ghost btn-sm btn-icon btn-icon--tiny inbox-trash-btn" type="submit" aria-label="Move to recycle bin" title="Move to recycle bin">🗑</button>
+          </form>
+          <h3 class="app-modal-title" id="inbox-detail-title">Inbox details</h3>
+        </div>
+        <button class="quick-capture-close" type="button" data-inbox-detail-close aria-label="Close">&times;</button>
+      </div>
+      <div class="inbox-detail-name" data-inbox-detail-name></div>
+      <form method="post" action="/inbox/update" data-inbox-detail-form id="inbox-detail-form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+        <input type="hidden" name="task_id" value="">
+        <label class="field">
+          <span>Description</span>
+          <textarea name="description" rows="6" placeholder="Add context or notes."></textarea>
+        </label>
+        <div class="inbox-detail-preview" data-inbox-detail-preview></div>
+      </form>
+      <div class="quick-capture-actions">
+        <button class="btn pink btn-sm" type="submit" form="inbox-detail-form">Save</button>
+        <a class="btn ghost btn-sm" href="#" data-inbox-detail-process>Process</a>
+      </div>
+    </div>
+  </div>
+  {% include "partials/guided_capture_modal.html" %}
 {% endblock %}

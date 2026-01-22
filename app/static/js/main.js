@@ -1,4 +1,5 @@
 document.addEventListener("DOMContentLoaded", () => {
+  let openGuidedCaptureModal = null;
   const horizon = document.querySelector(
     'select[name="time_horizon"], select[name="project_time_horizon"]'
   );
@@ -35,6 +36,10 @@ document.addEventListener("DOMContentLoaded", () => {
     const titleInput = captureForm.querySelector('input[name="title"]');
     const redirectToWizard = () => {
       const raw = titleInput?.value?.trim() || "";
+      if (typeof openGuidedCaptureModal === "function") {
+        openGuidedCaptureModal({ prefill: raw });
+        return;
+      }
       const url = raw ? `/capture/wizard?prefill=${encodeURIComponent(raw)}` : "/capture/wizard";
       window.location.assign(url);
     };
@@ -66,50 +71,240 @@ document.addEventListener("DOMContentLoaded", () => {
     const submitBtn = form.querySelector("[data-submit]");
     const attachProject = form.querySelector("[data-attach-project]");
     const projectCategory = form.querySelector("[data-project-category]");
+    const projectColor = form.querySelector("[data-project-color]");
     const horizonSelect = form.querySelector('select[name="horizon"]');
     const includeRadios = form.querySelectorAll('input[name="include_this_week"]');
+    const includeWeekFields = form.querySelectorAll("[data-include-week]");
     const helperNote = form.querySelector(".note.helper");
+    const horizonLabel = form.querySelector("[data-horizon-label]");
+    const horizonNoteTask = form.querySelector("[data-horizon-note-task]");
+    const horizonNoteProject = form.querySelector("[data-horizon-note-project]");
+    const blockStep = form.querySelector('.wizard-step[data-step="5"]');
+    const notSureSteps = Array.from(form.querySelectorAll("[data-not-sure-step]"));
+    const notSureDecisionInputs = Array.from(
+      form.querySelectorAll('input[name="not_sure_decision"]')
+    );
+    const notSureDetails = form.querySelector('textarea[name="not_sure_details"]');
+    const notSureSuggestBtn = form.querySelector("[data-not-sure-suggest]");
+    const notSureStatus = form.querySelector("[data-not-sure-status]");
+    const notSureSuggestion = form.querySelector("[data-not-sure-suggestion]");
+    const notSureSuggestionKind = form.querySelector("[data-not-sure-suggestion-kind]");
+    const notSureSuggestionText = form.querySelector("[data-not-sure-suggestion-text]");
+    const notSureUseBtn = form.querySelector("[data-not-sure-use]");
+    const horizonStep = form.querySelector('.wizard-step[data-step="3"]');
+    const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute("content");
 
     let current = 0;
+    let currentKind = "task";
 
     const waitingField = form.querySelector("[data-waiting-person]");
 
+    const getActiveSteps = () =>
+      steps.filter((step) => step.dataset.stepDisabled !== "true");
+
     const showStep = (index) => {
-      steps.forEach((s, i) => s.classList.toggle("hidden", i !== index));
-      prevBtn.classList.toggle("hidden", index === 0);
-      nextBtn.classList.toggle("hidden", index === steps.length - 1);
-      submitBtn.classList.toggle("hidden", index !== steps.length - 1);
+      const activeSteps = getActiveSteps();
+      const clamped = Math.max(0, Math.min(index, activeSteps.length - 1));
+      activeSteps.forEach((s, i) => s.classList.toggle("hidden", i !== clamped));
+      steps.forEach((step) => {
+        if (step.dataset.stepDisabled === "true") {
+          step.classList.add("hidden");
+        }
+      });
+      prevBtn.classList.toggle("hidden", clamped === 0);
+      nextBtn.classList.toggle("hidden", clamped >= activeSteps.length - 1);
+      submitBtn.classList.toggle("hidden", clamped < activeSteps.length - 1);
+      current = clamped;
     };
 
-    const syncKind = () => {
+    const setSectionActive = (section, isActive) => {
+      if (!section) return;
+      section.classList.toggle("hidden", !isActive);
+      section
+        .querySelectorAll("input, select, textarea")
+        .forEach((field) => (field.disabled = !isActive));
+    };
+
+    const setStepEnabled = (step, isEnabled) => {
+      if (!step) return;
+      step.dataset.stepDisabled = isEnabled ? "false" : "true";
+      if (!isEnabled) {
+        step.classList.add("hidden");
+      }
+      step
+        .querySelectorAll("input, select, textarea, button")
+        .forEach((field) => {
+          if (!isEnabled) {
+            if (!field.disabled) {
+              field.dataset.stepDisabled = "true";
+            }
+            field.disabled = true;
+            return;
+          }
+          if (field.dataset.stepDisabled === "true") {
+            field.disabled = false;
+            delete field.dataset.stepDisabled;
+          }
+        });
+    };
+
+    const getStepError = (step) => step?.querySelector(".wizard-error");
+
+    const showStepError = (step, message) => {
+      if (!step) return;
+      let error = getStepError(step);
+      if (!error) {
+        error = document.createElement("div");
+        error.className = "wizard-error";
+        step.prepend(error);
+      }
+      error.textContent = message;
+    };
+
+    const clearStepError = (step) => {
+      const error = getStepError(step);
+      if (error) {
+        error.remove();
+      }
+    };
+
+    const isFieldRequired = (field) =>
+      field.required || field.dataset.required === "true";
+
+    const validateStep = (step) => {
+      if (!step) return true;
+      clearStepError(step);
+      const fields = Array.from(step.querySelectorAll("input, select, textarea")).filter(
+        (field) => !field.disabled
+      );
+      let invalidField = null;
+      const requiredRadioGroups = new Set();
+      for (const field of fields) {
+        if (!isFieldRequired(field)) continue;
+        if (field.type === "radio") {
+          if (field.name) {
+            requiredRadioGroups.add(field.name);
+          }
+          continue;
+        }
+        if (field.type === "checkbox") continue;
+        const value = typeof field.value === "string" ? field.value.trim() : field.value;
+        if (!value) {
+          invalidField = field;
+          break;
+        }
+      }
+      if (!invalidField && requiredRadioGroups.size) {
+        for (const name of requiredRadioGroups) {
+          const group = fields.filter((field) => field.type === "radio" && field.name === name);
+          if (!group.some((field) => field.checked)) {
+            invalidField = group[0] || null;
+            break;
+          }
+        }
+      }
+      if (invalidField) {
+        showStepError(step, "Add the required info before continuing.");
+        invalidField.focus();
+        if (typeof invalidField.select === "function") {
+          invalidField.select();
+        }
+        return false;
+      }
+      return true;
+    };
+
+    const setNotSureSteps = (isEnabled) => {
+      notSureSteps.forEach((step) => setStepEnabled(step, isEnabled));
+    };
+
+    const resetNotSureSuggestion = () => {
+      if (notSureSuggestion) {
+        notSureSuggestion.classList.add("hidden");
+      }
+      if (notSureSuggestionKind) {
+        notSureSuggestionKind.textContent = "";
+      }
+      if (notSureSuggestionText) {
+        notSureSuggestionText.textContent = "";
+      }
+      if (notSureStatus) {
+        notSureStatus.textContent = "";
+      }
+      if (notSureUseBtn) {
+        delete notSureUseBtn.dataset.kind;
+      }
+    };
+
+    const syncKind = (options = {}) => {
+      const prevKind = currentKind;
       const kind = form.querySelector('input[name="item_kind"]:checked')?.value;
       const owner = form.querySelector('input[name="owner_type"]:checked')?.value;
-      if (!attachProject || !projectCategory) return;
-      if (kind === "task") {
-        attachProject.classList.remove("hidden");
-        projectCategory.classList.add("hidden");
-      } else {
-        attachProject.classList.add("hidden");
-        projectCategory.classList.remove("hidden");
+      currentKind = kind || "task";
+      const isTask = currentKind === "task";
+      const isProject = currentKind === "project";
+      const isNotSure = currentKind === "not_sure";
+      setSectionActive(attachProject, isTask);
+      setSectionActive(projectCategory, isProject);
+      setSectionActive(projectColor, isProject);
+      includeWeekFields.forEach((field) => setSectionActive(field, isProject));
+      if (horizonLabel) {
+        horizonLabel.textContent = isProject ? "Time horizon" : "When does it belong?";
+      }
+      horizonNoteTask?.classList.toggle("hidden", isProject);
+      horizonNoteProject?.classList.toggle("hidden", !isProject);
+      setStepEnabled(blockStep, isTask);
+      setNotSureSteps(isNotSure);
+      if (isNotSure && prevKind !== "not_sure") {
+        notSureDecisionInputs.forEach((input) => {
+          input.checked = false;
+        });
+        resetNotSureSuggestion();
+      }
+      if (!isNotSure) {
+        resetNotSureSuggestion();
       }
       if (waitingField) {
         waitingField.classList.toggle("hidden", owner !== "opp");
+        waitingField
+          .querySelectorAll("input, select, textarea")
+          .forEach((field) => (field.disabled = owner !== "opp"));
       }
+      syncHorizon();
+      if (options?.targetStep) {
+        const activeSteps = getActiveSteps();
+        const index = activeSteps.indexOf(options.targetStep);
+        if (index >= 0) {
+          current = index;
+        }
+      }
+      showStep(current);
     };
 
     const syncHorizon = () => {
-      if (!horizonSelect || !helperNote || !includeRadios.length) return;
+      if (!horizonSelect) return;
       const val = horizonSelect.value;
       const isWeek = val === "week" || val === "today";
-      helperNote.classList.toggle("hidden", isWeek);
-      includeRadios.forEach((r) => {
-        if (isWeek && r.value === "yes") r.checked = true;
-        if (!isWeek && r.value === "no") r.checked = true;
-      });
+      const isProject = currentKind === "project";
+      if (!isProject) {
+        helperNote?.classList.add("hidden");
+        return;
+      }
+      helperNote?.classList.toggle("hidden", isWeek);
+      if (includeRadios.length) {
+        includeRadios.forEach((r) => {
+          if (isWeek && r.value === "yes") r.checked = true;
+          if (!isWeek && r.value === "no") r.checked = true;
+        });
+      }
     };
 
     nextBtn?.addEventListener("click", () => {
-      if (current < steps.length - 1) {
+      const activeSteps = getActiveSteps();
+      if (!validateStep(activeSteps[current])) {
+        return;
+      }
+      if (current < activeSteps.length - 1) {
         current += 1;
         showStep(current);
       }
@@ -129,9 +324,374 @@ document.addEventListener("DOMContentLoaded", () => {
     );
     horizonSelect?.addEventListener("change", syncHorizon);
 
-    syncKind();
-    syncHorizon();
-    showStep(0);
+    const resetWizard = () => {
+      form.reset();
+      const sourceInput = form.querySelector('input[name="source_task_id"]');
+      if (sourceInput) {
+        sourceInput.disabled = !sourceInput.value;
+      }
+      resetNotSureSuggestion();
+      syncKind();
+      showStep(0);
+    };
+
+    form.addEventListener("wizard-reset", resetWizard);
+    form.addEventListener("input", (event) => {
+      const step = event.target.closest(".wizard-step");
+      clearStepError(step);
+    });
+    form.addEventListener("submit", (event) => {
+      const firstStep = steps.find((step) => step.dataset.step === "1");
+      if (!validateStep(firstStep)) {
+        showStep(0);
+        event.preventDefault();
+      }
+    });
+
+    notSureDecisionInputs.forEach((input) => {
+      input.addEventListener("change", () => {
+        const choice = input.value;
+        const target = form.querySelector(`input[name="item_kind"][value="${choice}"]`);
+        if (!target) return;
+        target.checked = true;
+        syncKind({ targetStep: horizonStep });
+      });
+    });
+
+    notSureSuggestBtn?.addEventListener("click", async () => {
+      const step = notSureSuggestBtn.closest(".wizard-step");
+      const details = (notSureDetails?.value || "").trim();
+      clearStepError(step);
+      if (!details) {
+        showStepError(step, "Share a little more detail so I can suggest a fit.");
+        notSureDetails?.focus();
+        return;
+      }
+      if (!csrfToken) {
+        showStepError(step, "Missing CSRF token. Refresh and try again.");
+        return;
+      }
+      notSureSuggestBtn.disabled = true;
+      if (notSureStatus) notSureStatus.textContent = "Thinking...";
+      try {
+        const payload = {
+          title: form.querySelector('input[name="capture_text"]')?.value || "",
+          details,
+          size:
+            form.querySelector('input[name="not_sure_size"]:checked')?.value || null,
+          next_action:
+            form.querySelector('input[name="not_sure_next"]:checked')?.value || null,
+        };
+        const res = await fetch("/capture/wizard/suggest", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-csrf-token": csrfToken || "",
+          },
+          body: JSON.stringify(payload),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          showStepError(step, data.detail || "Couldn't get a suggestion. Try again.");
+          return;
+        }
+        const kind = data.kind === "project" ? "project" : "task";
+        const kindLabel = kind === "project" ? "Project" : "Task";
+        const rationale = data.rationale || "You can still choose either way.";
+        const suffix = data.engine && data.engine !== "ollama" ? " (quick heuristic)" : "";
+        if (notSureSuggestionKind) {
+          notSureSuggestionKind.textContent = `${kindLabel}${suffix}`;
+        }
+        if (notSureSuggestionText) {
+          notSureSuggestionText.textContent = rationale;
+        }
+        if (notSureSuggestion) {
+          notSureSuggestion.classList.remove("hidden");
+        }
+        const decisionInput = notSureDecisionInputs.find((input) => input.value === kind);
+        if (decisionInput) {
+          decisionInput.checked = true;
+        }
+        if (notSureUseBtn) {
+          notSureUseBtn.dataset.kind = kind;
+        }
+      } catch (err) {
+        showStepError(step, "Couldn't get a suggestion. Try again.");
+      } finally {
+        notSureSuggestBtn.disabled = false;
+        if (notSureStatus) notSureStatus.textContent = "";
+      }
+    });
+
+    notSureUseBtn?.addEventListener("click", () => {
+      const kind = notSureUseBtn.dataset.kind;
+      if (!kind) return;
+      const decisionInput = notSureDecisionInputs.find((input) => input.value === kind);
+      if (!decisionInput) return;
+      decisionInput.checked = true;
+      decisionInput.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    resetWizard();
+  }
+
+  const guidedCaptureModal = document.getElementById("guided-capture-modal");
+  if (guidedCaptureModal) {
+    const openButtons = document.querySelectorAll("[data-guided-capture-open]");
+    const closeButtons = guidedCaptureModal.querySelectorAll("[data-guided-capture-close]");
+    const form = guidedCaptureModal.querySelector("#wizardForm");
+    const input = guidedCaptureModal.querySelector('input[name="capture_text"]');
+    const sourceInput = guidedCaptureModal.querySelector('input[name="source_task_id"]');
+
+    const openModal = ({ prefill = "", sourceTaskId = "" } = {}) => {
+      form?.dispatchEvent(new Event("wizard-reset"));
+      if (input) {
+        input.value = prefill || "";
+      }
+      if (sourceInput) {
+        sourceInput.value = sourceTaskId || "";
+        sourceInput.disabled = !sourceTaskId;
+      }
+      guidedCaptureModal.classList.remove("hidden");
+      input?.focus();
+      input?.select();
+    };
+
+    const closeModal = () => {
+      guidedCaptureModal.classList.add("hidden");
+      form?.dispatchEvent(new Event("wizard-reset"));
+    };
+
+    openGuidedCaptureModal = openModal;
+
+    openButtons.forEach((button) => {
+      button.addEventListener("click", (event) => {
+        event.preventDefault();
+        const prefill = (button.dataset.guidedPrefill || "").trim();
+        const sourceTaskId = button.dataset.guidedSource || "";
+        openModal({ prefill, sourceTaskId });
+      });
+    });
+
+    closeButtons.forEach((button) => {
+      button.addEventListener("click", (event) => {
+        event.preventDefault();
+        closeModal();
+      });
+    });
+
+    guidedCaptureModal.addEventListener("click", (event) => {
+      if (event.target === guidedCaptureModal) {
+        closeModal();
+      }
+    });
+
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape" && !guidedCaptureModal.classList.contains("hidden")) {
+        closeModal();
+      }
+    });
+
+    if (!guidedCaptureModal.classList.contains("hidden")) {
+      input?.focus();
+      input?.select();
+    }
+  }
+
+  const quickCaptureModal = document.getElementById("quick-capture-modal");
+  if (quickCaptureModal) {
+    const openButtons = document.querySelectorAll("[data-quick-capture-open]");
+    const closeButtons = quickCaptureModal.querySelectorAll("[data-quick-capture-close]");
+    const form = quickCaptureModal.querySelector("[data-quick-capture-form]");
+    const input = quickCaptureModal.querySelector("[data-quick-capture-input]");
+
+    const openModal = () => {
+      quickCaptureModal.classList.remove("hidden");
+      input?.focus();
+      input?.select();
+    };
+
+    const closeModal = () => {
+      quickCaptureModal.classList.add("hidden");
+      form?.reset();
+    };
+
+    openButtons.forEach((button) => {
+      button.addEventListener("click", (event) => {
+        event.preventDefault();
+        openModal();
+      });
+    });
+
+    closeButtons.forEach((button) => {
+      button.addEventListener("click", (event) => {
+        event.preventDefault();
+        closeModal();
+      });
+    });
+
+    quickCaptureModal.addEventListener("click", (event) => {
+      if (event.target === quickCaptureModal) {
+        closeModal();
+      }
+    });
+
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape" && !quickCaptureModal.classList.contains("hidden")) {
+        closeModal();
+      }
+    });
+  }
+
+  const inboxDetailModal = document.getElementById("inbox-detail-modal");
+  if (inboxDetailModal) {
+    const modalCard = inboxDetailModal.querySelector(".inbox-detail-card");
+    const closeButtons = inboxDetailModal.querySelectorAll("[data-inbox-detail-close]");
+    const form = inboxDetailModal.querySelector("[data-inbox-detail-form]");
+    const archiveForm = inboxDetailModal.querySelector("[data-inbox-detail-archive-form]");
+    const titleEl = inboxDetailModal.querySelector("[data-inbox-detail-name]");
+    const descField = form?.querySelector('textarea[name="description"]');
+    const previewEl = inboxDetailModal.querySelector("[data-inbox-detail-preview]");
+    const idField = form?.querySelector('input[name="task_id"]');
+    const archiveIdField = archiveForm?.querySelector('input[name="task_id"]');
+    const processLink = inboxDetailModal.querySelector("[data-inbox-detail-process]");
+
+    const escapeHtml = (value) =>
+      value.replace(/[&<>"']/g, (ch) => {
+        switch (ch) {
+          case "&":
+            return "&amp;";
+          case "<":
+            return "&lt;";
+          case ">":
+            return "&gt;";
+          case '"':
+            return "&quot;";
+          case "'":
+            return "&#39;";
+          default:
+            return ch;
+        }
+      });
+
+    const linkifyText = (value = "") => {
+      const urlRegex = /(?:https?:\/\/|www\.)[^\s<]+/gi;
+      let result = "";
+      let lastIndex = 0;
+      let match;
+
+      while ((match = urlRegex.exec(value)) !== null) {
+        const start = match.index;
+        let url = match[0];
+        let trailing = "";
+        const trailingMatch = url.match(/[.,;:!?)\]]+$/);
+        if (trailingMatch && trailingMatch[0]) {
+          trailing = trailingMatch[0];
+          url = url.slice(0, -trailing.length);
+        }
+        result += escapeHtml(value.slice(lastIndex, start));
+        const href = url.startsWith("http") ? url : `https://${url}`;
+        const safeHref = encodeURI(href).replace(/"/g, "%22").replace(/'/g, "%27");
+        result += `<a href="${safeHref}" target="_blank" rel="noopener noreferrer">${escapeHtml(url)}</a>`;
+        result += escapeHtml(trailing);
+        lastIndex = start + match[0].length;
+      }
+
+      result += escapeHtml(value.slice(lastIndex));
+      return result.replace(/\r?\n/g, "<br>");
+    };
+
+    const renderPreview = (value = "") => {
+      if (!previewEl) return;
+      if (!value.trim()) {
+        previewEl.innerHTML = '<span class="muted">No description.</span>';
+        return;
+      }
+      previewEl.innerHTML = linkifyText(value);
+    };
+
+    const setEditing = (isEditing) => {
+      modalCard?.classList.toggle("is-editing", isEditing);
+    };
+
+    const openInboxDetail = (item) => {
+      if (!item) return;
+      const title = item.dataset.inboxTitle || "Inbox item";
+      const descEl = item.querySelector("[data-inbox-desc]");
+      const desc = descEl ? descEl.textContent : "";
+      const taskId = item.dataset.taskId || "";
+      if (titleEl) titleEl.textContent = title;
+      if (descField) descField.value = desc;
+      renderPreview(desc);
+      setEditing(false);
+      if (idField) idField.value = taskId;
+      if (archiveIdField) archiveIdField.value = taskId;
+      if (processLink) {
+        processLink.dataset.guidedPrefill = title;
+        processLink.dataset.guidedSource = taskId;
+        processLink.setAttribute("href", `/capture/process/${taskId}`);
+      }
+      inboxDetailModal.classList.remove("hidden");
+      descField?.focus();
+    };
+
+    const closeInboxDetail = () => {
+      inboxDetailModal.classList.add("hidden");
+      form?.reset();
+      archiveForm?.reset();
+      if (previewEl) previewEl.innerHTML = "";
+      setEditing(false);
+    };
+
+    processLink?.addEventListener("click", (event) => {
+      const taskId = processLink.dataset.guidedSource;
+      const prefill = processLink.dataset.guidedPrefill || "";
+      if (typeof openGuidedCaptureModal === "function" && taskId) {
+        event.preventDefault();
+        closeInboxDetail();
+        openGuidedCaptureModal({ prefill, sourceTaskId: taskId });
+      }
+    });
+
+    document.addEventListener("click", (event) => {
+      const item = event.target.closest("[data-inbox-item]");
+      if (!item) return;
+      if (event.target.closest("[data-inbox-action]")) return;
+      event.preventDefault();
+      openInboxDetail(item);
+    });
+
+    closeButtons.forEach((button) => {
+      button.addEventListener("click", (event) => {
+        event.preventDefault();
+        closeInboxDetail();
+      });
+    });
+
+    previewEl?.addEventListener("click", () => {
+      setEditing(true);
+      descField?.focus();
+    });
+
+    descField?.addEventListener("input", () => {
+      renderPreview(descField.value);
+    });
+
+    descField?.addEventListener("blur", () => {
+      renderPreview(descField.value);
+      setEditing(false);
+    });
+
+    inboxDetailModal.addEventListener("click", (event) => {
+      if (event.target === inboxDetailModal) {
+        closeInboxDetail();
+      }
+    });
+
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape" && !inboxDetailModal.classList.contains("hidden")) {
+        closeInboxDetail();
+      }
+    });
   }
 
   const onboardingForm = document.querySelector("[data-onboarding-wizard]");
@@ -252,7 +812,23 @@ document.addEventListener("DOMContentLoaded", () => {
   // Auto-refresh calendar views every minute to pick up new events (avoid disrupting forms).
   const hasCalendar = document.querySelector(".calendar-panel, .week-calendar-panel");
   if (hasCalendar) {
+    const shouldSkipAutoRefresh = () => {
+      if (document.hidden) return true;
+      if (document.querySelector(".coach-widget.is-open")) return true;
+      if (document.querySelector(".app-modal:not(.hidden)")) return true;
+      if (document.querySelector("#quick-capture-modal:not(.hidden)")) return true;
+      if (document.querySelector(".task-edit-form:not(.hidden), .project-edit-form:not(.hidden)")) {
+        return true;
+      }
+      if (document.querySelector(".event-edit-form:not(.hidden)")) return true;
+      const active = document.activeElement;
+      if (active && ["INPUT", "TEXTAREA", "SELECT"].includes(active.tagName)) {
+        return true;
+      }
+      return false;
+    };
     setInterval(() => {
+      if (shouldSkipAutoRefresh()) return;
       window.location.reload();
     }, 60 * 1000);
   }
@@ -288,7 +864,7 @@ document.addEventListener("DOMContentLoaded", () => {
   document.addEventListener("click", (event) => {
     const toggle = event.target.closest(".task-edit-toggle");
     if (!toggle) return;
-    const container = toggle.closest(".task-card");
+    const container = toggle.closest(".task-card, .list-item");
     const form = container?.querySelector(".task-edit-form");
     if (!form) return;
     form.classList.toggle("hidden");
@@ -402,6 +978,54 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
+  const draggableLists = document.querySelectorAll("[data-draggable-list]");
+  if (draggableLists.length) {
+    const getAfterElement = (container, y) => {
+      const items = [...container.querySelectorAll(".list-item:not(.dragging)")];
+      return items.reduce(
+        (closest, child) => {
+          const box = child.getBoundingClientRect();
+          const offset = y - box.top - box.height / 2;
+          if (offset < 0 && offset > closest.offset) {
+            return { offset, element: child };
+          }
+          return closest;
+        },
+        { offset: Number.NEGATIVE_INFINITY, element: null }
+      ).element;
+    };
+
+    draggableLists.forEach((list) => {
+      list.querySelectorAll(".list-item").forEach((item) => {
+        item.setAttribute("draggable", "true");
+      });
+
+      list.addEventListener("dragstart", (event) => {
+        const item = event.target.closest(".list-item");
+        if (!item) return;
+        item.classList.add("dragging");
+        event.dataTransfer.effectAllowed = "move";
+      });
+
+      list.addEventListener("dragend", (event) => {
+        const item = event.target.closest(".list-item");
+        item?.classList.remove("dragging");
+      });
+
+      list.addEventListener("dragover", (event) => {
+        event.preventDefault();
+        const dragging = list.querySelector(".dragging");
+        if (!dragging) return;
+        const after = getAfterElement(list, event.clientY);
+        if (!after) {
+          list.appendChild(dragging);
+        } else {
+          list.insertBefore(dragging, after);
+        }
+      });
+    });
+  }
+
   const coachRoot = document.querySelector("[data-coach]");
   if (coachRoot) {
     const toggleBtn = coachRoot.querySelector("[data-coach-toggle]");
@@ -418,11 +1042,13 @@ document.addEventListener("DOMContentLoaded", () => {
     const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute("content");
     const storageKey = "sfo:coach-open";
     const clearKey = "sfo:coach-clear";
+    const historyKey = "sfo:coach-history";
     const nudgeRoot = coachRoot.querySelector("[data-coach-nudges]");
     const modalEl = document.getElementById("app-modal");
 
     let context = {};
     let historyLoaded = false;
+    let historyCache = [];
     let displacementAckHandler = null;
     let modalResolve = null;
 
@@ -436,6 +1062,22 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const setStatus = (text) => {
       if (statusEl) statusEl.textContent = text;
+    };
+
+    const persistHistory = () => {
+      try {
+        localStorage.setItem(historyKey, JSON.stringify(historyCache));
+      } catch (err) {
+        // Ignore storage errors.
+      }
+    };
+
+    const recordHistory = (entry) => {
+      historyCache.push(entry);
+      if (historyCache.length > 200) {
+        historyCache = historyCache.slice(-200);
+      }
+      persistHistory();
     };
 
     const getClearTimestamp = () => {
@@ -452,6 +1094,51 @@ document.addEventListener("DOMContentLoaded", () => {
     const setClearTimestamp = () => {
       try {
         localStorage.setItem(clearKey, new Date().toISOString());
+      } catch (err) {
+        // Ignore storage errors.
+      }
+    };
+
+    const renderHistory = (messages, { persist = true } = {}) => {
+      if (!messagesEl) return;
+      messagesEl.innerHTML = "";
+      historyCache = [];
+      let lastActions = null;
+      (messages || []).forEach((msg) => {
+        if (!msg || !msg.role || !msg.content) return;
+        addMessage(msg.role, msg.content, { persist: false });
+        const entry = {
+          role: msg.role,
+          content: msg.content,
+          created_at: msg.created_at || new Date().toISOString(),
+        };
+        if (msg.actions) {
+          entry.actions = msg.actions;
+          lastActions = msg.actions;
+        }
+        historyCache.push(entry);
+      });
+      if (lastActions) renderQuickActions(lastActions);
+      if (persist) persistHistory();
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+    };
+
+    const restoreCachedHistory = () => {
+      if (!messagesEl) return;
+      try {
+        const raw = localStorage.getItem(historyKey);
+        if (!raw) return;
+        const parsed = JSON.parse(raw);
+        if (!Array.isArray(parsed)) return;
+        const clearedAt = getClearTimestamp();
+        const filtered = parsed.filter((msg) => {
+          if (!clearedAt || !msg.created_at) return true;
+          const ts = Date.parse(msg.created_at);
+          return Number.isNaN(ts) || ts > clearedAt;
+        });
+        if (filtered.length) {
+          renderHistory(filtered, { persist: false });
+        }
       } catch (err) {
         // Ignore storage errors.
       }
@@ -651,7 +1338,7 @@ document.addEventListener("DOMContentLoaded", () => {
       if (existing) return;
       const shell = createNudgeShell(
         "Displacement check",
-        "Before you add this, ask: What will you say no to so this gets protected?",
+        "Before you add this, ask: What will you say no to so this gets protected? Click \"I considered this\" to continue saving.",
         "displacement"
       );
       if (!shell) return;
@@ -744,13 +1431,21 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     };
 
-    const addMessage = (role, content) => {
+    const addMessage = (role, content, { persist = true, actions = null, createdAt = null } = {}) => {
       if (!messagesEl) return null;
       const messageEl = document.createElement("div");
       messageEl.className = `coach-message coach-message--${role}`;
       messageEl.textContent = content;
       messagesEl.appendChild(messageEl);
       messagesEl.scrollTop = messagesEl.scrollHeight;
+      if (persist) {
+        recordHistory({
+          role,
+          content,
+          actions: actions || null,
+          created_at: createdAt || new Date().toISOString(),
+        });
+      }
       return messageEl;
     };
 
@@ -768,6 +1463,8 @@ document.addEventListener("DOMContentLoaded", () => {
       });
     };
 
+    restoreCachedHistory();
+
     const loadHistory = async () => {
       if (historyLoaded) return;
       historyLoaded = true;
@@ -777,18 +1474,16 @@ document.addEventListener("DOMContentLoaded", () => {
         if (!res.ok) throw new Error("Failed history");
         const data = await res.json();
         const clearedAt = getClearTimestamp();
-        (data.messages || []).forEach((msg) => {
-          if (clearedAt && msg.created_at) {
-            const ts = Date.parse(msg.created_at);
-            if (!Number.isNaN(ts) && ts <= clearedAt) {
-              return;
-            }
-          }
-          addMessage(msg.role, msg.content);
-          if (msg.actions) {
-            renderQuickActions(msg.actions);
-          }
+        const filtered = (data.messages || []).filter((msg) => {
+          if (!clearedAt || !msg.created_at) return true;
+          const ts = Date.parse(msg.created_at);
+          return Number.isNaN(ts) || ts > clearedAt;
         });
+        if (!filtered.length && historyCache.length) {
+          setStatus("Ready");
+          return;
+        }
+        renderHistory(filtered);
         setStatus("Ready");
       } catch (err) {
         setStatus("History unavailable");
@@ -801,7 +1496,7 @@ document.addEventListener("DOMContentLoaded", () => {
       addMessage("user", message);
       if (inputEl) inputEl.value = "";
       setStatus("Thinking...");
-      const pending = addMessage("assistant", "Thinking...");
+      const pending = addMessage("assistant", "Thinking...", { persist: false });
       try {
         const res = await fetch("/coach/message", {
           method: "POST",
@@ -813,9 +1508,25 @@ document.addEventListener("DOMContentLoaded", () => {
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.detail || "Coach error");
-        if (pending) pending.textContent = data.reply || "No response yet.";
+        const replyText = data.reply || "No response yet.";
+        if (pending) pending.textContent = replyText;
+        recordHistory({
+          role: "assistant",
+          content: replyText,
+          actions: data.actions || null,
+          created_at: new Date().toISOString(),
+        });
         renderQuickActions(data.actions);
-        setStatus(data.engine === "ollama" ? "Local LLM" : "Coach-lite");
+        const engineLabel =
+          data.engine === "ollama"
+            ? "Local LLM"
+            : data.engine === "action"
+              ? "Updated"
+              : "Coach-lite";
+        setStatus(engineLabel);
+        if (data.effects?.refresh) {
+          setTimeout(() => window.location.reload(), 500);
+        }
       } catch (err) {
         if (pending) pending.textContent = "Couldn't reach Charlie just now. Try again.";
         setStatus("Offline");
@@ -868,6 +1579,12 @@ document.addEventListener("DOMContentLoaded", () => {
       setClearTimestamp();
       if (messagesEl) messagesEl.innerHTML = "";
       if (quickActionsEl) quickActionsEl.innerHTML = "";
+      historyCache = [];
+      try {
+        localStorage.removeItem(historyKey);
+      } catch (err) {
+        // Ignore storage errors.
+      }
       historyLoaded = true;
       setStatus("Ready");
     });

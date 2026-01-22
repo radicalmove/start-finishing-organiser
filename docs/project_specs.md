@@ -1,6 +1,6 @@
 ---
 app_name: "Meaningful Work Organiser"
-version: "0.5"
+version: "0.6"
 author: "Richard Davies"
 created_for: "Personal use, extensible to others later"
 primary_reference: "Start Finishing – Charlie Gilkey"
@@ -95,7 +95,7 @@ constraints_and_rules:
 
 ---
 
-# Meaningful Work Organiser — Massive Blueprint (v0.5)
+# Meaningful Work Organiser — Massive Blueprint (v0.6)
 
 ## Table of Contents
 
@@ -789,8 +789,8 @@ This is where the app’s intelligence lives.
 
 ### v0.6 – Integrations Start
 
-- One calendar integration (read-only).
-- Simple Trello import for projects.
+- Gmail sync (email-to-inbox) with OAuth and local polling.
+- Calendar read-only integration (Cozi ICS).
 
 ### v1.0 – Personally Stable
 
@@ -813,4 +813,4 @@ This is where the app’s intelligence lives.
 - **Why**: Core purpose, identity, and values that the app keeps front and centre.
 
 ---
-# End of Massive Blueprint (v0.5)
+# End of Massive Blueprint (v0.6)

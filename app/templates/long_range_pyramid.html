@@ -37,7 +37,7 @@
           </div>
           <div class="pyramid-tier-body" data-horizon-list>
             {% for project in horizons["year"] %}
-              <span class="pill" draggable="true" data-project-id="{{ project.id }}" data-project-title="{{ project.title }}">
+              <span class="pill pill--project project-color-{{ project.color_scheme or 'slate' }}" draggable="true" data-project-id="{{ project.id }}" data-project-title="{{ project.title }}">
                 {{ project.title }}
               </span>
             {% else %}
@@ -52,7 +52,7 @@
           </div>
           <div class="pyramid-tier-body" data-horizon-list>
             {% for project in horizons["quarter"] %}
-              <span class="pill" draggable="true" data-project-id="{{ project.id }}" data-project-title="{{ project.title }}">
+              <span class="pill pill--project project-color-{{ project.color_scheme or 'slate' }}" draggable="true" data-project-id="{{ project.id }}" data-project-title="{{ project.title }}">
                 {{ project.title }}
               </span>
             {% else %}
@@ -67,7 +67,7 @@
           </div>
           <div class="pyramid-tier-body" data-horizon-list>
             {% for project in horizons["month"] %}
-              <span class="pill" draggable="true" data-project-id="{{ project.id }}" data-project-title="{{ project.title }}">
+              <span class="pill pill--project project-color-{{ project.color_scheme or 'slate' }}" draggable="true" data-project-id="{{ project.id }}" data-project-title="{{ project.title }}">
                 {{ project.title }}
               </span>
             {% else %}
@@ -82,7 +82,7 @@
           </div>
           <div class="pyramid-tier-body" data-horizon-list>
             {% for project in horizons["week"] %}
-              <span class="pill" draggable="true" data-project-id="{{ project.id }}" data-project-title="{{ project.title }}">
+              <span class="pill pill--project project-color-{{ project.color_scheme or 'slate' }}" draggable="true" data-project-id="{{ project.id }}" data-project-title="{{ project.title }}">
                 {{ project.title }}
               </span>
             {% else %}

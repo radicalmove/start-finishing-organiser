@@ -22,7 +22,7 @@ from ..models import (
     RitualEntry,
     RitualType,
 )
-from ..utils.rules import enforce_weekly_cap, compose_why_text, parse_block_type
+from ..utils.rules import enforce_weekly_cap, compose_why_text, parse_block_type, parse_optional_int
 from ..utils.coach import build_coach_context_json, block_summary, task_summary
 from ..utils.profile import get_profile
 from ..security import csrf_protect, require_html_auth
@@ -301,7 +301,7 @@ def landing(request: Request, db: Session = Depends(get_db)):
         db.query(Task)
         .options(selectinload(Task.project))
         .filter(
-            Task.when_bucket.in_([WhenBucket.LATER, WhenBucket.MONTH, WhenBucket.QUARTER]),
+            Task.in_inbox.is_(True),
             Task.status.notin_([TaskStatus.DONE, TaskStatus.ARCHIVED, TaskStatus.CANCELLED]),
         )
         .order_by(Task.created_at.desc())
@@ -696,22 +696,58 @@ def create_task(
     description: str | None = Form(None),
     when_bucket: WhenBucket = Form(WhenBucket.TODAY),
     block_type: str | None = Form(""),
-    duration_minutes: int | None = Form(None),
+    duration_minutes: str | None = Form(None),
     frog: bool = Form(False),
     db: Session = Depends(get_db),
 ):
     pid = int(project_id) if project_id not in (None, "", "null") else None
     btype = block_type if block_type not in (None, "", "null") else None
+    duration_value = parse_optional_int(duration_minutes)
+    if duration_value is not None and duration_value <= 0:
+        duration_value = None
 
     task = Task(
         verb_noun=verb_noun.strip(),
         project_id=pid,
         description=description or None,
+        in_inbox=False,
         when_bucket=when_bucket,
         block_type=parse_block_type(btype),
-        duration_minutes=duration_minutes or None,
+        duration_minutes=duration_value,
         frog=frog,
     )
     db.add(task)
     db.commit()
     return RedirectResponse(url="/?success=Saved", status_code=303)
+
+
+@router.post("/inbox/update")
+def update_inbox_item(
+    task_id: int = Form(...),
+    description: str | None = Form(None),
+    db: Session = Depends(get_db),
+):
+    task = db.get(Task, task_id)
+    if not task or not task.in_inbox:
+        return RedirectResponse(url="/?error=Inbox+item+not+found", status_code=303)
+    if description is not None:
+        task.description = description.strip() or None
+    db.add(task)
+    db.commit()
+    return RedirectResponse(url="/?success=Saved", status_code=303)
+
+
+@router.post("/inbox/archive")
+def archive_inbox_item(
+    task_id: int = Form(...),
+    db: Session = Depends(get_db),
+):
+    task = db.get(Task, task_id)
+    if not task or not task.in_inbox:
+        return RedirectResponse(url="/?error=Inbox+item+not+found", status_code=303)
+    task.status = TaskStatus.ARCHIVED
+    task.in_inbox = False
+    task.archived_from_inbox = True
+    db.add(task)
+    db.commit()
+    return RedirectResponse(url="/?success=Moved+to+Recycle+Bin", status_code=303)

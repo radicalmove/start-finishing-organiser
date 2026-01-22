@@ -2,7 +2,7 @@
 
 Neon-themed, single-user organiser inspired by *Start Finishing*. Built on FastAPI, Jinja, and SQLite for quick iteration.
 
-Current version: 0.5
+Current version: 0.6
 
 ## Run locally
 
@@ -42,6 +42,36 @@ SFO_HTTPS_ONLY=true
 SFO_SESSION_SAMESITE=lax
 SFO_SESSION_MAX_AGE=1209600
 ```
+
+## Gmail inbox capture (optional)
+
+To pull Gmail messages into the SFO inbox automatically, enable Gmail sync and authorize once.
+
+Setup:
+
+1. Create a Google Cloud OAuth client (Desktop app) and download the JSON.
+2. Save it as `~/.config/sfo/gmail_credentials.json` (or update the path below).
+3. Authorize once to generate a token:
+
+```bash
+python3 scripts/gmail_auth.py
+```
+
+Environment settings:
+
+```
+SFO_GMAIL_ENABLED=1
+SFO_GMAIL_CLIENT_SECRETS=~/.config/sfo/gmail_credentials.json
+SFO_GMAIL_TOKEN_PATH=~/.config/sfo/gmail_token.json
+SFO_GMAIL_POLL_SECONDS=300
+SFO_GMAIL_MAX_PER_SYNC=50
+SFO_GMAIL_BACKFILL_DAYS=0
+SFO_GMAIL_WORK_DOMAIN=canterbury.ac.nz
+```
+
+Notes:
+- Backfill is off by default (sync starts “from now”). Set `SFO_GMAIL_BACKFILL_DAYS` if you want recent history imported.
+- Emails are marked read after import.
 
 ## Charlie coach (local LLM optional)
 

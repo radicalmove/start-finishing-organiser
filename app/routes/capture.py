@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Depends, Request, Form, HTTPException
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from sqlalchemy.orm import Session
 
 from ..db import get_db
@@ -13,14 +13,17 @@ from ..models import (
     WhenBucket,
     OwnerType,
     WaitingOn,
+    TaskStatus,
 )
 from ..utils.rules import (
     enforce_weekly_cap,
     compose_why_text,
     compute_resurface_on,
     parse_block_type,
+    parse_optional_int,
 )
-from ..utils.coach import build_coach_context_json, project_summary
+from ..utils.coach import build_coach_context_json, project_summary, suggest_capture_kind
+from ..utils.projects import normalize_project_color
 from ..security import csrf_protect, require_html_auth
 
 router = APIRouter(dependencies=[Depends(require_html_auth), Depends(csrf_protect)])
@@ -50,11 +53,31 @@ def capture(request: Request, db: Session = Depends(get_db)):
     )
 
 
+@router.get("/capture/process/{task_id}")
+def process_inbox_task(task_id: int, db: Session = Depends(get_db)):
+    task = db.get(Task, task_id)
+    if not task or not task.in_inbox:
+        return RedirectResponse(url="/?error=Inbox+item+not+found", status_code=303)
+    from urllib.parse import quote_plus
+
+    prefill = quote_plus(task.verb_noun.strip())
+    return RedirectResponse(
+        url=f"/capture/wizard?prefill={prefill}&source_task_id={task.id}",
+        status_code=303,
+    )
+
+
 @router.get("/capture/wizard", response_class=HTMLResponse)
 def capture_wizard(request: Request, db: Session = Depends(get_db)):
     templates = request.app.state.templates
     projects = db.query(Project).order_by(Project.created_at.desc()).all()
     prefill = request.query_params.get("prefill") or ""
+    raw_source = request.query_params.get("source_task_id")
+    source_task_id = int(raw_source) if raw_source and raw_source.isdigit() else None
+    source_task = db.get(Task, source_task_id) if source_task_id is not None else None
+    if source_task and not source_task.in_inbox:
+        source_task = None
+        source_task_id = None
     coach_context_json = build_coach_context_json(
         request_path=str(request.url.path),
         screen_id="capture_wizard",
@@ -67,8 +90,11 @@ def capture_wizard(request: Request, db: Session = Depends(get_db)):
         {
             "request": request,
             "projects": projects,
-            "form_error": request.query_params.get("error"),
+            "guided_form_error": request.query_params.get("error"),
+            "guided_modal_open": True,
             "prefill": prefill,
+            "source_task_id": source_task_id,
+            "prefill_details": source_task.description if source_task else "",
             "coach_context_json": coach_context_json,
         },
     )
@@ -77,17 +103,20 @@ def capture_wizard(request: Request, db: Session = Depends(get_db)):
 @router.post("/capture/wizard")
 def submit_wizard(
     capture_text: str = Form(...),
+    capture_description: str | None = Form(None),
     owner_type: OwnerType = Form(OwnerType.MINE),
     item_kind: str = Form("task"),
     displacement_ack: str | None = Form(None),
+    source_task_id: int | None = Form(None),
     category: ProjectCategory = Form(ProjectCategory.WORK),
     project_id: str | None = Form(""),
+    project_color_scheme: str | None = Form(None),
     horizon: WhenBucket = Form(WhenBucket.WEEK),
     include_this_week: str = Form("yes"),
     why_link_text: str | None = Form(None),
     why_tags: list[str] | None = Form(None),
     block_type: str | None = Form(""),
-    duration_minutes: int | None = Form(None),
+    duration_minutes: str | None = Form(None),
     frog: bool = Form(False),
     waiting_person: str | None = Form(None),
     db: Session = Depends(get_db),
@@ -97,10 +126,23 @@ def submit_wizard(
 
         msg = quote_plus("Confirm the displacement check before saving.")
         prefill = quote_plus(capture_text.strip())
-        return RedirectResponse(url=f"/capture/wizard?error={msg}&prefill={prefill}", status_code=303)
+        source = f"&source_task_id={source_task_id}" if source_task_id else ""
+        return RedirectResponse(
+            url=f"/capture/wizard?error={msg}&prefill={prefill}{source}",
+            status_code=303,
+        )
     active_this_week = include_this_week.lower() == "yes" or horizon == WhenBucket.WEEK
     pid = int(project_id) if project_id not in (None, "", "null") else None
     btype = parse_block_type(block_type) if block_type not in (None, "", "null") else None
+    duration_value = parse_optional_int(duration_minutes)
+    if duration_value is not None and duration_value <= 0:
+        duration_value = None
+    details = capture_description.strip() if capture_description else None
+    source_task = db.get(Task, source_task_id) if source_task_id else None
+    if source_task and not source_task.in_inbox:
+        source_task = None
+    if details is None and source_task:
+        details = source_task.description
 
     try:
         if item_kind == "project":
@@ -112,23 +154,48 @@ def submit_wizard(
                 active_this_week=active_this_week,
                 time_horizon=horizon.value if isinstance(horizon, WhenBucket) else horizon,
                 why_link_text=compose_why_text(why_link_text, why_tags),
-                description=None,
+                color_scheme=normalize_project_color(project_color_scheme),
+                description=details,
             )
             db.add(project)
+            if source_task:
+                source_task.in_inbox = False
+                source_task.status = TaskStatus.ARCHIVED
         else:
-            task = Task(
-                verb_noun=capture_text.strip(),
-                project_id=pid,
-                description=None,
-                when_bucket=horizon,
-                block_type=btype,
-                duration_minutes=duration_minutes or None,
-                frog=frog,
-                owner_type=owner_type,
-                alignment=None,
-                resurface_on=compute_resurface_on(horizon.value if hasattr(horizon, "value") else str(horizon)),
-            )
-            db.add(task)
+            if source_task:
+                task = source_task
+                task.verb_noun = capture_text.strip()
+                task.project_id = pid
+                task.description = details
+                task.in_inbox = False
+                task.when_bucket = horizon
+                task.block_type = btype
+                task.duration_minutes = duration_value
+                task.frog = frog
+                task.owner_type = owner_type
+                task.alignment = None
+                task.resurface_on = compute_resurface_on(
+                    horizon.value if hasattr(horizon, "value") else str(horizon)
+                )
+                task.status = TaskStatus.PENDING
+                task.completed_at = None
+            else:
+                task = Task(
+                    verb_noun=capture_text.strip(),
+                    project_id=pid,
+                    description=details,
+                    in_inbox=False,
+                    when_bucket=horizon,
+                    block_type=btype,
+                    duration_minutes=duration_value,
+                    frog=frog,
+                    owner_type=owner_type,
+                    alignment=None,
+                    resurface_on=compute_resurface_on(
+                        horizon.value if hasattr(horizon, "value") else str(horizon)
+                    ),
+                )
+                db.add(task)
             if owner_type == OwnerType.OPP:
                 waiting = WaitingOn(
                     description=capture_text.strip(),
@@ -138,10 +205,41 @@ def submit_wizard(
                 db.add(waiting)
         db.commit()
     except HTTPException as exc:
+        from urllib.parse import quote_plus
+
         msg = compose_cap_error(exc)
-        return RedirectResponse(url=f"/capture/wizard?error={msg}", status_code=303)
+        prefill = quote_plus(capture_text.strip())
+        source = f"&source_task_id={source_task_id}" if source_task_id else ""
+        return RedirectResponse(
+            url=f"/capture/wizard?error={msg}&prefill={prefill}{source}",
+            status_code=303,
+        )
 
     return RedirectResponse(url="/?success=Captured", status_code=303)
+
+
+@router.post("/capture/wizard/suggest")
+async def suggest_wizard_kind(request: Request):
+    try:
+        payload = await request.json()
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail="Invalid JSON payload") from exc
+
+    details = (payload.get("details") or "").strip()
+    if not details:
+        raise HTTPException(status_code=400, detail="Add more detail for a suggestion.")
+    size = payload.get("size") or None
+    next_action = payload.get("next_action") or None
+    title = payload.get("title") or None
+    kind, rationale, engine = suggest_capture_kind(
+        details=details,
+        size=size,
+        next_action=next_action,
+        title=title,
+    )
+    if kind not in {"task", "project"}:
+        kind = "task"
+    return JSONResponse({"kind": kind, "rationale": rationale, "engine": engine})
 
 
 @router.post("/capture")
@@ -153,7 +251,7 @@ def submit_capture(
     task_description: str | None = Form(None),
     task_when_bucket: WhenBucket = Form(WhenBucket.TODAY),
     task_block_type: str | None = Form(""),
-    task_duration_minutes: int | None = Form(None),
+    task_duration_minutes: str | None = Form(None),
     task_frog: bool = Form(False),
     project_category: ProjectCategory = Form(ProjectCategory.WORK),
     project_time_horizon: str = Form("week"),
@@ -161,10 +259,11 @@ def submit_capture(
     project_description: str | None = Form(None),
     project_why_link_text: str | None = Form(None),
     project_why_tags: list[str] | None = Form(None),
+    project_color_scheme: str | None = Form(None),
     block_project_id: str | None = Form(""),
     block_date: str | None = Form(None),
     block_start_time: str | None = Form(None),
-    block_duration_minutes: int | None = Form(None),
+    block_duration_minutes: str | None = Form(None),
     block_type: str | None = Form(""),
     block_notes: str | None = Form(None),
     db: Session = Depends(get_db),
@@ -193,6 +292,7 @@ def submit_capture(
                 verb_noun=cleaned_title,
                 project_id=None,
                 description=None,
+                in_inbox=True,
                 when_bucket=WhenBucket.LATER,
                 block_type=None,
                 duration_minutes=None,
@@ -205,13 +305,17 @@ def submit_capture(
         if capture_kind == "task":
             pid = int(task_project_id) if task_project_id not in (None, "", "null") else None
             btype = task_block_type if task_block_type not in (None, "", "null") else None
+            duration_value = parse_optional_int(task_duration_minutes)
+            if duration_value is not None and duration_value <= 0:
+                duration_value = None
             task = Task(
                 verb_noun=cleaned_title,
                 project_id=pid,
                 description=task_description or None,
+                in_inbox=False,
                 when_bucket=task_when_bucket,
                 block_type=parse_block_type(btype),
-                duration_minutes=task_duration_minutes or None,
+                duration_minutes=duration_value,
                 frog=task_frog,
             )
             db.add(task)
@@ -231,6 +335,7 @@ def submit_capture(
                 active_this_week=active_this_week,
                 time_horizon=project_time_horizon,
                 why_link_text=compose_why_text(project_why_link_text, project_why_tags),
+                color_scheme=normalize_project_color(project_color_scheme),
                 description=project_description or None,
             )
             db.add(project)
@@ -250,9 +355,10 @@ def submit_capture(
             if parsed_block_type is None:
                 raise HTTPException(status_code=400, detail="Block type is required.")
 
-            if block_duration_minutes is None or block_duration_minutes <= 0:
+            block_minutes = parse_optional_int(block_duration_minutes)
+            if block_minutes is None or block_minutes <= 0:
                 raise HTTPException(status_code=400, detail="Duration is required.")
-            dur = max(5, block_duration_minutes)
+            dur = max(5, block_minutes)
 
             start_dt = datetime.combine(date_val, start_val)
             end_dt = start_dt + timedelta(minutes=dur)

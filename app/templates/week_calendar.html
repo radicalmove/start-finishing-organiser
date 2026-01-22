@@ -44,7 +44,10 @@
                     {% set label_suffix = parts[1] | trim %}
                   {% endif %}
                   <div class="event-block event-block--mini {{ ev.type }}{% if ev.extra_class %} {{ ev.extra_class }}{% endif %}" style="top: {{ ev.top }}%; height: {{ ev.height }}%;">
-                    <div class="event-time">{{ ev.start_display }}{% if ev.end_display %} – {{ ev.end_display }}{% endif %}</div>
+                    <div class="event-top">
+                      <div class="event-time">{{ ev.start_display }}{% if ev.end_display %} – {{ ev.end_display }}{% endif %}</div>
+                      {% if ev.project %}<div class="event-project">{{ ev.project }}</div>{% endif %}
+                    </div>
                     {% if ev.type == "external" and label_prefix %}
                       <div class="event-label event-label--split">
                         <span class="event-label-strong">{{ label_prefix }}</span>
@@ -66,7 +69,6 @@
                         </form>
                       </div>
                     {% endif %}
-                    {% if ev.project %}<div class="event-project">{{ ev.project }}</div>{% endif %}
                   </div>
                 {% endfor %}
               </div>

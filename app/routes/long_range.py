@@ -8,6 +8,7 @@ from ..db import get_db
 from ..models import Project, ProjectStatus, ProjectCategory, ProjectSize, SuccessLevel, SuccessPack
 from ..security import csrf_protect, require_html_auth
 from ..utils.coach import build_coach_context_json, project_summary
+from ..utils.projects import normalize_project_color
 from ..utils.rules import enforce_weekly_cap
 
 router = APIRouter(dependencies=[Depends(require_html_auth), Depends(csrf_protect)])
@@ -132,6 +133,7 @@ def update_long_range_project(
     category: str | None = Form(None),
     time_horizon: str | None = Form(None),
     target_date: str | None = Form(None),
+    color_scheme: str | None = Form(None),
     size: str | None = Form(None),
     level_of_success: str | None = Form(None),
     why_link_text: str | None = Form(None),
@@ -171,6 +173,9 @@ def update_long_range_project(
 
     if target_date is not None:
         project.target_date = _parse_optional_date(target_date)
+
+    if color_scheme is not None:
+        project.color_scheme = normalize_project_color(color_scheme)
 
     if why_link_text is not None:
         project.why_link_text = why_link_text.strip() or None

@@ -51,7 +51,7 @@
                 <div class="note">Work ({{ weekly_work_projects|length }}/4)</div>
                 <div class="ritual-pillset">
                   {% for project in weekly_work_projects %}
-                    <span class="pill">{{ project.title }}</span>
+                    <span class="pill pill--project project-color-{{ project.color_scheme or 'slate' }}">{{ project.title }}</span>
                   {% endfor %}
                 </div>
               {% endif %}
@@ -59,7 +59,7 @@
                 <div class="note">Personal ({{ weekly_personal_projects|length }}/3)</div>
                 <div class="ritual-pillset">
                   {% for project in weekly_personal_projects %}
-                    <span class="pill">{{ project.title }}</span>
+                    <span class="pill pill--project project-color-{{ project.color_scheme or 'slate' }}">{{ project.title }}</span>
                   {% endfor %}
                 </div>
               {% endif %}

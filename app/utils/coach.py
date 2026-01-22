@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import random
+import re
 from datetime import date, datetime, time
 from typing import Any
 from urllib.error import URLError, HTTPError
@@ -29,6 +30,36 @@ def _json_default(value: Any) -> str:
     return str(value)
 
 
+def _normalize_text(text: str) -> str:
+    return re.sub(r"[^a-z0-9 ]+", " ", (text or "").lower()).strip()
+
+
+def _is_short_message(text: str) -> bool:
+    cleaned = _normalize_text(text)
+    if not cleaned:
+        return False
+    return len(cleaned.split()) <= 3
+
+
+def _trim_list(items: list[Any], limit: int) -> tuple[list[Any], int]:
+    if len(items) <= limit:
+        return items, 0
+    return items[:limit], len(items) - limit
+
+
+def _trim_screen_data(screen_data: dict[str, Any], limit: int = 6) -> dict[str, Any]:
+    trimmed: dict[str, Any] = {}
+    for key, value in (screen_data or {}).items():
+        if isinstance(value, list):
+            subset, extra = _trim_list(value, limit)
+            trimmed[key] = subset
+            if extra:
+                trimmed[f"{key}_more"] = extra
+        else:
+            trimmed[key] = value
+    return trimmed
+
+
 def project_summary(project: Project) -> dict[str, Any]:
     return {
         "id": project.id,
@@ -36,6 +67,7 @@ def project_summary(project: Project) -> dict[str, Any]:
         "category": project.category.value if project.category else None,
         "status": project.status.value if project.status else None,
         "size": project.size.value if project.size else None,
+        "color_scheme": project.color_scheme,
         "time_horizon": project.time_horizon,
         "start_date": _to_iso(project.start_date),
         "target_date": _to_iso(project.target_date),
@@ -53,6 +85,7 @@ def task_summary(task: Task) -> dict[str, Any]:
         "description": task.description,
         "project_id": task.project_id,
         "project_title": task.project.title if task.project else None,
+        "in_inbox": task.in_inbox,
         "when_bucket": task.when_bucket.value if task.when_bucket else None,
         "block_type": task.block_type.value if task.block_type else None,
         "duration_minutes": task.duration_minutes,
@@ -211,6 +244,20 @@ def build_coach_context_json(
     return payload.replace("</", "<\\/")
 
 
+def _context_for_llm(context: dict[str, Any] | None) -> str | None:
+    if not context:
+        return None
+    lists = context.get("lists", {}) if isinstance(context, dict) else {}
+    digest: dict[str, Any] = {
+        "screen": context.get("screen", {}),
+        "screen_data": _trim_screen_data(context.get("screen_data", {})),
+        "counts": _summarize_counts(context),
+    }
+    if isinstance(lists, dict) and lists.get("profile"):
+        digest["profile"] = lists["profile"]
+    return json.dumps(digest, ensure_ascii=True, default=_json_default)
+
+
 def _quote_bank() -> list[str]:
     return [
         "Everything that matters is a project.",
@@ -242,7 +289,6 @@ def _is_guide_request(text: str) -> bool:
     guide_phrases = (
         "help me with what i'm looking at",
         "help me with what im looking at",
-        "help me",
         "help with this",
         "what should i do",
         "what do i do",
@@ -286,6 +332,23 @@ def _is_goal_request(text: str) -> bool:
         "goal setting",
     )
     return any(phrase in lowered for phrase in goal_phrases)
+
+
+def _is_greeting(text: str) -> bool:
+    cleaned = _normalize_text(text)
+    if not cleaned:
+        return False
+    tokens = cleaned.split()
+    if len(tokens) > 3:
+        return False
+    base = {"hello", "hi", "hey", "hiya", "yo", "sup", "gday"}
+    if cleaned in {"good morning", "good afternoon", "good evening", "kia ora"}:
+        return True
+    if len(tokens) == 1 and tokens[0] in base:
+        return True
+    if len(tokens) == 2 and tokens[0] in base and tokens[1] in {"there", "charlie"}:
+        return True
+    return False
 
 
 def _screen_playbook(screen_id: str) -> str | None:
@@ -383,6 +446,38 @@ def coach_guide_reply() -> str:
 def coach_help_reply(context: dict[str, Any] | None) -> str:
     screen = (context or {}).get("screen", {})
     screen_id = screen.get("id", "home")
+    screen_data = (context or {}).get("screen_data", {})
+    if screen_id == "home" and isinstance(screen_data, dict):
+        inbox_tasks = screen_data.get("inbox_tasks", [])
+        today_tasks = screen_data.get("today_tasks", [])
+        current_block = screen_data.get("current_block")
+        if isinstance(inbox_tasks, list) and inbox_tasks:
+            title = inbox_tasks[0].get("verb_noun") or "an inbox item"
+            return (
+                "You're on Home. Start with the Inbox: process "
+                f"\"{title}\" by deciding task vs project, then give it a time bucket. "
+                "Want me to guide that one?"
+            )
+        if isinstance(today_tasks, list) and today_tasks:
+            title = today_tasks[0].get("verb_noun") or "a task"
+            return (
+                "You're on Home. Pick one task for today, then protect a Focus block for it. "
+                f"For example, \"{title}\" could be your One Thing. Want help choosing?"
+            )
+        if isinstance(current_block, dict) and current_block.get("title"):
+            title = current_block.get("title")
+            return (
+                f"You're on Home. Your current block is \"{title}\"; protect the time and "
+                "attach one task so it stays concrete. Want to do that now?"
+            )
+    if screen_id == "tasks" and isinstance(screen_data, dict):
+        tasks = screen_data.get("tasks", [])
+        if isinstance(tasks, list) and tasks:
+            title = tasks[0].get("verb_noun") or "a task"
+            return (
+                "You're on Tasks. Tighten one task by setting when plus block type so it can be scheduled. "
+                f"Want to start with \"{title}\"?"
+            )
     playbook = _screen_playbook(screen_id)
     if playbook:
         return playbook
@@ -414,18 +509,118 @@ def _summarize_counts(context: dict[str, Any]) -> dict[str, int]:
     }
 
 
+def _candidate_tasks(context: dict[str, Any] | None) -> list[dict[str, Any]]:
+    if not context:
+        return []
+    screen_data = context.get("screen_data", {}) if isinstance(context, dict) else {}
+    tasks: list[dict[str, Any]] = []
+    for key in ("inbox_tasks", "today_tasks", "tasks"):
+        items = screen_data.get(key, [])
+        if isinstance(items, list):
+            tasks.extend([item for item in items if isinstance(item, dict)])
+    if not tasks:
+        lists = context.get("lists", {}) if isinstance(context, dict) else {}
+        items = lists.get("tasks", [])
+        if isinstance(items, list):
+            tasks.extend([item for item in items if isinstance(item, dict)])
+    deduped: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for task in tasks:
+        key = str(task.get("id") or task.get("verb_noun") or "")
+        if key and key in seen:
+            continue
+        if key:
+            seen.add(key)
+        deduped.append(task)
+    return deduped
+
+
+def _match_task_in_message(message: str, context: dict[str, Any] | None) -> dict[str, Any] | None:
+    msg = _normalize_text(message)
+    if not msg:
+        return None
+    msg_words = set(msg.split())
+    for task in _candidate_tasks(context):
+        name = _normalize_text(task.get("verb_noun") or "")
+        if not name:
+            continue
+        if name in msg:
+            return task
+        name_words = set(name.split())
+        if name_words and name_words.issubset(msg_words):
+            return task
+    return None
+
+
+def _task_guidance_reply(task: dict[str, Any]) -> str | None:
+    title = task.get("verb_noun") or "That item"
+    in_inbox = bool(task.get("in_inbox"))
+    when_bucket = task.get("when_bucket")
+    block_type = task.get("block_type")
+    duration = task.get("duration_minutes")
+    scheduled_for = task.get("scheduled_for")
+
+    if in_inbox:
+        return (
+            f"\"{title}\" is sitting in your Inbox. Decide if it's a task (15-120 min) or a project. "
+            "If it's a task, give it a rough duration and when it should surface; if it's a project, "
+            "set a horizon and a next action. Which is it?"
+        )
+
+    if not when_bucket:
+        return (
+            f"\"{title}\" needs a time bucket so it shows up in the right view. "
+            "Is it today, this week, this month, or later?"
+        )
+
+    if not block_type or not duration:
+        return (
+            f"\"{title}\" needs a block type and rough duration before it can land on the calendar. "
+            "Pick Focus vs Admin and estimate minutes. Want me to suggest a default?"
+        )
+
+    if not scheduled_for and when_bucket in {"today", "week"}:
+        return (
+            f"\"{title}\" is set for {when_bucket}. Put a block on the calendar so it has real time. "
+            "Do you want to schedule it now?"
+        )
+
+    return (
+        f"\"{title}\" looks ready. What's the single next step you want to protect first?"
+    )
+
+
 def coach_lite_reply(message: str, context: dict[str, Any] | None) -> str:
     screen = (context or {}).get("screen", {})
     screen_id = screen.get("id", "home")
     screen_title = screen.get("title", "your screen")
+    screen_data = (context or {}).get("screen_data", {})
     counts = _summarize_counts(context or {})
     message_lower = (message or "").lower()
+    inbox_count = 0
+    if isinstance(screen_data, dict):
+        inbox_tasks = screen_data.get("inbox_tasks", [])
+        if isinstance(inbox_tasks, list):
+            inbox_count = len(inbox_tasks)
 
     if _is_goal_request(message):
         return (
             "You do not need quarterly goals to start. Pick one weekly focus and protect a Focus block, "
             "then refine the bigger goals as you go. What is one outcome you want by Friday?"
         )
+
+    if _is_greeting(message):
+        if screen_id == "home":
+            return (
+                "Hey — good to see you. You're on Home. Want help with the Inbox or picking your One Thing?"
+            )
+        return f"Hey — good to see you. You're on {screen_title}. Want help with what's on this screen?"
+
+    task_match = _match_task_in_message(message, context)
+    if task_match:
+        reply = _task_guidance_reply(task_match)
+        if reply:
+            return reply
 
     observations = []
     if counts["projects_active"] > 7:
@@ -440,7 +635,9 @@ def coach_lite_reply(message: str, context: dict[str, Any] | None) -> str:
         observations.append(
             f"There are {counts['unscheduled_ready']} tasks ready to schedule into blocks."
         )
-    if counts["waiting_total"] > 0 and screen_id in {"home", "waiting"}:
+    if counts["waiting_total"] > 0 and (
+        screen_id == "waiting" or "waiting" in message_lower or "opp" in message_lower
+    ):
         observations.append(
             f"You've got {counts['waiting_total']} items waiting on others."
         )
@@ -474,6 +671,8 @@ def coach_lite_reply(message: str, context: dict[str, Any] | None) -> str:
         home_suggestions = []
         if counts["tasks_total"] == 0 and counts["projects_total"] == 0:
             home_suggestions.append("Start with Quick capture to dump what's on your mind.")
+        if inbox_count > 0:
+            home_suggestions.append("Process one Inbox item so it has a home.")
         if counts["unscheduled_ready"] > 0:
             home_suggestions.append("Schedule one ready task into a Focus block so it has time.")
         if counts["blocks_total"] == 0:
@@ -535,6 +734,27 @@ def _ollama_model() -> str:
     return os.getenv("SFO_OLLAMA_MODEL", "llama3.1:8b").strip()
 
 
+def _llm_history_limit() -> int:
+    raw = os.getenv("SFO_LLM_HISTORY_LIMIT")
+    if raw and raw.isdigit():
+        return max(1, int(raw))
+    return 6
+
+
+def _llm_max_tokens() -> int:
+    raw = os.getenv("SFO_LLM_MAX_TOKENS")
+    if raw and raw.isdigit():
+        return max(60, int(raw))
+    return 160
+
+
+def _llm_shortcuts_enabled() -> bool:
+    raw = os.getenv("SFO_LLM_SHORTCUTS")
+    if raw is None:
+        return True
+    return raw.strip().lower() in {"1", "true", "yes", "on"}
+
+
 def _llm_timeout() -> int:
     raw = os.getenv("SFO_LLM_TIMEOUT")
     if raw and raw.isdigit():
@@ -561,17 +781,14 @@ def _build_llm_messages(
     context_json: str | None,
 ) -> list[dict[str, str]]:
     messages = [{"role": "system", "content": system_prompt}]
-    recent = history[-12:] if history else []
-    for msg in recent:
-        content = msg.content
-        if msg.role == "user" and msg.context_json:
-            content = f"{content}\n\nContext:\n{msg.context_json}"
-        messages.append({"role": msg.role, "content": content})
     if context_json:
-        composed = f"{new_message}\n\nContext:\n{context_json}"
-    else:
-        composed = new_message
-    messages.append({"role": "user", "content": composed})
+        messages.append(
+            {"role": "system", "content": f"Context JSON (read-only):\n{context_json}"}
+        )
+    recent = history[-_llm_history_limit():] if history else []
+    for msg in recent:
+        messages.append({"role": msg.role, "content": msg.content})
+    messages.append({"role": "user", "content": new_message})
     return messages
 
 
@@ -583,8 +800,12 @@ def _system_prompt() -> str:
         "You can push the user when needed, but never shame or belittle. "
         "Use curiosity and invitations, not commands. "
         "You give advice only; do not claim to take actions or change data. "
-        "Use the provided context to comment on what the user is viewing. "
-        "When the user asks for help on the current screen, guide them step-by-step and keep it light. "
+        "Use the provided context JSON as your ground truth about the user's screen and data. "
+        "Use the current screen to anchor your guidance. "
+        "If the user mentions a specific task, project, or block, look for it in the context and respond about that item; "
+        "if you cannot find it, ask a clarifying question. "
+        "When the user asks for help on the current screen, guide them with one step at a time and keep it light. "
+        "Avoid generic app tours unless the user asks how to use the app or says they're lost. "
         "Focus on 1-2 salient details; do not list everything. "
         "Keep replies concise: 2-4 sentences, single paragraph, ~70 words max. "
         "Avoid lists unless the user explicitly asks for steps. "
@@ -593,6 +814,138 @@ def _system_prompt() -> str:
         "Use contractions and vary sentence length. "
         "If you include a quote, format it exactly as: Like I said in Start Finishing, \"...\""
     )
+
+
+def _heuristic_capture_kind(
+    *,
+    details: str,
+    size: str | None,
+    next_action: str | None,
+    title: str | None,
+) -> tuple[str, str]:
+    if size == "multi" or next_action == "no":
+        return "project", "Multiple steps or an unclear next action usually means project."
+    if size == "single" and next_action == "yes":
+        return "task", "Single sitting with a clear next step usually means task."
+
+    text = _normalize_text(f"{title or ''} {details}")
+    project_keywords = {
+        "plan",
+        "strategy",
+        "research",
+        "build",
+        "design",
+        "launch",
+        "campaign",
+        "roadmap",
+        "rollout",
+        "rebrand",
+        "system",
+        "process",
+        "program",
+        "initiative",
+        "project",
+        "multi",
+        "multiple",
+        "phases",
+        "phase",
+    }
+    task_keywords = {
+        "call",
+        "email",
+        "reply",
+        "book",
+        "schedule",
+        "buy",
+        "fix",
+        "draft",
+        "review",
+        "send",
+        "submit",
+        "update",
+        "finish",
+        "write",
+        "clean",
+    }
+    if any(word in text for word in project_keywords):
+        return "project", "Sounds like multi-step work with moving parts."
+    if any(word in text for word in task_keywords):
+        return "task", "Looks like a single clear action."
+    return "task", "Looks like a small, single-sitting action you can adjust later."
+
+
+def suggest_capture_kind(
+    *,
+    details: str,
+    size: str | None = None,
+    next_action: str | None = None,
+    title: str | None = None,
+) -> tuple[str, str, str]:
+    provider = _llm_provider()
+    details = details.strip()
+    prompt = (
+        "Classify if the item is best treated as a TASK or PROJECT.\n"
+        "Task = single sitting (15-120 min) with a clear next action.\n"
+        "Project = multi-step, multiple sessions, or unclear next action.\n"
+        "Reply with 'Task' or 'Project' on the first line, and one short reason on the second line."
+    )
+    payload = (
+        f"Title: {title or ''}\n"
+        f"Details: {details}\n"
+        f"Single sitting?: {size or 'unknown'}\n"
+        f"Next action clear?: {next_action or 'unknown'}"
+    )
+
+    if provider == "off":
+        kind, rationale = _heuristic_capture_kind(
+            details=details,
+            size=size,
+            next_action=next_action,
+            title=title,
+        )
+        return kind, rationale, "heuristic"
+
+    if provider == "auto" and not _ollama_available():
+        kind, rationale = _heuristic_capture_kind(
+            details=details,
+            size=size,
+            next_action=next_action,
+            title=title,
+        )
+        return kind, rationale, "heuristic"
+
+    if provider in {"ollama", "auto"}:
+        try:
+            messages = [
+                {"role": "system", "content": prompt},
+                {"role": "user", "content": payload},
+            ]
+            reply = _call_ollama(messages)
+            if reply:
+                lines = [line.strip() for line in reply.splitlines() if line.strip()]
+                first = lines[0].lower() if lines else ""
+                kind = "project" if "project" in first else "task" if "task" in first else ""
+                rationale = ""
+                if len(lines) > 1:
+                    rationale = lines[1]
+                elif " - " in lines[0]:
+                    rationale = lines[0].split(" - ", 1)[1].strip()
+                elif ": " in lines[0]:
+                    rationale = lines[0].split(": ", 1)[1].strip()
+                if kind:
+                    return kind, rationale or "You can still choose either way.", "ollama"
+        except (URLError, HTTPError, TimeoutError, ValueError):
+            pass
+        except Exception:
+            pass
+
+    kind, rationale = _heuristic_capture_kind(
+        details=details,
+        size=size,
+        next_action=next_action,
+        title=title,
+    )
+    return kind, rationale, "heuristic"
 
 
 def _call_ollama(messages: list[dict[str, str]]) -> str:
@@ -604,6 +957,7 @@ def _call_ollama(messages: list[dict[str, str]]) -> str:
         "options": {
             "temperature": 0.6,
             "top_p": 0.9,
+            "num_predict": _llm_max_tokens(),
         },
     }
     data = json.dumps(payload).encode("utf-8")
@@ -621,10 +975,29 @@ def generate_coach_reply(
     history: list[CoachMessage],
 ) -> tuple[str, list[dict[str, str]], str]:
     provider = _llm_provider()
-    context_json = json.dumps(context, ensure_ascii=True, default=_json_default) if context else None
+    llm_context_json = _context_for_llm(context)
     actions = suggest_quick_actions(context)
 
+    if _llm_shortcuts_enabled() and _is_short_message(message):
+        return coach_lite_reply(message, context), actions, "coach-lite"
+
     if _is_guide_request(message):
+        if provider in {"ollama", "auto"}:
+            if provider != "auto" or _ollama_available():
+                try:
+                    messages = _build_llm_messages(
+                        _system_prompt(),
+                        history,
+                        message,
+                        llm_context_json,
+                    )
+                    reply = _call_ollama(messages)
+                    if reply:
+                        return reply, actions, "ollama"
+                except (URLError, HTTPError, TimeoutError, ValueError):
+                    pass
+                except Exception:
+                    pass
         return coach_help_reply(context), actions, "coach-lite"
 
     if provider == "off":
@@ -635,7 +1008,7 @@ def generate_coach_reply(
 
     if provider in {"ollama", "auto"}:
         try:
-            messages = _build_llm_messages(_system_prompt(), history, message, context_json)
+            messages = _build_llm_messages(_system_prompt(), history, message, llm_context_json)
             reply = _call_ollama(messages)
             if reply:
                 return reply, actions, "ollama"

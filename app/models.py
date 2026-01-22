@@ -106,6 +106,7 @@ class Project(Base):
     id = Column(Integer, primary_key=True, index=True)
     title = Column(String(160), nullable=False)
     description = Column(Text, nullable=True)
+    color_scheme = Column(String(24), nullable=True)
     category = Column(SAEnum(ProjectCategory, **ENUM_KWARGS), nullable=False, default=ProjectCategory.WORK)
     status = Column(SAEnum(ProjectStatus, **ENUM_KWARGS), nullable=False, default=ProjectStatus.ACTIVE)
     size = Column(SAEnum(ProjectSize, **ENUM_KWARGS), nullable=True)
@@ -136,6 +137,8 @@ class Task(Base):
     project_id = Column(Integer, ForeignKey("projects.id"), nullable=True)
     verb_noun = Column(String(200), nullable=False)
     description = Column(Text, nullable=True)
+    in_inbox = Column(Boolean, nullable=False, default=False)
+    archived_from_inbox = Column(Boolean, nullable=False, default=False)
     when_bucket = Column(SAEnum(WhenBucket, **ENUM_KWARGS), nullable=False, default=WhenBucket.LATER)
     block_type = Column(SAEnum(BlockType, **ENUM_KWARGS), nullable=True)
     duration_minutes = Column(Integer, nullable=True)
@@ -335,3 +338,31 @@ class GuidanceEvent(Base):
     code = Column(String(64), nullable=False)
     context_json = Column(Text, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
+class EmailSyncState(Base):
+    __tablename__ = "email_sync_state"
+
+    id = Column(Integer, primary_key=True, index=True)
+    provider = Column(String(40), nullable=False, unique=True)
+    last_history_id = Column(String(64), nullable=True)
+    last_sync_at = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+
+class EmailMessage(Base):
+    __tablename__ = "email_messages"
+
+    id = Column(Integer, primary_key=True, index=True)
+    message_id = Column(String(128), nullable=False, unique=True, index=True)
+    thread_id = Column(String(128), nullable=True)
+    from_name = Column(String(200), nullable=True)
+    from_email = Column(String(200), nullable=True)
+    subject = Column(String(255), nullable=True)
+    snippet = Column(Text, nullable=True)
+    received_at = Column(DateTime(timezone=True), nullable=True)
+    imported_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    task_id = Column(Integer, ForeignKey("tasks.id"), nullable=True)
+
+    task = relationship("Task")
