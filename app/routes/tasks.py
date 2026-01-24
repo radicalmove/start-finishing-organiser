@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, date, timedelta
+from urllib.parse import quote_plus
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -110,7 +111,7 @@ def _safe_redirect(next_url: str | None, fallback: str, message: str | None = No
     url = next_url if next_url and next_url.startswith("/") else fallback
     if message:
         separator = "&" if "?" in url else "?"
-        url = f"{url}{separator}success={message}"
+        url = f"{url}{separator}success={quote_plus(message)}"
     return RedirectResponse(url=url, status_code=303)
 
 
@@ -198,7 +199,7 @@ def complete_task(
     task.in_inbox = False
     db.add(task)
     db.commit()
-    return _safe_redirect(next_url, "/tasks/time", "Completed")
+    return _safe_redirect(next_url, "/tasks/time", f"Completed: {task.verb_noun}")
 
 
 @router.post("/tasks/reopen")

@@ -1,4 +1,4 @@
-# SFO Test Plan (v0.6)
+# SFO Test Plan (v0.7)
 
 ## Goal
 Validate core flows with junk data before real use and manual Trello migration. Add automated

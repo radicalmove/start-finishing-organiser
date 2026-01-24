@@ -90,6 +90,9 @@ def ensure_ritual_table():
                     plan_review TEXT NULL,
                     reality_scan TEXT NULL,
                     focus_time_status VARCHAR(40) NULL,
+                    morning_right_now TEXT NULL,
+                    morning_email_plan TEXT NULL,
+                    morning_focus_chunk TEXT NULL,
                     one_thing TEXT NULL,
                     frog TEXT NULL,
                     gratitude TEXT NULL,
@@ -99,8 +102,17 @@ def ensure_ritual_table():
                     block_plan TEXT NULL,
                     admin_plan TEXT NULL,
                     emotional_intent TEXT NULL,
+                    midday_alignment VARCHAR(40) NULL,
+                    midday_surprises TEXT NULL,
+                    midday_one_thing TEXT NULL,
+                    midday_frog TEXT NULL,
+                    aar_went_well TEXT NULL,
+                    aar_hard TEXT NULL,
+                    aar_next_step TEXT NULL,
                     wins TEXT NULL,
                     adjustments TEXT NULL,
+                    evening_shutdown TEXT NULL,
+                    evening_breadcrumbs TEXT NULL,
                     energy VARCHAR(50) NULL,
                     notes TEXT NULL,
                     created_at DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL
@@ -125,6 +137,12 @@ def ensure_ritual_columns():
             conn.execute(text("ALTER TABLE ritual_entries ADD COLUMN reality_scan TEXT NULL"))
         if "focus_time_status" not in cols:
             conn.execute(text("ALTER TABLE ritual_entries ADD COLUMN focus_time_status VARCHAR(40) NULL"))
+        if "morning_right_now" not in cols:
+            conn.execute(text("ALTER TABLE ritual_entries ADD COLUMN morning_right_now TEXT NULL"))
+        if "morning_email_plan" not in cols:
+            conn.execute(text("ALTER TABLE ritual_entries ADD COLUMN morning_email_plan TEXT NULL"))
+        if "morning_focus_chunk" not in cols:
+            conn.execute(text("ALTER TABLE ritual_entries ADD COLUMN morning_focus_chunk TEXT NULL"))
         if "anticipation" not in cols:
             conn.execute(text("ALTER TABLE ritual_entries ADD COLUMN anticipation TEXT NULL"))
         if "why_expanded" not in cols:
@@ -135,6 +153,24 @@ def ensure_ritual_columns():
             conn.execute(text("ALTER TABLE ritual_entries ADD COLUMN admin_plan TEXT NULL"))
         if "emotional_intent" not in cols:
             conn.execute(text("ALTER TABLE ritual_entries ADD COLUMN emotional_intent TEXT NULL"))
+        if "midday_alignment" not in cols:
+            conn.execute(text("ALTER TABLE ritual_entries ADD COLUMN midday_alignment VARCHAR(40) NULL"))
+        if "midday_surprises" not in cols:
+            conn.execute(text("ALTER TABLE ritual_entries ADD COLUMN midday_surprises TEXT NULL"))
+        if "midday_one_thing" not in cols:
+            conn.execute(text("ALTER TABLE ritual_entries ADD COLUMN midday_one_thing TEXT NULL"))
+        if "midday_frog" not in cols:
+            conn.execute(text("ALTER TABLE ritual_entries ADD COLUMN midday_frog TEXT NULL"))
+        if "aar_went_well" not in cols:
+            conn.execute(text("ALTER TABLE ritual_entries ADD COLUMN aar_went_well TEXT NULL"))
+        if "aar_hard" not in cols:
+            conn.execute(text("ALTER TABLE ritual_entries ADD COLUMN aar_hard TEXT NULL"))
+        if "aar_next_step" not in cols:
+            conn.execute(text("ALTER TABLE ritual_entries ADD COLUMN aar_next_step TEXT NULL"))
+        if "evening_shutdown" not in cols:
+            conn.execute(text("ALTER TABLE ritual_entries ADD COLUMN evening_shutdown TEXT NULL"))
+        if "evening_breadcrumbs" not in cols:
+            conn.execute(text("ALTER TABLE ritual_entries ADD COLUMN evening_breadcrumbs TEXT NULL"))
 
 
 def ensure_guidance_reminder_columns():

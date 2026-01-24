@@ -1,6 +1,6 @@
 ---
 app_name: "Meaningful Work Organiser"
-version: "0.6"
+version: "0.7"
 author: "Richard Davies"
 created_for: "Personal use, extensible to others later"
 primary_reference: "Start Finishing – Charlie Gilkey"
@@ -95,7 +95,7 @@ constraints_and_rules:
 
 ---
 
-# Meaningful Work Organiser — Massive Blueprint (v0.6)
+# Meaningful Work Organiser — Massive Blueprint (v0.7)
 
 ## Table of Contents
 
@@ -792,6 +792,12 @@ This is where the app’s intelligence lives.
 - Gmail sync (email-to-inbox) with OAuth and local polling.
 - Calendar read-only integration (Cozi ICS).
 
+### v0.7 – Ritual Depth + Coaching Patterns
+
+- Expanded morning/midday/evening ritual prompts (10/15 minute flows).
+- Pattern-based Charlie nudges driven by rituals, tasks, and health signals.
+- Simplified health dashboard for calmer daily use.
+
 ### v1.0 – Personally Stable
 
 - Used by Richard as primary organiser.
@@ -813,4 +819,4 @@ This is where the app’s intelligence lives.
 - **Why**: Core purpose, identity, and values that the app keeps front and centre.
 
 ---
-# End of Massive Blueprint (v0.6)
+# End of Massive Blueprint (v0.7)

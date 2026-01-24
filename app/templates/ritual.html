@@ -117,6 +117,10 @@
               <option value="overbooked" {% if is_today_entry and last_entry.focus_time_status == "overbooked" %}selected{% endif %}>Overbooked</option>
             </select>
           </label>
+          <label class="field">
+            <span>What one thing will you do right now?</span>
+            <textarea name="morning_right_now" rows="2">{{ last_entry.morning_right_now if is_today_entry else '' }}</textarea>
+          </label>
         </div>
 
         <div class="ritual-section">
@@ -174,12 +178,24 @@
             </div>
           {% endif %}
           <label class="field">
+            <span>First focus block chunk</span>
+            <textarea name="morning_focus_chunk" rows="2">{{ last_entry.morning_focus_chunk if is_today_entry else '' }}</textarea>
+          </label>
+          <label class="field">
             <span>Focus block plan</span>
             <textarea name="block_plan" rows="3">{{ last_entry.block_plan if is_today_entry else '' }}</textarea>
           </label>
           <label class="field">
             <span>Admin block plan</span>
             <textarea name="admin_plan" rows="3">{{ last_entry.admin_plan if is_today_entry else '' }}</textarea>
+          </label>
+        </div>
+
+        <div class="ritual-section">
+          <h4>Inbox boundaries</h4>
+          <label class="field">
+            <span>Email/Teams plan</span>
+            <textarea name="morning_email_plan" rows="2">{{ last_entry.morning_email_plan if is_today_entry else '' }}</textarea>
           </label>
         </div>
 
@@ -195,22 +211,72 @@
           </label>
         </div>
       {% elif ritual_type == "midday" %}
+        <div class="ritual-section">
+          <h4>Midday reset</h4>
+          <label class="field">
+            <span>Still aligned with today's plan?</span>
+            <select name="midday_alignment">
+              <option value="">Select...</option>
+              <option value="on_track" {% if is_today_entry and last_entry.midday_alignment == "on_track" %}selected{% endif %}>On track</option>
+              <option value="adjusting" {% if is_today_entry and last_entry.midday_alignment == "adjusting" %}selected{% endif %}>Adjusting</option>
+              <option value="off_track" {% if is_today_entry and last_entry.midday_alignment == "off_track" %}selected{% endif %}>Off track</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>Any surprises since the morning plan?</span>
+            <textarea name="midday_surprises" rows="2">{{ last_entry.midday_surprises if is_today_entry else '' }}</textarea>
+          </label>
+        </div>
         <label class="field">
           <span>Adjustments</span>
           <textarea name="adjustments" rows="3">{{ last_entry.adjustments if is_today_entry else '' }}</textarea>
         </label>
+        <div class="ritual-section">
+          <h4>Update One Thing & Frog (optional)</h4>
+          <label class="field">
+            <span>Updated One Thing</span>
+            <input type="text" name="midday_one_thing" value="{{ last_entry.midday_one_thing if is_today_entry else '' }}">
+          </label>
+          <label class="field">
+            <span>Updated Frog</span>
+            <input type="text" name="midday_frog" value="{{ last_entry.midday_frog if is_today_entry else '' }}">
+          </label>
+        </div>
+        <div class="ritual-section">
+          <h4>Quick block AAR</h4>
+          <label class="field">
+            <span>What went well?</span>
+            <textarea name="aar_went_well" rows="2">{{ last_entry.aar_went_well if is_today_entry else '' }}</textarea>
+          </label>
+          <label class="field">
+            <span>What was hard?</span>
+            <textarea name="aar_hard" rows="2">{{ last_entry.aar_hard if is_today_entry else '' }}</textarea>
+          </label>
+          <label class="field">
+            <span>Next smallest step</span>
+            <textarea name="aar_next_step" rows="2">{{ last_entry.aar_next_step if is_today_entry else '' }}</textarea>
+          </label>
+        </div>
         <label class="field">
           <span>Energy check</span>
           <input type="text" name="energy" list="energy-tags" value="{{ last_entry.energy if is_today_entry else '' }}" placeholder="e.g., flat, wired, calm">
         </label>
       {% elif ritual_type == "evening" %}
         <label class="field">
-          <span>Wins (include invisible work)</span>
+          <span>What did you accomplish? (include invisible work)</span>
           <textarea name="wins" rows="3">{{ last_entry.wins if is_today_entry else '' }}</textarea>
         </label>
         <label class="field">
           <span>Adjustments / reassignments</span>
           <textarea name="adjustments" rows="3">{{ last_entry.adjustments if is_today_entry else '' }}</textarea>
+        </label>
+        <label class="field">
+          <span>Shutdown steps (disengage)</span>
+          <textarea name="evening_shutdown" rows="3">{{ last_entry.evening_shutdown if is_today_entry else '' }}</textarea>
+        </label>
+        <label class="field">
+          <span>Breadcrumbs for tomorrow</span>
+          <textarea name="evening_breadcrumbs" rows="3">{{ last_entry.evening_breadcrumbs if is_today_entry else '' }}</textarea>
         </label>
         <label class="field">
           <span>Emotion / reflection</span>

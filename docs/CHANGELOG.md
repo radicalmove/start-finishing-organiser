@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.7.0 - 2026-01-24
+- Expanded ritual check-ins with morning focus chunk, midday alignment reset, and evening shutdown/breadcrumbs.
+- Added pattern-based Charlie nudges with threshold gating and optional LLM wording.
+- Simplified the health dashboard and removed heavy guidance blocks.
+- Refined header/nav styling, button sizing, and added inbox count badge.
+
 ## 0.6.0 - 2026-01-22
 - Added Gmail sync with OAuth auth, background polling, and email-to-inbox import.
 - Added inbox detail modal with editable description, linkified preview, and recycle bin actions.

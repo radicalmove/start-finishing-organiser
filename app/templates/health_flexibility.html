@@ -3,8 +3,6 @@
 {% block content %}
   <section class="health-shell">
     {% set hero_title = "Flexibility + mobility" %}
-    {% set hero_subtitle = "Build range, reduce pain, and move with ease." %}
-    {% set hero_tag = "Mobility + recovery" %}
     {% include "partials/health_nav.html" %}
 
     {% if form_error %}
@@ -15,9 +13,6 @@
       <div class="panel">
         <div class="panel-title-row">
           <h3>Log mobility</h3>
-          <div class="panel-actions">
-            <span class="pill">Range of motion</span>
-          </div>
         </div>
         <form class="form" method="post" action="/health/entry">
           <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
@@ -50,37 +45,11 @@
         </form>
       </div>
 
-      <div class="panel">
-        <div class="panel-title-row">
-          <h3>Mobility guidance</h3>
-          <div class="panel-actions">
-            <span class="pill">Best practice</span>
-          </div>
-        </div>
-        <div class="health-guidance-list">
-          <div class="health-guidance-item">
-            <strong>Daily micro-doses:</strong> 5-10 minutes per day beats weekly marathons.
-          </div>
-          <div class="health-guidance-item">
-            <strong>Active range:</strong> Use controlled reps, not just passive holds.
-          </div>
-          <div class="health-guidance-item">
-            <strong>Breath work:</strong> Slow exhales help downshift and deepen stretches.
-          </div>
-          <div class="health-guidance-item">
-            <strong>Warm tissue:</strong> Mobility after training yields better range.
-          </div>
-        </div>
-        <div class="note">Work within a pain-free range and progress gradually.</div>
-      </div>
     </div>
 
     <div class="panel">
       <div class="panel-title-row">
         <h3>Mobility trends</h3>
-        <div class="panel-actions">
-          <span class="pill">Last 30 entries</span>
-        </div>
       </div>
       <div class="health-chart-grid">
         {% for metric in metrics %}
@@ -90,7 +59,9 @@
             <div class="health-metric-header">
               <div>
                 <div class="health-metric-title">{{ metric.name }}</div>
-                <div class="health-metric-subtitle">{{ metric.description or "Track range of motion." }}</div>
+                {% if metric.description %}
+                  <div class="health-metric-subtitle">{{ metric.description }}</div>
+                {% endif %}
               </div>
               <div class="health-metric-latest">
                 {% if latest %}
@@ -118,9 +89,6 @@
     <div class="panel">
       <div class="panel-title-row">
         <h3>Recent entries</h3>
-        <div class="panel-actions">
-          <span class="pill">Latest log</span>
-        </div>
       </div>
       <div class="health-entry-list">
         {% for entry in recent_entries %}

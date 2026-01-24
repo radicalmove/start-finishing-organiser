@@ -22,6 +22,7 @@
   <section class="main-shell">
     <div class="left-col">
       <div class="panel inbox-panel">
+        <span class="pill pill--count inbox-count">{{ inbox_tasks|length }}</span>
         <div class="panel-title-row">
           <div class="panel-title-group">
             <h3>Inbox</h3>
@@ -39,16 +40,16 @@
           {% for t in inbox_tasks %}
             <div class="list-item inbox-item" data-inbox-item data-task-id="{{ t.id }}" data-inbox-title="{{ t.verb_noun|e }}">
               <div class="hidden" data-inbox-desc>{{ t.description or '' }}</div>
+              <div class="task-card-actions task-card-actions--hover inbox-item-actions">
+                <a class="btn ghost btn-sm btn-icon btn-icon--tiny inbox-process-icon" href="/capture/process/{{ t.id }}" data-inbox-action data-guided-capture-open data-guided-prefill="{{ t.verb_noun|e }}" data-guided-source="{{ t.id }}" aria-label="Process" title="Process">➜</a>
+                <form method="post" action="/inbox/archive" class="task-card-action" data-inbox-action>
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+                  <input type="hidden" name="task_id" value="{{ t.id }}">
+                  <button class="btn ghost btn-sm btn-icon btn-icon--tiny inbox-trash-btn" type="submit" aria-label="Move to recycle bin" title="Move to recycle bin">🗑</button>
+                </form>
+              </div>
               <div class="task-card-header">
                 <div class="task-card-title">{{ t.verb_noun }}</div>
-                <div class="task-card-actions inbox-item-actions">
-                  <form method="post" action="/inbox/archive" class="inbox-trash-form">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
-                    <input type="hidden" name="task_id" value="{{ t.id }}">
-                    <button class="btn ghost btn-sm btn-icon btn-icon--tiny inbox-trash-btn" type="submit" data-inbox-action aria-label="Move to recycle bin" title="Move to recycle bin">🗑</button>
-                  </form>
-                  <a class="btn ghost btn-sm inbox-process-btn" href="/capture/process/{{ t.id }}" data-inbox-action data-guided-capture-open data-guided-prefill="{{ t.verb_noun|e }}" data-guided-source="{{ t.id }}">Process</a>
-                </div>
               </div>
               <div class="muted">{{ t.when_bucket.value|title }}</div>
               <div class="task-meta">
@@ -245,4 +246,54 @@
     </div>
   </div>
   {% include "partials/guided_capture_modal.html" %}
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      document.querySelectorAll("[data-draggable-list]").forEach((list) => {
+        if (list.dataset.dragReady === "true") return;
+        list.dataset.dragReady = "true";
+        list.querySelectorAll(".list-item").forEach((item) => {
+          item.setAttribute("draggable", "true");
+        });
+
+        const getAfterElement = (container, y) => {
+          const items = [...container.querySelectorAll(".list-item:not(.dragging)")];
+          return items.reduce(
+            (closest, child) => {
+              const box = child.getBoundingClientRect();
+              const offset = y - box.top - box.height / 2;
+              if (offset < 0 && offset > closest.offset) {
+                return { offset, element: child };
+              }
+              return closest;
+            },
+            { offset: Number.NEGATIVE_INFINITY, element: null }
+          ).element;
+        };
+
+        list.addEventListener("dragstart", (event) => {
+          const item = event.target.closest(".list-item");
+          if (!item) return;
+          item.classList.add("dragging");
+          event.dataTransfer.effectAllowed = "move";
+        });
+
+        list.addEventListener("dragend", (event) => {
+          const item = event.target.closest(".list-item");
+          item?.classList.remove("dragging");
+        });
+
+        list.addEventListener("dragover", (event) => {
+          event.preventDefault();
+          const dragging = list.querySelector(".dragging");
+          if (!dragging) return;
+          const after = getAfterElement(list, event.clientY);
+          if (!after) {
+            list.appendChild(dragging);
+          } else {
+            list.insertBefore(dragging, after);
+          }
+        });
+      });
+    });
+  </script>
 {% endblock %}

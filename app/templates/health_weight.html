@@ -3,8 +3,6 @@
 {% block content %}
   <section class="health-shell">
     {% set hero_title = "Weight + body composition" %}
-    {% set hero_subtitle = "Track the signals that reflect how you feel and perform." %}
-    {% set hero_tag = "Composition + vitals" %}
     {% include "partials/health_nav.html" %}
 
     {% if form_error %}
@@ -15,9 +13,6 @@
       <div class="panel">
         <div class="panel-title-row">
           <h3>Log blood pressure</h3>
-          <div class="panel-actions">
-            <span class="pill">Systolic + diastolic</span>
-          </div>
         </div>
         <form class="form" method="post" action="/health/blood-pressure">
           <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
@@ -51,9 +46,6 @@
       <div class="panel">
         <div class="panel-title-row">
           <h3>Log body metrics</h3>
-          <div class="panel-actions">
-            <span class="pill">Weekly snapshot</span>
-          </div>
         </div>
         <form class="form" method="post" action="/health/entry">
           <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
@@ -86,37 +78,11 @@
         </form>
       </div>
 
-      <div class="panel">
-        <div class="panel-title-row">
-          <h3>Body composition notes</h3>
-          <div class="panel-actions">
-            <span class="pill">Consistency wins</span>
-          </div>
-        </div>
-        <div class="health-guidance-list">
-          <div class="health-guidance-item">
-            <strong>Weigh-in cadence:</strong> 3-7x/week and use a rolling average to smooth noise.
-          </div>
-          <div class="health-guidance-item">
-            <strong>Measurements:</strong> Waist and arm measurements capture changes the scale misses.
-          </div>
-          <div class="health-guidance-item">
-            <strong>Blood pressure:</strong> Measure seated, rested, and at similar times.
-          </div>
-          <div class="health-guidance-item">
-            <strong>Strength anchor:</strong> Maintain resistance training to protect lean mass.
-          </div>
-        </div>
-        <div class="note">Talk with a clinician if blood pressure remains elevated.</div>
-      </div>
     </div>
 
     <div class="panel">
       <div class="panel-title-row">
         <h3>Weight trends</h3>
-        <div class="panel-actions">
-          <span class="pill">Last 30 entries</span>
-        </div>
       </div>
       <div class="health-chart-grid">
         {% for metric in metrics %}
@@ -126,7 +92,9 @@
             <div class="health-metric-header">
               <div>
                 <div class="health-metric-title">{{ metric.name }}</div>
-                <div class="health-metric-subtitle">{{ metric.description or "Track your baseline." }}</div>
+                {% if metric.description %}
+                  <div class="health-metric-subtitle">{{ metric.description }}</div>
+                {% endif %}
               </div>
               <div class="health-metric-latest">
                 {% if latest %}
@@ -154,9 +122,6 @@
     <div class="panel">
       <div class="panel-title-row">
         <h3>Recent entries</h3>
-        <div class="panel-actions">
-          <span class="pill">Latest log</span>
-        </div>
       </div>
       <div class="health-entry-list">
         {% for entry in recent_entries %}

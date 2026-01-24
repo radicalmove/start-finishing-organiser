@@ -70,7 +70,7 @@ def create_app() -> FastAPI:
     ensure_project_color_column()
     ensure_health_metrics()
 
-    app = FastAPI(title="Start Finishing Organiser", version="0.5")
+    app = FastAPI(title="Start Finishing Organiser", version="0.7.0")
 
     def _parse_bool(value: str | None) -> bool:
         return bool(value) and value.strip().lower() in ("1", "true", "yes", "on")

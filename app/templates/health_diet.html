@@ -3,8 +3,6 @@
 {% block content %}
   <section class="health-shell">
     {% set hero_title = "Diet + nutrition" %}
-    {% set hero_subtitle = "Fuel performance with deliberate intake and recovery habits." %}
-    {% set hero_tag = "Macros + consistency" %}
     {% include "partials/health_nav.html" %}
 
     {% if form_error %}
@@ -15,9 +13,6 @@
       <div class="panel">
         <div class="panel-title-row">
           <h3>Log nutrition</h3>
-          <div class="panel-actions">
-            <span class="pill">Daily intake</span>
-          </div>
         </div>
         <form class="form" method="post" action="/health/entry">
           <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
@@ -50,37 +45,11 @@
         </form>
       </div>
 
-      <div class="panel">
-        <div class="panel-title-row">
-          <h3>Nutrition focus</h3>
-          <div class="panel-actions">
-            <span class="pill">Research-backed</span>
-          </div>
-        </div>
-        <div class="health-guidance-list">
-          <div class="health-guidance-item">
-            <strong>Protein distribution:</strong> 20-40g per meal supports muscle protein synthesis.
-          </div>
-          <div class="health-guidance-item">
-            <strong>Fiber target:</strong> 25-38g/day supports gut health and appetite control.
-          </div>
-          <div class="health-guidance-item">
-            <strong>Hydration:</strong> Start with 30-35ml/kg/day and adjust for training.
-          </div>
-          <div class="health-guidance-item">
-            <strong>Energy balance:</strong> Sustainable goals are built with small, consistent deltas.
-          </div>
-        </div>
-        <div class="note">Nutrition guidance is general; personalize with a qualified professional.</div>
-      </div>
     </div>
 
     <div class="panel">
       <div class="panel-title-row">
         <h3>Diet trends</h3>
-        <div class="panel-actions">
-          <span class="pill">Last 30 entries</span>
-        </div>
       </div>
       <div class="health-chart-grid">
         {% for metric in metrics %}
@@ -90,7 +59,9 @@
             <div class="health-metric-header">
               <div>
                 <div class="health-metric-title">{{ metric.name }}</div>
-                <div class="health-metric-subtitle">{{ metric.description or "Track daily intake." }}</div>
+                {% if metric.description %}
+                  <div class="health-metric-subtitle">{{ metric.description }}</div>
+                {% endif %}
               </div>
               <div class="health-metric-latest">
                 {% if latest %}
@@ -118,9 +89,6 @@
     <div class="panel">
       <div class="panel-title-row">
         <h3>Recent nutrition entries</h3>
-        <div class="panel-actions">
-          <span class="pill">Latest log</span>
-        </div>
       </div>
       <div class="health-entry-list">
         {% for entry in recent_entries %}

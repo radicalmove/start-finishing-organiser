@@ -727,13 +727,13 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   const tasksToggle = document.querySelector("[data-task-toggle]");
-  const tasksBoard = document.querySelector("[data-task-board]");
-  if (tasksToggle && tasksBoard) {
+  const tasksBoardView = document.querySelector("[data-task-board]");
+  if (tasksToggle && tasksBoardView) {
     tasksToggle.querySelectorAll("[data-view]").forEach((button) => {
       button.addEventListener("click", () => {
         const view = button.dataset.view;
-        if (!view || tasksBoard.dataset.view === view) return;
-        tasksBoard.dataset.view = view;
+        if (!view || tasksBoardView.dataset.view === view) return;
+        tasksBoardView.dataset.view = view;
         tasksToggle
           .querySelectorAll("[data-view]")
           .forEach((btn) => btn.classList.toggle("is-active", btn.dataset.view === view));
@@ -861,19 +861,365 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
-  document.addEventListener("click", (event) => {
-    const toggle = event.target.closest(".task-edit-toggle");
-    if (!toggle) return;
-    const container = toggle.closest(".task-card, .list-item");
-    const form = container?.querySelector(".task-edit-form");
-    if (!form) return;
-    form.classList.toggle("hidden");
-    if (!form.classList.contains("hidden")) {
-      const input = form.querySelector('input[name="verb_noun"]');
+  let taskDragInProgress = false;
+  let horizonDragInProgress = false;
+  const projectEditModal = document.getElementById("project-edit-modal");
+  if (projectEditModal) {
+    const modalBody = projectEditModal.querySelector("[data-project-edit-body]");
+    const closeButtons = projectEditModal.querySelectorAll("[data-project-edit-close]");
+    let activeForm = null;
+    let activeHost = null;
+
+    const openProjectEditModal = (card) => {
+      if (!modalBody || !card) return;
+      const form = card.querySelector(".project-edit-form");
+      if (!form) return;
+      activeForm = form;
+      activeHost = form.parentElement;
+      form.classList.remove("hidden");
+      modalBody.appendChild(form);
+      projectEditModal.classList.remove("hidden");
+      const input = form.querySelector('input[name="title"]');
       input?.focus();
       input?.select();
-    }
-  });
+    };
+
+    const closeProjectEditModal = () => {
+      projectEditModal.classList.add("hidden");
+      if (activeForm && activeHost) {
+        activeForm.classList.add("hidden");
+        activeHost.appendChild(activeForm);
+      }
+      activeForm = null;
+      activeHost = null;
+    };
+
+    document.addEventListener("click", (event) => {
+      const card = event.target.closest(".horizon-item.project-edit");
+      if (!card) return;
+      if (horizonDragInProgress) return;
+      if (
+        event.target.closest(
+          ".project-edit-form, .project-edit-actions, input, select, textarea, a"
+        )
+      ) {
+        return;
+      }
+      event.preventDefault();
+      openProjectEditModal(card);
+    });
+
+    closeButtons.forEach((button) => {
+      button.addEventListener("click", (event) => {
+        event.preventDefault();
+        closeProjectEditModal();
+      });
+    });
+
+    projectEditModal.addEventListener("click", (event) => {
+      if (event.target === projectEditModal) {
+        closeProjectEditModal();
+      }
+    });
+
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape" && !projectEditModal.classList.contains("hidden")) {
+        closeProjectEditModal();
+      }
+    });
+  }
+  const taskEditModal = document.querySelector("#task-edit-modal");
+  if (taskEditModal) {
+    const taskEditForm = taskEditModal.querySelector("[data-task-edit-form]");
+    const closeButton = taskEditModal.querySelector("[data-task-edit-close]");
+    const titleInput = taskEditForm?.querySelector('input[name="verb_noun"]');
+    const descriptionInput = taskEditForm?.querySelector('textarea[name="description"]');
+    const taskIdInput = taskEditForm?.querySelector('input[name="task_id"]');
+    const projectSelect = taskEditForm?.querySelector('select[name="project_id"]');
+    const whenSelect = taskEditForm?.querySelector('select[name="when_bucket"]');
+    const blockSelect = taskEditForm?.querySelector('select[name="block_type"]');
+    const durationInput = taskEditForm?.querySelector('input[name="duration_minutes"]');
+    const alignmentSelect = taskEditForm?.querySelector('select[name="alignment"]');
+    const frogCheckbox = taskEditForm?.querySelector('input[name="frog"]');
+
+    const setSelectValue = (select, value) => {
+      if (!select) return;
+      select.value = value ?? "";
+      if (value && select.value !== value) {
+        select.value = "";
+      }
+    };
+
+    const openTaskEditModal = (card) => {
+      if (!taskEditForm || !card) return;
+      const data = card.dataset;
+      const title = data.taskTitle || "";
+      const description = data.taskDescription || "";
+      const projectId = data.taskProjectId || "";
+      const whenBucket = data.taskWhen || "today";
+      const blockType = data.taskBlockType || "";
+      const duration = data.taskDuration || "";
+      const alignment = data.taskAlignment || "";
+      const frog = data.taskFrog === "true";
+
+      if (taskIdInput) taskIdInput.value = data.taskId || "";
+      if (titleInput) titleInput.value = title;
+      if (descriptionInput) descriptionInput.value = description;
+      setSelectValue(projectSelect, projectId);
+      setSelectValue(whenSelect, whenBucket);
+      setSelectValue(blockSelect, blockType);
+      if (durationInput) durationInput.value = duration;
+      setSelectValue(alignmentSelect, alignment);
+      if (frogCheckbox) frogCheckbox.checked = frog;
+
+      taskEditModal.classList.remove("hidden");
+      titleInput?.focus();
+      titleInput?.select();
+    };
+
+    const closeTaskEditModal = () => {
+      if (!taskEditForm) return;
+      taskEditModal.classList.add("hidden");
+      taskEditForm.reset();
+      if (taskIdInput) taskIdInput.value = "";
+    };
+
+    document.addEventListener("click", (event) => {
+      if (taskDragInProgress) return;
+      if (event.target.closest("[data-task-action]")) return;
+      const card = event.target.closest("[data-task-card]");
+      if (!card) return;
+      event.preventDefault();
+      openTaskEditModal(card);
+    });
+
+    closeButton?.addEventListener("click", closeTaskEditModal);
+    taskEditModal.addEventListener("click", (event) => {
+      if (event.target === taskEditModal) {
+        closeTaskEditModal();
+      }
+    });
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape" && !taskEditModal.classList.contains("hidden")) {
+        closeTaskEditModal();
+      }
+    });
+  }
+
+  const tasksBoard = document.querySelector(".tasks-board");
+  if (tasksBoard && tasksBoard.dataset.dragReady !== "true") {
+    tasksBoard.dataset.dragReady = "true";
+    const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute("content");
+    let dragCard = null;
+    let dragOrigin = null;
+
+    const getAfterElement = (container, y) => {
+      const items = [
+        ...container.querySelectorAll('[data-task-card]:not(.is-dragging)'),
+      ];
+      return items.reduce(
+        (closest, child) => {
+          const box = child.getBoundingClientRect();
+          const offset = y - box.top - box.height / 2;
+          if (offset < 0 && offset > closest.offset) {
+            return { offset, element: child };
+          }
+          return closest;
+        },
+        { offset: Number.NEGATIVE_INFINITY, element: null }
+      ).element;
+    };
+
+    const updateColumnCounts = () => {
+      tasksBoard.querySelectorAll("[data-tasks-column]").forEach((column) => {
+        const pill = column.querySelector(".tasks-column-header .pill");
+        if (!pill) return;
+        const count = column.querySelectorAll("[data-task-card]").length;
+        pill.textContent = String(count);
+      });
+    };
+
+    const updateEmptyStates = () => {
+      tasksBoard.querySelectorAll("[data-tasks-column-body]").forEach((body) => {
+        const hasTasks = body.querySelector("[data-task-card]") !== null;
+        const empty = body.querySelector(".tasks-empty");
+        if (hasTasks && empty) {
+          empty.remove();
+          return;
+        }
+        if (!hasTasks && !empty) {
+          const message = body.dataset.emptyMessage || "No tasks yet.";
+          const placeholder = document.createElement("div");
+          placeholder.className = "muted tasks-empty";
+          placeholder.textContent = message;
+          body.appendChild(placeholder);
+        }
+      });
+    };
+
+    const updateWhenPill = (card, whenValue) => {
+      const pill = card?.querySelector(".task-when-pill");
+      if (!pill || !whenValue) return;
+      pill.textContent = `${whenValue.charAt(0).toUpperCase()}${whenValue.slice(1)}`;
+    };
+
+    const clearDropTargets = () => {
+      tasksBoard
+        .querySelectorAll(".is-drop-target")
+        .forEach((el) => el.classList.remove("is-drop-target"));
+    };
+
+    tasksBoard.addEventListener("dragstart", (event) => {
+      const card = event.target.closest('[data-task-card][draggable="true"]');
+      if (!card) return;
+      dragCard = card;
+      dragOrigin = {
+        body: card.closest("[data-tasks-column-body]"),
+        nextSibling: card.nextElementSibling,
+        when: card.dataset.taskWhen || "today",
+        project: card.dataset.taskProjectId || "",
+      };
+      taskDragInProgress = true;
+      card.classList.add("is-dragging");
+      event.dataTransfer.effectAllowed = "move";
+      event.dataTransfer.setData("text/plain", card.dataset.taskId || "");
+    });
+
+    tasksBoard.addEventListener("dragend", () => {
+      if (dragCard) {
+        dragCard.classList.remove("is-dragging");
+      }
+      dragCard = null;
+      dragOrigin = null;
+      clearDropTargets();
+      setTimeout(() => {
+        taskDragInProgress = false;
+      }, 80);
+    });
+
+    tasksBoard.addEventListener("dragover", (event) => {
+      if (!dragCard) return;
+      const column = event.target.closest("[data-tasks-column]");
+      if (!column) return;
+      const body =
+        event.target.closest("[data-tasks-column-body]") ||
+        column.querySelector("[data-tasks-column-body]");
+      if (!body) return;
+      event.preventDefault();
+      event.dataTransfer.dropEffect = "move";
+      clearDropTargets();
+      column.classList.add("is-drop-target");
+      const after = getAfterElement(body, event.clientY);
+      if (!after) {
+        body.appendChild(dragCard);
+      } else {
+        body.insertBefore(dragCard, after);
+      }
+    });
+
+    tasksBoard.addEventListener("dragleave", (event) => {
+      const column = event.target.closest("[data-tasks-column]");
+      if (!column) return;
+      if (!column.contains(event.relatedTarget)) {
+        column.classList.remove("is-drop-target");
+      }
+    });
+
+    tasksBoard.addEventListener("drop", async (event) => {
+      const column = event.target.closest("[data-tasks-column]");
+      if (!column || !dragCard) return;
+      const body = column.querySelector("[data-tasks-column-body]");
+      if (!body) return;
+      event.preventDefault();
+      clearDropTargets();
+
+      const viewMode = tasksBoard.dataset.view || "time";
+      const taskId = dragCard.dataset.taskId;
+      const currentWhen = dragOrigin?.when || dragCard.dataset.taskWhen || "today";
+      const currentProject = dragOrigin?.project || dragCard.dataset.taskProjectId || "";
+
+      let targetWhen = currentWhen;
+      let targetProject = currentProject;
+
+      if (viewMode === "time") {
+        targetWhen = column.dataset.whenBucket || currentWhen;
+      } else if (viewMode === "project") {
+        targetProject = column.dataset.projectId ?? "";
+      }
+
+      if (targetWhen === currentWhen && String(targetProject) === String(currentProject)) {
+        dragCard.classList.remove("is-dragging");
+        dragCard = null;
+        dragOrigin = null;
+        updateColumnCounts();
+        updateEmptyStates();
+        return;
+      }
+
+      if (!csrfToken) {
+        window.alert("Missing CSRF token. Refresh and try again.");
+        if (dragOrigin?.body) {
+          if (dragOrigin.nextSibling) {
+            dragOrigin.body.insertBefore(dragCard, dragOrigin.nextSibling);
+          } else {
+            dragOrigin.body.appendChild(dragCard);
+          }
+        }
+        updateColumnCounts();
+        updateEmptyStates();
+        return;
+      }
+
+      const formData = new FormData();
+      formData.append("csrf_token", csrfToken);
+      formData.append("task_id", taskId || "");
+      formData.append("when_bucket", targetWhen);
+      formData.append("project_id", targetProject);
+      formData.append("next_url", window.location.pathname);
+
+      try {
+        const response = await fetch("/tasks/update", {
+          method: "POST",
+          body: formData,
+          credentials: "same-origin",
+        });
+        if (!response.ok) {
+          window.alert("Unable to move the task. Try again.");
+          if (dragOrigin?.body) {
+            if (dragOrigin.nextSibling) {
+              dragOrigin.body.insertBefore(dragCard, dragOrigin.nextSibling);
+            } else {
+              dragOrigin.body.appendChild(dragCard);
+            }
+          }
+          updateColumnCounts();
+          return;
+        }
+        dragCard.dataset.taskWhen = targetWhen;
+        dragCard.dataset.taskProjectId = targetProject;
+        if (viewMode === "time") {
+          updateWhenPill(dragCard, targetWhen);
+        }
+        updateColumnCounts();
+        updateEmptyStates();
+      } catch (err) {
+        window.alert("Unable to move the task. Check your connection and try again.");
+        if (dragOrigin?.body) {
+          if (dragOrigin.nextSibling) {
+            dragOrigin.body.insertBefore(dragCard, dragOrigin.nextSibling);
+          } else {
+            dragOrigin.body.appendChild(dragCard);
+          }
+        }
+        updateColumnCounts();
+        updateEmptyStates();
+      } finally {
+        dragCard?.classList.remove("is-dragging");
+        dragCard = null;
+        dragOrigin = null;
+      }
+    });
+  }
 
   const horizonBoard = document.querySelector("[data-horizon-board]");
   if (horizonBoard) {
@@ -906,6 +1252,7 @@ document.addEventListener("DOMContentLoaded", () => {
         projectId: item.dataset.projectId,
         sourceKey: column.dataset.horizonKey,
       };
+      horizonDragInProgress = true;
       item.classList.add("is-dragging");
       event.dataTransfer.effectAllowed = "move";
       event.dataTransfer.setData("text/plain", item.dataset.projectId || "");
@@ -917,6 +1264,9 @@ document.addEventListener("DOMContentLoaded", () => {
       }
       dragInfo = null;
       clearDropTargets();
+      setTimeout(() => {
+        horizonDragInProgress = false;
+      }, 80);
     });
 
     horizonBoard.addEventListener("dragover", (event) => {
@@ -996,6 +1346,8 @@ document.addEventListener("DOMContentLoaded", () => {
     };
 
     draggableLists.forEach((list) => {
+      if (list.dataset.dragReady === "true") return;
+      list.dataset.dragReady = "true";
       list.querySelectorAll(".list-item").forEach((item) => {
         item.setAttribute("draggable", "true");
       });

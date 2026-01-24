@@ -2,7 +2,7 @@
 
 Neon-themed, single-user organiser inspired by *Start Finishing*. Built on FastAPI, Jinja, and SQLite for quick iteration.
 
-Current version: 0.6
+Current version: 0.7
 
 ## Run locally
 

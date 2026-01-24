@@ -11,19 +11,20 @@
   <script defer src="{{ url_for('static', path='/js/main.js') }}"></script>
 </head>
 <body>
-  <div class="version-pill version-corner">v0.6</div>
+  <div class="version-pill version-corner">v0.7</div>
   <div class="page">
     <header class="header">
       <div class="brand">
         <div class="brand-actions-card">
-          <a class="btn ghost header-action icon-only" href="/" aria-label="Home">
+          {% set current_path = request.url.path %}
+          <a class="btn ghost header-action icon-only {% if current_path == '/' %}is-active{% endif %}" href="/" aria-label="Home" {% if current_path == '/' %}aria-current="page"{% endif %}>
             <span class="brand-mark brand-mark--button" aria-hidden="true">SFO</span>
           </a>
-          
-          <a class="btn ghost header-action header-action-sm" href="/long-term">Long Term</a>
-          <a class="btn ghost header-action header-action-sm" href="/health">Health</a>
-          <a class="btn ghost header-action header-action-sm" href="/tasks">Tasks</a>
-          <a class="btn ghost header-action header-action-sm blue" href="/export">Export</a>
+
+          <a class="btn ghost header-action header-action-sm {% if current_path.startswith('/long-term') %}is-active{% endif %}" href="/long-term" {% if current_path.startswith('/long-term') %}aria-current="page"{% endif %}>Long Term</a>
+          <a class="btn ghost header-action header-action-sm {% if current_path.startswith('/tasks') %}is-active{% endif %}" href="/tasks" {% if current_path.startswith('/tasks') %}aria-current="page"{% endif %}>Tasks</a>
+          <a class="btn ghost header-action header-action-sm {% if current_path.startswith('/health') %}is-active{% endif %}" href="/health" {% if current_path.startswith('/health') %}aria-current="page"{% endif %}>Health</a>
+          <a class="btn ghost header-action header-action-sm blue {% if current_path.startswith('/export') %}is-active{% endif %}" href="/export" {% if current_path.startswith('/export') %}aria-current="page"{% endif %}>Export</a>
         </div>
         <div class="header-center">
           <a class="brand-link" href="/">

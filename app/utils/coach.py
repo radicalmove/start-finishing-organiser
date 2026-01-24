@@ -139,6 +139,9 @@ def ritual_summary(entry: RitualEntry) -> dict[str, Any]:
         "plan_review": entry.plan_review,
         "reality_scan": entry.reality_scan,
         "focus_time_status": entry.focus_time_status,
+        "morning_right_now": entry.morning_right_now,
+        "morning_email_plan": entry.morning_email_plan,
+        "morning_focus_chunk": entry.morning_focus_chunk,
         "one_thing": entry.one_thing,
         "frog": entry.frog,
         "gratitude": entry.gratitude,
@@ -148,8 +151,17 @@ def ritual_summary(entry: RitualEntry) -> dict[str, Any]:
         "block_plan": entry.block_plan,
         "admin_plan": entry.admin_plan,
         "emotional_intent": entry.emotional_intent,
+        "midday_alignment": entry.midday_alignment,
+        "midday_surprises": entry.midday_surprises,
+        "midday_one_thing": entry.midday_one_thing,
+        "midday_frog": entry.midday_frog,
+        "aar_went_well": entry.aar_went_well,
+        "aar_hard": entry.aar_hard,
+        "aar_next_step": entry.aar_next_step,
         "wins": entry.wins,
         "adjustments": entry.adjustments,
+        "evening_shutdown": entry.evening_shutdown,
+        "evening_breadcrumbs": entry.evening_breadcrumbs,
         "energy": entry.energy,
         "notes": entry.notes,
         "created_at": _to_iso(entry.created_at),
@@ -966,6 +978,33 @@ def _call_ollama(messages: list[dict[str, str]]) -> str:
         body = resp.read()
     parsed = json.loads(body)
     return (parsed.get("message") or {}).get("content", "").strip()
+
+
+def refine_nudge_text(body: str) -> str:
+    provider = _llm_provider()
+    if provider == "off":
+        return body
+    if provider == "auto" and not _ollama_available():
+        return body
+    if provider not in {"ollama", "auto"}:
+        return body
+    prompt = (
+        "Rewrite the coach insight below in Charlie's voice. "
+        "Keep it concise (1-2 sentences, <= 40 words). "
+        "No bullets or lists. End with a gentle invitation."
+    )
+    try:
+        reply = _call_ollama(
+            [
+                {"role": "system", "content": prompt},
+                {"role": "user", "content": body},
+            ]
+        )
+        return reply or body
+    except (URLError, HTTPError, TimeoutError, ValueError):
+        return body
+    except Exception:
+        return body
 
 
 def generate_coach_reply(

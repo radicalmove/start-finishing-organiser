@@ -26,31 +26,36 @@
         {% if view_mode == 'time' %}
         <div class="tasks-view tasks-view--time">
           {% for bucket, items in buckets.items() %}
-            <div class="tasks-column">
+            <div class="tasks-column" data-tasks-column data-when-bucket="{{ bucket.value }}">
               <div class="tasks-column-header">
                 <span class="caps">{{ bucket.value|title }}</span>
                 <span class="pill">{{ items|length }}</span>
               </div>
-              <div class="tasks-column-body">
+              <div class="tasks-column-body" data-tasks-column-body data-empty-message="No tasks here yet.">
                 {% for task in items %}
-                  <div class="task-card" data-task-card>
+                  <div class="task-card" data-task-card draggable="true" data-task-id="{{ task.id }}" data-task-title="{{ task.verb_noun|e }}" data-task-description="{{ (task.description or '')|e }}" data-task-project-id="{{ task.project_id or '' }}" data-task-when="{{ task.when_bucket.value }}" data-task-block-type="{{ task.block_type.value if task.block_type else '' }}" data-task-duration="{{ task.duration_minutes or '' }}" data-task-alignment="{{ task.alignment.value if task.alignment else '' }}" data-task-frog="{{ 'true' if task.frog else 'false' }}">
+                    <div class="task-card-actions task-card-actions--hover">
+                      <form method="post" action="/tasks/complete" class="task-card-action" data-task-action>
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+                        <input type="hidden" name="task_id" value="{{ task.id }}">
+                        <input type="hidden" name="next_url" value="{{ request.url.path }}">
+                        <button class="btn ghost btn-sm btn-icon btn-icon--tiny task-complete-btn" type="submit" aria-label="Mark complete" title="Mark complete">✓</button>
+                      </form>
+                      <form method="post" action="/tasks/archive" class="task-card-action" data-task-action>
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+                        <input type="hidden" name="task_id" value="{{ task.id }}">
+                        <input type="hidden" name="next_url" value="{{ request.url.path }}">
+                        <button class="btn ghost btn-sm btn-icon btn-icon--tiny inbox-trash-btn" type="submit" aria-label="Move to archive" title="Move to archive">🗑</button>
+                      </form>
+                    </div>
                     <div class="task-card-header">
                       <div class="task-card-title">{{ task.verb_noun }}</div>
-                      <div class="task-card-actions">
-                        <form method="post" action="/tasks/complete">
-                          <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
-                          <input type="hidden" name="task_id" value="{{ task.id }}">
-                          <input type="hidden" name="next_url" value="{{ request.url.path }}">
-                          <button class="btn ghost btn-sm" type="submit">Done</button>
-                        </form>
-                        <button class="btn ghost btn-sm task-edit-toggle" type="button">Edit</button>
-                      </div>
                     </div>
                     {% if task.description %}
                       <div class="muted">{{ task.description }}</div>
                     {% endif %}
                     <div class="task-meta">
-                      <span class="pill">{{ task.when_bucket.value|title }}</span>
+                      <span class="pill task-when-pill">{{ task.when_bucket.value|title }}</span>
                       {% if task.block_type %}<span class="pill pill--block pill--block-{{ task.block_type.value }}">{{ task.block_type.value }}</span>{% endif %}
                       {% if task.frog %}<span class="pill pill--frog pill--warn">Frog</span>{% endif %}
                       {% if task.alignment %}<span class="pill pill--alignment pill--alignment-{{ task.alignment.value }}">{{ task.alignment.value }}</span>{% endif %}
@@ -58,74 +63,9 @@
                         <span class="pill pill--project project-color-{{ task.project.color_scheme or 'slate' }}">{{ task.project.title }}</span>
                       {% endif %}
                     </div>
-                    <form method="post" action="/tasks/update" class="task-edit-form hidden">
-                      <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
-                      <input type="hidden" name="task_id" value="{{ task.id }}">
-                      <input type="hidden" name="next_url" value="{{ request.url.path }}">
-                      <label class="field">
-                        <span>Task</span>
-                        <input type="text" name="verb_noun" value="{{ task.verb_noun }}">
-                      </label>
-                      <label class="field">
-                        <span>Description</span>
-                        <textarea name="description" rows="2">{{ task.description or '' }}</textarea>
-                      </label>
-                      <div class="field two">
-                        <label>
-                          <span>Project</span>
-                          <select name="project_id">
-                            <option value="">— None —</option>
-                            {% for p in projects %}
-                              <option value="{{ p.id }}" {% if task.project_id == p.id %}selected{% endif %}>{{ p.title }}</option>
-                            {% endfor %}
-                          </select>
-                        </label>
-                        <label>
-                          <span>When</span>
-                          <select name="when_bucket">
-                            {% for key in ['today','week','month','quarter','later'] %}
-                              <option value="{{ key }}" {% if task.when_bucket.value == key %}selected{% endif %}>{{ key|title }}</option>
-                            {% endfor %}
-                          </select>
-                        </label>
-                      </div>
-                      <div class="field two">
-                        <label>
-                          <span>Block type</span>
-                          <select name="block_type">
-                            <option value="">—</option>
-                            {% for block in block_types %}
-                              <option value="{{ block }}" {% if task.block_type and task.block_type.value == block %}selected{% endif %}>{{ block|title }}</option>
-                            {% endfor %}
-                          </select>
-                        </label>
-                        <label>
-                          <span>Duration (min)</span>
-                          <input type="number" name="duration_minutes" value="{{ task.duration_minutes or '' }}" min="5" step="5">
-                        </label>
-                      </div>
-                      <div class="field two">
-                        <label>
-                          <span>Alignment</span>
-                          <select name="alignment">
-                            <option value="">—</option>
-                            {% for align in alignments %}
-                              <option value="{{ align }}" {% if task.alignment and task.alignment.value == align %}selected{% endif %}>{{ align|title }}</option>
-                            {% endfor %}
-                          </select>
-                        </label>
-                        <label class="field checkbox">
-                          <input type="checkbox" name="frog" value="true" {% if task.frog %}checked{% endif %}>
-                          <span>Frog</span>
-                        </label>
-                      </div>
-                      <div class="cta-row cta-row--end">
-                        <button class="btn btn-sm" type="submit">Save</button>
-                      </div>
-                    </form>
                   </div>
                 {% else %}
-                  <div class="muted">No tasks here yet.</div>
+                  <div class="muted tasks-empty">No tasks here yet.</div>
                 {% endfor %}
               </div>
             </div>
@@ -135,205 +75,85 @@
         <div class="tasks-view tasks-view--project">
           {% for project in projects %}
             {% set items = by_project.get(project.id, []) %}
-            <div class="tasks-column">
+            <div class="tasks-column" data-tasks-column data-project-id="{{ project.id }}">
               <div class="tasks-column-header">
                 <span class="caps">{{ project.title }}</span>
                 <span class="pill">{{ items|length }}</span>
               </div>
-              <div class="tasks-column-body">
+              <div class="tasks-column-body" data-tasks-column-body data-empty-message="No active tasks yet.">
                 {% for task in items %}
-                  <div class="task-card" data-task-card>
+                  <div class="task-card" data-task-card draggable="true" data-task-id="{{ task.id }}" data-task-title="{{ task.verb_noun|e }}" data-task-description="{{ (task.description or '')|e }}" data-task-project-id="{{ task.project_id or '' }}" data-task-when="{{ task.when_bucket.value }}" data-task-block-type="{{ task.block_type.value if task.block_type else '' }}" data-task-duration="{{ task.duration_minutes or '' }}" data-task-alignment="{{ task.alignment.value if task.alignment else '' }}" data-task-frog="{{ 'true' if task.frog else 'false' }}">
+                    <div class="task-card-actions task-card-actions--hover">
+                      <form method="post" action="/tasks/complete" class="task-card-action" data-task-action>
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+                        <input type="hidden" name="task_id" value="{{ task.id }}">
+                        <input type="hidden" name="next_url" value="{{ request.url.path }}">
+                        <button class="btn ghost btn-sm btn-icon btn-icon--tiny task-complete-btn" type="submit" aria-label="Mark complete" title="Mark complete">✓</button>
+                      </form>
+                      <form method="post" action="/tasks/archive" class="task-card-action" data-task-action>
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+                        <input type="hidden" name="task_id" value="{{ task.id }}">
+                        <input type="hidden" name="next_url" value="{{ request.url.path }}">
+                        <button class="btn ghost btn-sm btn-icon btn-icon--tiny inbox-trash-btn" type="submit" aria-label="Move to archive" title="Move to archive">🗑</button>
+                      </form>
+                    </div>
                     <div class="task-card-header">
                       <div class="task-card-title">{{ task.verb_noun }}</div>
-                      <div class="task-card-actions">
-                        <form method="post" action="/tasks/complete">
-                          <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
-                          <input type="hidden" name="task_id" value="{{ task.id }}">
-                          <input type="hidden" name="next_url" value="{{ request.url.path }}">
-                          <button class="btn ghost btn-sm" type="submit">Done</button>
-                        </form>
-                        <button class="btn ghost btn-sm task-edit-toggle" type="button">Edit</button>
-                      </div>
                     </div>
                     {% if task.description %}
                       <div class="muted">{{ task.description }}</div>
                     {% endif %}
                     <div class="task-meta">
-                      <span class="pill">{{ task.when_bucket.value|title }}</span>
+                      <span class="pill task-when-pill">{{ task.when_bucket.value|title }}</span>
                       {% if task.block_type %}<span class="pill pill--block pill--block-{{ task.block_type.value }}">{{ task.block_type.value }}</span>{% endif %}
                       {% if task.frog %}<span class="pill pill--frog pill--warn">Frog</span>{% endif %}
                       {% if task.alignment %}<span class="pill pill--alignment pill--alignment-{{ task.alignment.value }}">{{ task.alignment.value }}</span>{% endif %}
                     </div>
-                    <form method="post" action="/tasks/update" class="task-edit-form hidden">
-                      <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
-                      <input type="hidden" name="task_id" value="{{ task.id }}">
-                      <input type="hidden" name="next_url" value="{{ request.url.path }}">
-                      <label class="field">
-                        <span>Task</span>
-                        <input type="text" name="verb_noun" value="{{ task.verb_noun }}">
-                      </label>
-                      <label class="field">
-                        <span>Description</span>
-                        <textarea name="description" rows="2">{{ task.description or '' }}</textarea>
-                      </label>
-                      <div class="field two">
-                        <label>
-                          <span>Project</span>
-                          <select name="project_id">
-                            <option value="">— None —</option>
-                            {% for p in projects %}
-                              <option value="{{ p.id }}" {% if task.project_id == p.id %}selected{% endif %}>{{ p.title }}</option>
-                            {% endfor %}
-                          </select>
-                        </label>
-                        <label>
-                          <span>When</span>
-                          <select name="when_bucket">
-                            {% for key in ['today','week','month','quarter','later'] %}
-                              <option value="{{ key }}" {% if task.when_bucket.value == key %}selected{% endif %}>{{ key|title }}</option>
-                            {% endfor %}
-                          </select>
-                        </label>
-                      </div>
-                      <div class="field two">
-                        <label>
-                          <span>Block type</span>
-                          <select name="block_type">
-                            <option value="">—</option>
-                            {% for block in block_types %}
-                              <option value="{{ block }}" {% if task.block_type and task.block_type.value == block %}selected{% endif %}>{{ block|title }}</option>
-                            {% endfor %}
-                          </select>
-                        </label>
-                        <label>
-                          <span>Duration (min)</span>
-                          <input type="number" name="duration_minutes" value="{{ task.duration_minutes or '' }}" min="5" step="5">
-                        </label>
-                      </div>
-                      <div class="field two">
-                        <label>
-                          <span>Alignment</span>
-                          <select name="alignment">
-                            <option value="">—</option>
-                            {% for align in alignments %}
-                              <option value="{{ align }}" {% if task.alignment and task.alignment.value == align %}selected{% endif %}>{{ align|title }}</option>
-                            {% endfor %}
-                          </select>
-                        </label>
-                        <label class="field checkbox">
-                          <input type="checkbox" name="frog" value="true" {% if task.frog %}checked{% endif %}>
-                          <span>Frog</span>
-                        </label>
-                      </div>
-                      <div class="cta-row cta-row--end">
-                        <button class="btn btn-sm" type="submit">Save</button>
-                      </div>
-                    </form>
                   </div>
                 {% else %}
-                  <div class="muted">No active tasks yet.</div>
+                  <div class="muted tasks-empty">No active tasks yet.</div>
                 {% endfor %}
               </div>
             </div>
           {% endfor %}
           {% set no_project_items = by_project.get(None, []) %}
-          <div class="tasks-column">
+          <div class="tasks-column" data-tasks-column data-project-id="">
             <div class="tasks-column-header">
               <span class="caps">No project</span>
               <span class="pill">{{ no_project_items|length }}</span>
             </div>
-            <div class="tasks-column-body">
+            <div class="tasks-column-body" data-tasks-column-body data-empty-message="No active tasks yet.">
               {% for task in no_project_items %}
-                <div class="task-card" data-task-card>
+                <div class="task-card" data-task-card draggable="true" data-task-id="{{ task.id }}" data-task-title="{{ task.verb_noun|e }}" data-task-description="{{ (task.description or '')|e }}" data-task-project-id="{{ task.project_id or '' }}" data-task-when="{{ task.when_bucket.value }}" data-task-block-type="{{ task.block_type.value if task.block_type else '' }}" data-task-duration="{{ task.duration_minutes or '' }}" data-task-alignment="{{ task.alignment.value if task.alignment else '' }}" data-task-frog="{{ 'true' if task.frog else 'false' }}">
+                  <div class="task-card-actions task-card-actions--hover">
+                    <form method="post" action="/tasks/complete" class="task-card-action" data-task-action>
+                      <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+                      <input type="hidden" name="task_id" value="{{ task.id }}">
+                      <input type="hidden" name="next_url" value="{{ request.url.path }}">
+                      <button class="btn ghost btn-sm btn-icon btn-icon--tiny task-complete-btn" type="submit" aria-label="Mark complete" title="Mark complete">✓</button>
+                    </form>
+                    <form method="post" action="/tasks/archive" class="task-card-action" data-task-action>
+                      <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+                      <input type="hidden" name="task_id" value="{{ task.id }}">
+                      <input type="hidden" name="next_url" value="{{ request.url.path }}">
+                      <button class="btn ghost btn-sm btn-icon btn-icon--tiny inbox-trash-btn" type="submit" aria-label="Move to archive" title="Move to archive">🗑</button>
+                    </form>
+                  </div>
                   <div class="task-card-header">
                     <div class="task-card-title">{{ task.verb_noun }}</div>
-                    <div class="task-card-actions">
-                      <form method="post" action="/tasks/complete">
-                        <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
-                        <input type="hidden" name="task_id" value="{{ task.id }}">
-                        <input type="hidden" name="next_url" value="{{ request.url.path }}">
-                        <button class="btn ghost btn-sm" type="submit">Done</button>
-                      </form>
-                      <button class="btn ghost btn-sm task-edit-toggle" type="button">Edit</button>
-                    </div>
                   </div>
                   {% if task.description %}
                     <div class="muted">{{ task.description }}</div>
                   {% endif %}
                   <div class="task-meta">
-                    <span class="pill">{{ task.when_bucket.value|title }}</span>
+                    <span class="pill task-when-pill">{{ task.when_bucket.value|title }}</span>
                     {% if task.block_type %}<span class="pill pill--block pill--block-{{ task.block_type.value }}">{{ task.block_type.value }}</span>{% endif %}
                     {% if task.frog %}<span class="pill pill--frog pill--warn">Frog</span>{% endif %}
                     {% if task.alignment %}<span class="pill pill--alignment pill--alignment-{{ task.alignment.value }}">{{ task.alignment.value }}</span>{% endif %}
                   </div>
-                  <form method="post" action="/tasks/update" class="task-edit-form hidden">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
-                    <input type="hidden" name="task_id" value="{{ task.id }}">
-                    <input type="hidden" name="next_url" value="{{ request.url.path }}">
-                    <label class="field">
-                      <span>Task</span>
-                      <input type="text" name="verb_noun" value="{{ task.verb_noun }}">
-                    </label>
-                    <label class="field">
-                      <span>Description</span>
-                      <textarea name="description" rows="2">{{ task.description or '' }}</textarea>
-                    </label>
-                    <div class="field two">
-                      <label>
-                        <span>Project</span>
-                        <select name="project_id">
-                          <option value="">— None —</option>
-                          {% for p in projects %}
-                            <option value="{{ p.id }}" {% if task.project_id == p.id %}selected{% endif %}>{{ p.title }}</option>
-                          {% endfor %}
-                        </select>
-                      </label>
-                      <label>
-                        <span>When</span>
-                        <select name="when_bucket">
-                          {% for key in ['today','week','month','quarter','later'] %}
-                            <option value="{{ key }}" {% if task.when_bucket.value == key %}selected{% endif %}>{{ key|title }}</option>
-                          {% endfor %}
-                        </select>
-                      </label>
-                    </div>
-                    <div class="field two">
-                      <label>
-                        <span>Block type</span>
-                        <select name="block_type">
-                          <option value="">—</option>
-                          {% for block in block_types %}
-                            <option value="{{ block }}" {% if task.block_type and task.block_type.value == block %}selected{% endif %}>{{ block|title }}</option>
-                          {% endfor %}
-                        </select>
-                      </label>
-                      <label>
-                        <span>Duration (min)</span>
-                        <input type="number" name="duration_minutes" value="{{ task.duration_minutes or '' }}" min="5" step="5">
-                      </label>
-                    </div>
-                    <div class="field two">
-                      <label>
-                        <span>Alignment</span>
-                        <select name="alignment">
-                          <option value="">—</option>
-                          {% for align in alignments %}
-                            <option value="{{ align }}" {% if task.alignment and task.alignment.value == align %}selected{% endif %}>{{ align|title }}</option>
-                          {% endfor %}
-                        </select>
-                      </label>
-                      <label class="field checkbox">
-                        <input type="checkbox" name="frog" value="true" {% if task.frog %}checked{% endif %}>
-                        <span>Frog</span>
-                      </label>
-                    </div>
-                    <div class="cta-row cta-row--end">
-                      <button class="btn btn-sm" type="submit">Save</button>
-                    </div>
-                  </form>
                 </div>
               {% else %}
-                <div class="muted">No active tasks yet.</div>
+                <div class="muted tasks-empty">No active tasks yet.</div>
               {% endfor %}
             </div>
           </div>
@@ -453,4 +273,234 @@
     </div>
     {% endif %}
   </section>
+  <div class="app-modal hidden" id="task-edit-modal" role="dialog" aria-modal="true" aria-labelledby="task-edit-title">
+    <div class="app-modal-card task-edit-modal-card">
+      <div class="quick-capture-header">
+        <h3 class="app-modal-title" id="task-edit-title">Edit task</h3>
+        <button class="quick-capture-close" type="button" data-task-edit-close aria-label="Close">&times;</button>
+      </div>
+      <form method="post" action="/tasks/update" data-task-edit-form class="form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+        <input type="hidden" name="task_id" value="">
+        <input type="hidden" name="next_url" value="{{ request.url.path }}">
+        <label class="field">
+          <span>Task</span>
+          <input type="text" name="verb_noun" value="">
+        </label>
+        <label class="field">
+          <span>Description</span>
+          <textarea name="description" rows="4"></textarea>
+        </label>
+        <div class="field two">
+          <label>
+            <span>Project</span>
+            <select name="project_id">
+              <option value="">— None —</option>
+              {% for p in projects %}
+                <option value="{{ p.id }}">{{ p.title }}</option>
+              {% endfor %}
+            </select>
+          </label>
+          <label>
+            <span>When</span>
+            <select name="when_bucket">
+              {% for key in ['today','week','month','quarter','later'] %}
+                <option value="{{ key }}">{{ key|title }}</option>
+              {% endfor %}
+            </select>
+          </label>
+        </div>
+        <div class="field two">
+          <label>
+            <span>Block type</span>
+            <select name="block_type">
+              <option value="">—</option>
+              {% for block in block_types %}
+                <option value="{{ block }}">{{ block|title }}</option>
+              {% endfor %}
+            </select>
+          </label>
+          <label>
+            <span>Duration (min)</span>
+            <input type="number" name="duration_minutes" value="" min="5" step="5">
+          </label>
+        </div>
+        <div class="field two">
+          <label>
+            <span>Alignment</span>
+            <select name="alignment">
+              <option value="">—</option>
+              {% for align in alignments %}
+                <option value="{{ align }}">{{ align|title }}</option>
+              {% endfor %}
+            </select>
+          </label>
+          <label class="field checkbox">
+            <input type="checkbox" name="frog" value="true">
+            <span>Frog</span>
+          </label>
+        </div>
+        <div class="cta-row cta-row--end">
+          <button class="btn btn-sm" type="submit">Save</button>
+        </div>
+      </form>
+    </div>
+  </div>
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      const board = document.querySelector(".tasks-board");
+      if (!board || board.dataset.dragReady === "true") return;
+      board.dataset.dragReady = "true";
+
+      const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute("content");
+      let dragging = null;
+
+      const getAfterElement = (container, y) => {
+        const items = [...container.querySelectorAll('[data-task-card]:not(.is-dragging)')];
+        return items.reduce(
+          (closest, child) => {
+            const box = child.getBoundingClientRect();
+            const offset = y - box.top - box.height / 2;
+            if (offset < 0 && offset > closest.offset) {
+              return { offset, element: child };
+            }
+            return closest;
+          },
+          { offset: Number.NEGATIVE_INFINITY, element: null }
+        ).element;
+      };
+
+      const updateCounts = () => {
+        board.querySelectorAll("[data-tasks-column]").forEach((column) => {
+          const pill = column.querySelector(".tasks-column-header .pill");
+          if (!pill) return;
+          const count = column.querySelectorAll("[data-task-card]").length;
+          pill.textContent = String(count);
+        });
+      };
+
+      const updateEmptyStates = () => {
+        board.querySelectorAll("[data-tasks-column-body]").forEach((body) => {
+          const hasTasks = body.querySelector("[data-task-card]") !== null;
+          const empty = body.querySelector(".tasks-empty");
+          if (hasTasks && empty) {
+            empty.remove();
+            return;
+          }
+          if (!hasTasks && !empty) {
+            const message = body.dataset.emptyMessage || "No tasks yet.";
+            const placeholder = document.createElement("div");
+            placeholder.className = "muted tasks-empty";
+            placeholder.textContent = message;
+            body.appendChild(placeholder);
+          }
+        });
+      };
+
+      const updateWhenPill = (card, whenValue) => {
+        const pill = card.querySelector(".task-when-pill");
+        if (!pill || !whenValue) return;
+        pill.textContent = `${whenValue.charAt(0).toUpperCase()}${whenValue.slice(1)}`;
+      };
+
+      board.addEventListener("dragstart", (event) => {
+        const card = event.target.closest('[data-task-card][draggable="true"]');
+        if (!card) return;
+        dragging = card;
+        card.classList.add("is-dragging");
+        event.dataTransfer.effectAllowed = "move";
+      });
+
+      board.addEventListener("dragend", () => {
+        if (dragging) {
+          dragging.classList.remove("is-dragging");
+        }
+      });
+
+      board.addEventListener("dragover", (event) => {
+        if (!dragging) return;
+        const column = event.target.closest("[data-tasks-column]");
+        if (!column) return;
+        const body =
+          event.target.closest("[data-tasks-column-body]") ||
+          column.querySelector("[data-tasks-column-body]");
+        if (!body) return;
+        event.preventDefault();
+        const after = getAfterElement(body, event.clientY);
+        if (!after) {
+          body.appendChild(dragging);
+        } else {
+          body.insertBefore(dragging, after);
+        }
+      });
+
+      board.addEventListener("drop", async (event) => {
+        const column = event.target.closest("[data-tasks-column]");
+        if (!column || !dragging) return;
+        const body =
+          event.target.closest("[data-tasks-column-body]") ||
+          column.querySelector("[data-tasks-column-body]");
+        if (!body) return;
+        event.preventDefault();
+
+        const viewMode = board.dataset.view || "time";
+        const moving = dragging;
+        const taskId = moving.dataset.taskId || "";
+        const currentWhen = moving.dataset.taskWhen || "today";
+        const currentProject = moving.dataset.taskProjectId || "";
+        let targetWhen = currentWhen;
+        let targetProject = currentProject;
+
+        if (viewMode === "time") {
+          targetWhen = column.dataset.whenBucket || currentWhen;
+        } else if (viewMode === "project") {
+          targetProject = column.dataset.projectId ?? "";
+        }
+
+        updateCounts();
+        updateEmptyStates();
+
+        if (targetWhen === currentWhen && String(targetProject) === String(currentProject)) {
+          return;
+        }
+
+        if (!csrfToken) {
+          window.alert("Missing CSRF token. Refresh and try again.");
+          return;
+        }
+
+        const formData = new FormData();
+        formData.append("csrf_token", csrfToken);
+        formData.append("task_id", taskId);
+        formData.append("when_bucket", targetWhen);
+        formData.append("project_id", targetProject);
+        formData.append("next_url", window.location.pathname);
+
+        try {
+          const response = await fetch("/tasks/update", {
+            method: "POST",
+            body: formData,
+            credentials: "same-origin",
+          });
+          if (!response.ok) {
+            window.alert("Unable to move the task. Try again.");
+            return;
+          }
+          moving.dataset.taskWhen = targetWhen;
+          moving.dataset.taskProjectId = targetProject;
+          if (viewMode === "time") {
+            updateWhenPill(moving, targetWhen);
+          }
+          updateCounts();
+          updateEmptyStates();
+        } catch (err) {
+          window.alert("Unable to move the task. Check your connection and try again.");
+          updateEmptyStates();
+        } finally {
+          moving.classList.remove("is-dragging");
+          dragging = null;
+        }
+      });
+    });
+  </script>
 {% endblock %}

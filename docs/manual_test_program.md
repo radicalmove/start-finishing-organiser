@@ -1,4 +1,4 @@
-# SFO Manual Test Program (v0.6)
+# SFO Manual Test Program (v0.7)
 
 ## How to use
 - Status values: TODO, PASS, FAIL, SKIP.
@@ -74,14 +74,16 @@
 ## Tasks board (TASK)
 | ID | Scenario | Steps | Expected | Status |
 | --- | --- | --- | --- | --- |
-| TASK-001 | Tasks page loads | Open `/tasks` | Active, completed, archived lists render | TODO |
-| TASK-002 | Toggle view | Switch between By time and By project | Columns update and remain editable | TODO |
-| TASK-003 | Edit task details | Edit a task; change project/when/block/duration | Changes persist and display | TODO |
-| TASK-004 | Mark task done | Click Done on a task | Moves to Completed list | TODO |
-| TASK-005 | Reopen task | Reopen from completed list | Returns to Active list | TODO |
-| TASK-006 | Archive task | Archive a task | Task moves to Archived list | TODO |
-| TASK-007 | Bulk archive completed | Select multiple completed; archive | Selected tasks move to Archived | TODO |
-| TASK-008 | Completed this week | Complete a task today | Appears under Completed this week | TODO |
+| TASK-001 | Active (By time) loads | Open `/tasks/time` | Time buckets render with tasks | PASS |
+| TASK-002 | Active (By project) loads | Open `/tasks/project` | Project columns render with tasks | TODO |
+| TASK-003 | Completed page loads | Open `/tasks/completed` | Completed panels render | TODO |
+| TASK-004 | Archived page loads | Open `/tasks/archived` | Archived list renders | TODO |
+| TASK-005 | Edit task details | Edit a task; change project/when/block/duration | Changes persist and display | TODO |
+| TASK-006 | Mark task done | Click Done on a task | Moves to Completed page | TODO |
+| TASK-007 | Reopen task | Reopen from Completed page | Returns to Active page | TODO |
+| TASK-008 | Archive task | Archive a task | Task moves to Archived page | TODO |
+| TASK-009 | Bulk archive completed | Select multiple completed; archive | Selected tasks move to Archived page | TODO |
+| TASK-010 | Completed this week | Complete a task today | Appears under Completed this week | TODO |
 
 ## Blocks (BLOCK)
 | ID | Scenario | Steps | Expected | Status |
