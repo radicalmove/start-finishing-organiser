@@ -20,8 +20,29 @@ if [[ -z "$PYTHON_BIN" ]]; then
   exit 1
 fi
 
-"$PYTHON_BIN" -m pip install --upgrade pip
-"$PYTHON_BIN" -m pip install -r requirements.txt pyinstaller
+REQ_FILE="$ROOT_DIR/requirements.txt"
+REQ_HASH_FILE="$ROOT_DIR/build/requirements.hash"
+REQ_HASH=""
+if command -v shasum >/dev/null 2>&1; then
+  REQ_HASH="$(shasum -a 256 "$REQ_FILE" | awk '{print $1}')"
+elif command -v sha256sum >/dev/null 2>&1; then
+  REQ_HASH="$(sha256sum "$REQ_FILE" | awk '{print $1}')"
+fi
+PY_VERSION="$("$PYTHON_BIN" -c 'import sys; print(".".join(map(str, sys.version_info[:3])))')"
+STAMP="${REQ_HASH}:${PY_VERSION}"
+
+if [[ "${SFO_SKIP_PIP:-}" == "1" ]]; then
+  echo "Skipping pip install (SFO_SKIP_PIP=1)"
+elif [[ -n "$REQ_HASH" && -f "$REQ_HASH_FILE" && "$(cat "$REQ_HASH_FILE")" == "$STAMP" ]]; then
+  echo "Requirements unchanged; skipping pip install."
+else
+  "$PYTHON_BIN" -m pip install --upgrade pip
+  "$PYTHON_BIN" -m pip install -r requirements.txt pyinstaller
+  if [[ -n "$REQ_HASH" ]]; then
+    mkdir -p "$(dirname "$REQ_HASH_FILE")"
+    echo "$STAMP" > "$REQ_HASH_FILE"
+  fi
+fi
 
 "$PYTHON_BIN" -m PyInstaller \
   --clean \

@@ -34,7 +34,7 @@
       "icons/icon.ico"
     ],
     "resources": {
-      "../client_secret_2_1055809623761-1ba9633dga88tbmfo1cgepn93m53sr3o.apps.googleusercontent.com.json": "resources/gmail_credentials.json",
+      "resources/gmail_credentials.json": "resources/gmail_credentials.json",
       "bin/sfo-backend": "bin/sfo-backend"
     }
   }

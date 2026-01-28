@@ -85,8 +85,15 @@ fn spawn_backend(app: &tauri::AppHandle) -> Option<Child> {
   if !creds_target.exists() {
     let bundled_creds = resource_dir.join("resources").join("gmail_credentials.json");
     if bundled_creds.exists() {
-      if let Err(err) = fs::copy(&bundled_creds, &creds_target) {
-        spawn_log(&format!("copy gmail credentials error: {err}"));
+      let should_copy = fs::metadata(&bundled_creds)
+        .map(|meta| meta.len() > 0)
+        .unwrap_or(false);
+      if should_copy {
+        if let Err(err) = fs::copy(&bundled_creds, &creds_target) {
+          spawn_log(&format!("copy gmail credentials error: {err}"));
+        }
+      } else {
+        spawn_log("bundled gmail credentials empty; skipping copy");
       }
     }
   }

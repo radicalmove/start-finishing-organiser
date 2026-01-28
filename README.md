@@ -34,6 +34,11 @@ scripts/rebuild_and_open_app.sh
 The resulting app bundle will be in `src-tauri/target/release/bundle/macos/`.
 
 Notes:
+- If you want Gmail credentials bundled into the desktop app, place them at
+  `src-tauri/resources/gmail_credentials.json` before building (the build script
+  will also copy from any `client_secret*.json` in the repo root if present).
+
+Notes:
 - The app stores data in `~/Library/Application Support/com.rcd58.sfo/` (database is `sfo.db`).
 - Gmail credentials are copied to `~/Library/Application Support/com.rcd58.sfo/gmail_credentials.json` on first run if bundled.
 - Gmail tokens will be stored in the same folder as `gmail_token.json`.
@@ -102,6 +107,9 @@ SFO_GMAIL_WORK_DOMAIN=canterbury.ac.nz
 Notes:
 - Backfill is off by default (sync starts “from now”). Set `SFO_GMAIL_BACKFILL_DAYS` if you want recent history imported.
 - Emails are marked read after import.
+
+Build tip:
+- `SFO_SKIP_PIP=1` skips `pip install` during backend builds if you know your env is already up to date.
 
 ## Charlie coach (local LLM optional)
 

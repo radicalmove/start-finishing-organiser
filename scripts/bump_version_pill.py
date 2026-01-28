@@ -10,6 +10,7 @@ ROOT_DIR = Path(__file__).resolve().parents[1]
 TARGET = ROOT_DIR / "app" / "templates" / "base.html"
 TAURI_CONFIG = ROOT_DIR / "src-tauri" / "tauri.conf.json"
 CARGO_TOML = ROOT_DIR / "src-tauri" / "Cargo.toml"
+README = ROOT_DIR / "README.md"
 
 
 def _replace_version(path: Path, pattern: re.Pattern, replacement: str) -> bool:
@@ -17,6 +18,24 @@ def _replace_version(path: Path, pattern: re.Pattern, replacement: str) -> bool:
         return False
     text = path.read_text(encoding="utf-8")
     updated, count = pattern.subn(replacement, text, count=1)
+    if count == 0:
+        return False
+    if updated != text:
+        path.write_text(updated, encoding="utf-8")
+    return True
+
+
+def _replace_readme_version(path: Path, new_version: str) -> bool:
+    if not path.exists():
+        return False
+    text = path.read_text(encoding="utf-8")
+    updated, count = re.subn(
+        r"^Current version:\s*[^\n]+$",
+        f"Current version: {new_version}",
+        text,
+        count=1,
+        flags=re.MULTILINE,
+    )
     if count == 0:
         return False
     if updated != text:
@@ -59,10 +78,13 @@ def main() -> int:
         re.compile(r'^(version\s*=\s*")[^"]+(")', re.MULTILINE),
         rf"\g<1>{semver}\2",
     )
+    readme_updated = _replace_readme_version(README, f"{major}.{minor:0{width}d}")
 
     print(f"{new_version} (was {old_version})")
     if tauri_updated or cargo_updated:
         print(f"Desktop version set to {semver}")
+    if readme_updated:
+        print("README version updated")
     return 0
 
 

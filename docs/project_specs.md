@@ -95,7 +95,7 @@ constraints_and_rules:
 
 ---
 
-# Meaningful Work Organiser — Massive Blueprint (v0.7)
+# Meaningful Work Organiser — Massive Blueprint (v0.721)
 
 ## Table of Contents
 
@@ -819,4 +819,4 @@ This is where the app’s intelligence lives.
 - **Why**: Core purpose, identity, and values that the app keeps front and centre.
 
 ---
-# End of Massive Blueprint (v0.7)
+# End of Massive Blueprint (v0.721)
