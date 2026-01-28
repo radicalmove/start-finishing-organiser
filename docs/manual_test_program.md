@@ -1,4 +1,4 @@
-# SFO Manual Test Program (v0.7)
+# SFO Manual Test Program (v0.721)
 
 ## How to use
 - Status values: TODO, PASS, FAIL, SKIP.
@@ -84,6 +84,7 @@
 | TASK-008 | Archive task | Archive a task | Task moves to Archived page | TODO |
 | TASK-009 | Bulk archive completed | Select multiple completed; archive | Selected tasks move to Archived page | TODO |
 | TASK-010 | Completed this week | Complete a task today | Appears under Completed this week | TODO |
+| TASK-011 | Send task to Inbox | Edit a non-inbox task; click Send to Inbox; save | Task appears in Home inbox; button no longer shows on edit | TODO |
 
 ## Blocks (BLOCK)
 | ID | Scenario | Steps | Expected | Status |

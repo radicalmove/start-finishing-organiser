@@ -1,4 +1,51 @@
 document.addEventListener("DOMContentLoaded", () => {
+  const isTauriEnv = Boolean(window.__TAURI__ || window.__TAURI_INTERNALS__);
+  const dragDebugEnabled = (() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.has("dragdebug")) {
+      const value = params.get("dragdebug");
+      if (value === "1") {
+        localStorage.setItem("sfo:dragdebug", "1");
+      } else if (value === "0") {
+        localStorage.setItem("sfo:dragdebug", "0");
+      } else {
+        localStorage.removeItem("sfo:dragdebug");
+      }
+    }
+    const stored = localStorage.getItem("sfo:dragdebug");
+    if (stored === "0") return false;
+    if (stored === "1") return true;
+    return isTauriEnv;
+  })();
+
+  const dragDebugEl = (() => {
+    if (!dragDebugEnabled) return null;
+    const el = document.createElement("div");
+    el.id = "drag-debug";
+    el.className = "drag-debug";
+    el.textContent = "Drag debug enabled (pointer v2)";
+    document.body.appendChild(el);
+    return el;
+  })();
+
+  const logDrag = (message) => {
+    if (!dragDebugEl) return;
+    const timestamp = new Date().toLocaleTimeString();
+    dragDebugEl.textContent = `${timestamp} ${message}`;
+  };
+
+  const setGlobalDragging = (isDragging) => {
+    document.body.classList.toggle("dragging", Boolean(isDragging));
+  };
+
+  if (dragDebugEl) {
+    document.addEventListener("pointerdown", (event) => {
+      const target = event.target.closest("[data-task-card], .list-item");
+      if (!target) return;
+      logDrag("pointerdown");
+    });
+  }
+
   let openGuidedCaptureModal = null;
   const horizon = document.querySelector(
     'select[name="time_horizon"], select[name="project_time_horizon"]'
@@ -80,6 +127,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const horizonNoteTask = form.querySelector("[data-horizon-note-task]");
     const horizonNoteProject = form.querySelector("[data-horizon-note-project]");
     const blockStep = form.querySelector('.wizard-step[data-step="5"]');
+    const whyStep = form.querySelector('.wizard-step[data-step="4"]');
     const notSureSteps = Array.from(form.querySelectorAll("[data-not-sure-step]"));
     const notSureDecisionInputs = Array.from(
       form.querySelectorAll('input[name="not_sure_decision"]')
@@ -243,6 +291,7 @@ document.addEventListener("DOMContentLoaded", () => {
       currentKind = kind || "task";
       const isTask = currentKind === "task";
       const isProject = currentKind === "project";
+      const isDecideLater = currentKind === "decide_later";
       const isNotSure = currentKind === "not_sure";
       setSectionActive(attachProject, isTask);
       setSectionActive(projectCategory, isProject);
@@ -253,6 +302,8 @@ document.addEventListener("DOMContentLoaded", () => {
       }
       horizonNoteTask?.classList.toggle("hidden", isProject);
       horizonNoteProject?.classList.toggle("hidden", !isProject);
+      setStepEnabled(horizonStep, !isDecideLater);
+      setStepEnabled(whyStep, !isDecideLater);
       setStepEnabled(blockStep, isTask);
       setNotSureSteps(isNotSure);
       if (isNotSure && prevKind !== "not_sure") {
@@ -441,8 +492,10 @@ document.addEventListener("DOMContentLoaded", () => {
     const form = guidedCaptureModal.querySelector("#wizardForm");
     const input = guidedCaptureModal.querySelector('input[name="capture_text"]');
     const sourceInput = guidedCaptureModal.querySelector('input[name="source_task_id"]');
+    const nextUrlInput = guidedCaptureModal.querySelector('input[name="next_url"]');
+    const projectSelect = guidedCaptureModal.querySelector('select[name="project_id"]');
 
-    const openModal = ({ prefill = "", sourceTaskId = "" } = {}) => {
+    const openModal = ({ prefill = "", sourceTaskId = "", nextUrl = "", projectId = "" } = {}) => {
       form?.dispatchEvent(new Event("wizard-reset"));
       if (input) {
         input.value = prefill || "";
@@ -450,6 +503,12 @@ document.addEventListener("DOMContentLoaded", () => {
       if (sourceInput) {
         sourceInput.value = sourceTaskId || "";
         sourceInput.disabled = !sourceTaskId;
+      }
+      if (nextUrlInput) {
+        nextUrlInput.value = nextUrl || "";
+      }
+      if (projectSelect) {
+        projectSelect.value = projectId || "";
       }
       guidedCaptureModal.classList.remove("hidden");
       input?.focus();
@@ -468,7 +527,9 @@ document.addEventListener("DOMContentLoaded", () => {
         event.preventDefault();
         const prefill = (button.dataset.guidedPrefill || "").trim();
         const sourceTaskId = button.dataset.guidedSource || "";
-        openModal({ prefill, sourceTaskId });
+        const nextUrl = button.dataset.guidedNextUrl || window.location.pathname;
+        const projectId = button.dataset.guidedProjectId || "";
+        openModal({ prefill, sourceTaskId, nextUrl, projectId });
       });
     });
 
@@ -653,6 +714,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     document.addEventListener("click", (event) => {
+      if (inboxDragInProgress) return;
       const item = event.target.closest("[data-inbox-item]");
       if (!item) return;
       if (event.target.closest("[data-inbox-action]")) return;
@@ -720,6 +782,21 @@ document.addEventListener("DOMContentLoaded", () => {
       if (current > 0) {
         current -= 1;
         showStep(current);
+      }
+    });
+
+    submitBtn?.addEventListener("click", (event) => {
+      if (submitBtn.classList.contains("hidden")) return;
+      if (typeof onboardingForm.requestSubmit === "function") {
+        event.preventDefault();
+        onboardingForm.requestSubmit();
+      }
+    });
+
+    onboardingForm.addEventListener("submit", () => {
+      if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.textContent = "Saving...";
       }
     });
 
@@ -863,6 +940,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   let taskDragInProgress = false;
   let horizonDragInProgress = false;
+  let inboxDragInProgress = false;
   const projectEditModal = document.getElementById("project-edit-modal");
   if (projectEditModal) {
     const modalBody = projectEditModal.querySelector("[data-project-edit-body]");
@@ -941,6 +1019,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const durationInput = taskEditForm?.querySelector('input[name="duration_minutes"]');
     const alignmentSelect = taskEditForm?.querySelector('select[name="alignment"]');
     const frogCheckbox = taskEditForm?.querySelector('input[name="frog"]');
+    const sendToInboxButton = taskEditForm?.querySelector("[data-task-send-inbox]");
 
     const setSelectValue = (select, value) => {
       if (!select) return;
@@ -961,6 +1040,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const duration = data.taskDuration || "";
       const alignment = data.taskAlignment || "";
       const frog = data.taskFrog === "true";
+      const inInbox = data.taskInInbox === "true";
 
       if (taskIdInput) taskIdInput.value = data.taskId || "";
       if (titleInput) titleInput.value = title;
@@ -971,6 +1051,10 @@ document.addEventListener("DOMContentLoaded", () => {
       if (durationInput) durationInput.value = duration;
       setSelectValue(alignmentSelect, alignment);
       if (frogCheckbox) frogCheckbox.checked = frog;
+      if (sendToInboxButton) {
+        sendToInboxButton.classList.toggle("hidden", inInbox);
+        sendToInboxButton.disabled = inInbox;
+      }
 
       taskEditModal.classList.remove("hidden");
       titleInput?.focus();
@@ -982,6 +1066,8 @@ document.addEventListener("DOMContentLoaded", () => {
       taskEditModal.classList.add("hidden");
       taskEditForm.reset();
       if (taskIdInput) taskIdInput.value = "";
+      sendToInboxButton?.classList.add("hidden");
+      sendToInboxButton?.setAttribute("disabled", "true");
     };
 
     document.addEventListener("click", (event) => {
@@ -1007,11 +1093,26 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   const tasksBoard = document.querySelector(".tasks-board");
-  if (tasksBoard && tasksBoard.dataset.dragReady !== "true") {
-    tasksBoard.dataset.dragReady = "true";
+  if (tasksBoard && tasksBoard.dataset.dragReady !== "main") {
+    tasksBoard.dataset.dragReady = "main";
+    const usePointerDrag = isTauriEnv;
+    tasksBoard.querySelectorAll("[data-task-card]").forEach((card) => {
+      if (usePointerDrag) {
+        card.removeAttribute("draggable");
+      } else {
+        card.setAttribute("draggable", "true");
+      }
+    });
     const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute("content");
     let dragCard = null;
     let dragOrigin = null;
+    let dropColumn = null;
+    let dropBody = null;
+    let dropHandled = false;
+    const placeholder = document.createElement("div");
+    placeholder.className = "task-drop-placeholder";
+    placeholder.setAttribute("aria-hidden", "true");
+    const isWithinTasksBoard = (node) => Boolean(node && tasksBoard.contains(node));
 
     const getAfterElement = (container, y) => {
       const items = [
@@ -1069,74 +1170,49 @@ document.addEventListener("DOMContentLoaded", () => {
         .forEach((el) => el.classList.remove("is-drop-target"));
     };
 
-    tasksBoard.addEventListener("dragstart", (event) => {
-      const card = event.target.closest('[data-task-card][draggable="true"]');
-      if (!card) return;
-      dragCard = card;
-      dragOrigin = {
-        body: card.closest("[data-tasks-column-body]"),
-        nextSibling: card.nextElementSibling,
-        when: card.dataset.taskWhen || "today",
-        project: card.dataset.taskProjectId || "",
-      };
-      taskDragInProgress = true;
-      card.classList.add("is-dragging");
-      event.dataTransfer.effectAllowed = "move";
-      event.dataTransfer.setData("text/plain", card.dataset.taskId || "");
-    });
-
-    tasksBoard.addEventListener("dragend", () => {
+    const finalizeDrag = () => {
       if (dragCard) {
         dragCard.classList.remove("is-dragging");
       }
+      placeholder.remove();
       dragCard = null;
       dragOrigin = null;
+      dropColumn = null;
+      dropBody = null;
+      dropHandled = false;
       clearDropTargets();
       setTimeout(() => {
         taskDragInProgress = false;
       }, 80);
-    });
+    };
 
-    tasksBoard.addEventListener("dragover", (event) => {
-      if (!dragCard) return;
-      const column = event.target.closest("[data-tasks-column]");
-      if (!column) return;
-      const body =
-        event.target.closest("[data-tasks-column-body]") ||
-        column.querySelector("[data-tasks-column-body]");
-      if (!body) return;
-      event.preventDefault();
-      event.dataTransfer.dropEffect = "move";
-      clearDropTargets();
-      column.classList.add("is-drop-target");
-      const after = getAfterElement(body, event.clientY);
-      if (!after) {
-        body.appendChild(dragCard);
+    const revertToOrigin = () => {
+      if (!dragOrigin?.body || !dragCard) return;
+      if (dragOrigin.nextSibling) {
+        dragOrigin.body.insertBefore(dragCard, dragOrigin.nextSibling);
       } else {
-        body.insertBefore(dragCard, after);
+        dragOrigin.body.appendChild(dragCard);
       }
-    });
+    };
 
-    tasksBoard.addEventListener("dragleave", (event) => {
-      const column = event.target.closest("[data-tasks-column]");
-      if (!column) return;
-      if (!column.contains(event.relatedTarget)) {
-        column.classList.remove("is-drop-target");
+    const commitMove = async (column, body) => {
+      if (!dragCard || !column || !body) {
+        finalizeDrag();
+        return;
       }
-    });
 
-    tasksBoard.addEventListener("drop", async (event) => {
-      const column = event.target.closest("[data-tasks-column]");
-      if (!column || !dragCard) return;
-      const body = column.querySelector("[data-tasks-column-body]");
-      if (!body) return;
-      event.preventDefault();
-      clearDropTargets();
+      if (placeholder.parentNode === body) {
+        body.insertBefore(dragCard, placeholder);
+      } else {
+        body.appendChild(dragCard);
+      }
+      placeholder.remove();
 
       const viewMode = tasksBoard.dataset.view || "time";
-      const taskId = dragCard.dataset.taskId;
-      const currentWhen = dragOrigin?.when || dragCard.dataset.taskWhen || "today";
-      const currentProject = dragOrigin?.project || dragCard.dataset.taskProjectId || "";
+      const card = dragCard;
+      const taskId = card.dataset.taskId;
+      const currentWhen = dragOrigin?.when || card.dataset.taskWhen || "today";
+      const currentProject = dragOrigin?.project || card.dataset.taskProjectId || "";
 
       let targetWhen = currentWhen;
       let targetProject = currentProject;
@@ -1147,26 +1223,20 @@ document.addEventListener("DOMContentLoaded", () => {
         targetProject = column.dataset.projectId ?? "";
       }
 
+      updateColumnCounts();
+      updateEmptyStates();
+
       if (targetWhen === currentWhen && String(targetProject) === String(currentProject)) {
-        dragCard.classList.remove("is-dragging");
-        dragCard = null;
-        dragOrigin = null;
-        updateColumnCounts();
-        updateEmptyStates();
+        finalizeDrag();
         return;
       }
 
       if (!csrfToken) {
         window.alert("Missing CSRF token. Refresh and try again.");
-        if (dragOrigin?.body) {
-          if (dragOrigin.nextSibling) {
-            dragOrigin.body.insertBefore(dragCard, dragOrigin.nextSibling);
-          } else {
-            dragOrigin.body.appendChild(dragCard);
-          }
-        }
+        revertToOrigin();
         updateColumnCounts();
         updateEmptyStates();
+        finalizeDrag();
         return;
       }
 
@@ -1177,53 +1247,348 @@ document.addEventListener("DOMContentLoaded", () => {
       formData.append("project_id", targetProject);
       formData.append("next_url", window.location.pathname);
 
+      const isTauri = Boolean(window.__TAURI__ || window.__TAURI_INTERNALS__);
+      if (isTauri) {
+        card.dataset.taskWhen = targetWhen;
+        card.dataset.taskProjectId = targetProject;
+        if (viewMode === "time") {
+          updateWhenPill(card, targetWhen);
+        }
+        updateColumnCounts();
+        updateEmptyStates();
+        const form = document.createElement("form");
+        form.method = "post";
+        form.action = "/tasks/update";
+        form.style.display = "none";
+        for (const [key, value] of formData.entries()) {
+          const input = document.createElement("input");
+          input.type = "hidden";
+          input.name = key;
+          input.value = String(value ?? "");
+          form.appendChild(input);
+        }
+        document.body.appendChild(form);
+        finalizeDrag();
+        form.submit();
+        return;
+      }
+
       try {
         const response = await fetch("/tasks/update", {
           method: "POST",
           body: formData,
           credentials: "same-origin",
+          headers: {
+            "x-csrf-token": csrfToken || "",
+            "x-requested-with": "fetch",
+            accept: "application/json",
+          },
         });
         if (!response.ok) {
           window.alert("Unable to move the task. Try again.");
-          if (dragOrigin?.body) {
-            if (dragOrigin.nextSibling) {
-              dragOrigin.body.insertBefore(dragCard, dragOrigin.nextSibling);
-            } else {
-              dragOrigin.body.appendChild(dragCard);
-            }
-          }
+          revertToOrigin();
           updateColumnCounts();
+          updateEmptyStates();
+          finalizeDrag();
           return;
         }
-        dragCard.dataset.taskWhen = targetWhen;
-        dragCard.dataset.taskProjectId = targetProject;
+        card.dataset.taskWhen = targetWhen;
+        card.dataset.taskProjectId = targetProject;
         if (viewMode === "time") {
-          updateWhenPill(dragCard, targetWhen);
+          updateWhenPill(card, targetWhen);
         }
         updateColumnCounts();
         updateEmptyStates();
       } catch (err) {
         window.alert("Unable to move the task. Check your connection and try again.");
-        if (dragOrigin?.body) {
-          if (dragOrigin.nextSibling) {
-            dragOrigin.body.insertBefore(dragCard, dragOrigin.nextSibling);
-          } else {
-            dragOrigin.body.appendChild(dragCard);
-          }
-        }
+        revertToOrigin();
         updateColumnCounts();
         updateEmptyStates();
       } finally {
-        dragCard?.classList.remove("is-dragging");
-        dragCard = null;
-        dragOrigin = null;
+        finalizeDrag();
       }
-    });
+    };
+
+    const getColumnFromPoint = (x, y) => {
+      const columns = tasksBoard.querySelectorAll("[data-tasks-column]");
+      for (const column of columns) {
+        const rect = column.getBoundingClientRect();
+        if (x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom) {
+          return column;
+        }
+      }
+      return null;
+    };
+
+    if (usePointerDrag) {
+      let pointerId = null;
+      let startX = 0;
+      let startY = 0;
+      let dragging = false;
+      let dragCardStyle = "";
+      let ghostOffsetX = 0;
+      let ghostOffsetY = 0;
+      const dragCursorOffsetY = 115;
+      const dragThreshold = 6;
+
+      const shouldIgnorePointer = (event) =>
+        Boolean(
+          event.target.closest(
+            "[data-task-action], button, a, input, textarea, select"
+          )
+        );
+
+      const resetPointer = () => {
+        pointerId = null;
+        startX = 0;
+        startY = 0;
+        dragging = false;
+        ghostOffsetX = 0;
+        ghostOffsetY = 0;
+        dragCardStyle = "";
+      };
+
+      const updateGhostPosition = (event) => {
+        if (!dragCard || !dragging) return;
+        dragCard.style.left = `${event.clientX - ghostOffsetX}px`;
+        dragCard.style.top = `${event.clientY - ghostOffsetY}px`;
+      };
+
+      const beginDrag = (event) => {
+        if (!dragCard || !event) return;
+        dragging = true;
+        taskDragInProgress = true;
+        dragCard.classList.add("is-dragging");
+        dragCard.classList.add("drag-lift");
+        setGlobalDragging(true);
+        placeholder.style.height = `${dragCard.offsetHeight}px`;
+        if (dragOrigin?.body) {
+          dragOrigin.body.insertBefore(placeholder, dragCard);
+        }
+        dragCardStyle = dragCard.getAttribute("style") || "";
+        const rect = dragCard.getBoundingClientRect();
+        ghostOffsetX = event.clientX - rect.left;
+        ghostOffsetY = event.clientY - rect.top + dragCursorOffsetY;
+        document.body.appendChild(dragCard);
+        dragCard.style.position = "fixed";
+        dragCard.style.width = `${rect.width}px`;
+        dragCard.style.height = `${rect.height}px`;
+        dragCard.style.left = `${rect.left}px`;
+        dragCard.style.top = `${rect.top}px`;
+        dragCard.style.pointerEvents = "none";
+        updateGhostPosition(event);
+        logDrag(`task dragstart ${dragCard.dataset.taskId || ""}`);
+      };
+
+      const handlePointerMove = (event) => {
+        if (!dragCard || pointerId !== event.pointerId) return;
+        const dx = event.clientX - startX;
+        const dy = event.clientY - startY;
+        if (!dragging) {
+          if (Math.hypot(dx, dy) < dragThreshold) return;
+          beginDrag(event);
+        }
+        event.preventDefault();
+        updateGhostPosition(event);
+        const target = document.elementFromPoint(event.clientX, event.clientY);
+        const column =
+          target?.closest?.("[data-tasks-column]") ||
+          getColumnFromPoint(event.clientX, event.clientY);
+        if (!column || !isWithinTasksBoard(column)) {
+          clearDropTargets();
+          dropColumn = null;
+          dropBody = null;
+          placeholder.remove();
+          return;
+        }
+        const body =
+          target.closest("[data-tasks-column-body]") ||
+          column.querySelector("[data-tasks-column-body]");
+        if (!body) return;
+        clearDropTargets();
+        column.classList.add("is-drop-target");
+        const after = getAfterElement(body, event.clientY);
+        if (!after) {
+          body.appendChild(placeholder);
+        } else {
+          body.insertBefore(placeholder, after);
+        }
+        const prevColumn = dropColumn;
+        dropBody = body;
+        dropColumn = column;
+        if (prevColumn !== column) {
+          logDrag(
+            `task dragover ${column.dataset.whenBucket || column.dataset.projectId || ""}`
+          );
+        }
+      };
+
+      const finishPointerDrag = async (event, cancelled = false) => {
+        if (!dragCard || pointerId !== event.pointerId) return;
+        if (dragCard.releasePointerCapture) {
+          try {
+            dragCard.releasePointerCapture(pointerId);
+          } catch (err) {
+            // Ignore pointer capture release errors.
+          }
+        }
+        if (!dragging) {
+          dragCard = null;
+          dragOrigin = null;
+          resetPointer();
+          setGlobalDragging(false);
+          return;
+        }
+        dragCard.classList.remove("drag-lift");
+        if (dragCardStyle) {
+          dragCard.setAttribute("style", dragCardStyle);
+        } else {
+          dragCard.removeAttribute("style");
+        }
+        logDrag("task dragend");
+        if (cancelled || !dropColumn || !dropBody) {
+          revertToOrigin();
+          updateColumnCounts();
+          updateEmptyStates();
+          finalizeDrag();
+          resetPointer();
+          setGlobalDragging(false);
+          return;
+        }
+        dropHandled = true;
+        logDrag("task drop");
+        await commitMove(dropColumn, dropBody);
+        resetPointer();
+        setGlobalDragging(false);
+      };
+
+      tasksBoard.addEventListener("pointerdown", (event) => {
+        if (event.button !== 0 || event.isPrimary === false) return;
+        if (shouldIgnorePointer(event)) return;
+        const card = event.target.closest("[data-task-card]");
+        if (!card || !isWithinTasksBoard(card)) return;
+        dragCard = card;
+        dragOrigin = {
+          body: card.closest("[data-tasks-column-body]"),
+          nextSibling: card.nextElementSibling,
+          when: card.dataset.taskWhen || "today",
+          project: card.dataset.taskProjectId || "",
+        };
+        pointerId = event.pointerId;
+        startX = event.clientX;
+        startY = event.clientY;
+        dropColumn = null;
+        dropBody = null;
+        if (dragCard.setPointerCapture) {
+          try {
+            dragCard.setPointerCapture(pointerId);
+          } catch (err) {
+            // Ignore pointer capture errors.
+          }
+        }
+      });
+
+      document.addEventListener("pointermove", handlePointerMove);
+      document.addEventListener("pointerup", (event) => {
+        finishPointerDrag(event, false);
+      });
+      document.addEventListener("pointercancel", (event) => {
+        finishPointerDrag(event, true);
+      });
+    } else {
+      document.addEventListener("dragstart", (event) => {
+        const card = event.target.closest('[data-task-card][draggable="true"]');
+        if (!card || !isWithinTasksBoard(card)) return;
+        dragCard = card;
+        dragOrigin = {
+          body: card.closest("[data-tasks-column-body]"),
+          nextSibling: card.nextElementSibling,
+          when: card.dataset.taskWhen || "today",
+          project: card.dataset.taskProjectId || "",
+        };
+        taskDragInProgress = true;
+        card.classList.add("is-dragging");
+        setGlobalDragging(true);
+        placeholder.style.height = `${card.offsetHeight}px`;
+        logDrag(`task dragstart ${card.dataset.taskId || ""}`);
+        if (event.dataTransfer) {
+          event.dataTransfer.effectAllowed = "move";
+          event.dataTransfer.setData("text/plain", card.dataset.taskId || "");
+        }
+      });
+
+      document.addEventListener("dragend", () => {
+        if (!dragCard) return;
+        logDrag("task dragend");
+        setGlobalDragging(false);
+        if (!dropHandled) {
+          placeholder.remove();
+          updateColumnCounts();
+          updateEmptyStates();
+        }
+        finalizeDrag();
+      });
+
+      document.addEventListener("dragover", (event) => {
+        if (!dragCard) return;
+        const column = event.target.closest("[data-tasks-column]");
+        if (!column || !isWithinTasksBoard(column)) return;
+        const body =
+          event.target.closest("[data-tasks-column-body]") ||
+          column.querySelector("[data-tasks-column-body]");
+        if (!body) return;
+        event.preventDefault();
+        if (event.dataTransfer) {
+          event.dataTransfer.dropEffect = "move";
+        }
+        clearDropTargets();
+        column.classList.add("is-drop-target");
+        const after = getAfterElement(body, event.clientY);
+        if (!after) {
+          body.appendChild(placeholder);
+        } else {
+          body.insertBefore(placeholder, after);
+        }
+        if (dropColumn !== column) {
+          logDrag(
+            `task dragover ${column.dataset.whenBucket || column.dataset.projectId || ""}`
+          );
+        }
+        dropBody = body;
+        dropColumn = column;
+      });
+
+      document.addEventListener("drop", async (event) => {
+        if (!dragCard) return;
+        const column =
+          event.target.closest("[data-tasks-column]") ||
+          (dropColumn && isWithinTasksBoard(dropColumn) ? dropColumn : null);
+        if (!column) {
+          placeholder.remove();
+          finalizeDrag();
+          return;
+        }
+        const body =
+          (dropBody && column.contains(dropBody) && dropBody) ||
+          column.querySelector("[data-tasks-column-body]");
+        if (!body) {
+          placeholder.remove();
+          finalizeDrag();
+          return;
+        }
+        event.preventDefault();
+        clearDropTargets();
+        dropHandled = true;
+        logDrag("task drop");
+        await commitMove(column, body);
+      });
+    }
   }
 
   const horizonBoard = document.querySelector("[data-horizon-board]");
   if (horizonBoard) {
     const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute("content");
+    const usePointerDrag = isTauriEnv;
     const scrollKey = "sfo:long-range-scroll";
     const storedScroll = sessionStorage.getItem(scrollKey);
     if (storedScroll) {
@@ -1242,94 +1607,378 @@ document.addEventListener("DOMContentLoaded", () => {
         .forEach((el) => el.classList.remove("is-drop-target"));
     };
 
-    horizonBoard.addEventListener("dragstart", (event) => {
-      const item = event.target.closest('[data-project-id][draggable="true"]');
-      if (!item) return;
-      const column = item.closest("[data-horizon-column]");
-      if (!column) return;
-      dragInfo = {
-        item,
-        projectId: item.dataset.projectId,
-        sourceKey: column.dataset.horizonKey,
-      };
-      horizonDragInProgress = true;
-      item.classList.add("is-dragging");
-      event.dataTransfer.effectAllowed = "move";
-      event.dataTransfer.setData("text/plain", item.dataset.projectId || "");
-    });
-
-    horizonBoard.addEventListener("dragend", () => {
-      if (dragInfo?.item) {
-        dragInfo.item.classList.remove("is-dragging");
-      }
-      dragInfo = null;
-      clearDropTargets();
-      setTimeout(() => {
-        horizonDragInProgress = false;
-      }, 80);
-    });
-
-    horizonBoard.addEventListener("dragover", (event) => {
-      const column = event.target.closest("[data-horizon-column]");
-      if (!column) return;
-      event.preventDefault();
-      event.dataTransfer.dropEffect = "move";
-      column.classList.add("is-drop-target");
-    });
-
-    horizonBoard.addEventListener("dragleave", (event) => {
-      const column = event.target.closest("[data-horizon-column]");
-      if (!column) return;
-      if (!column.contains(event.relatedTarget)) {
-        column.classList.remove("is-drop-target");
+    horizonBoard.querySelectorAll("[data-project-id]").forEach((item) => {
+      if (usePointerDrag) {
+        item.removeAttribute("draggable");
+      } else {
+        item.setAttribute("draggable", "true");
       }
     });
 
-    horizonBoard.addEventListener("drop", async (event) => {
-      const column = event.target.closest("[data-horizon-column]");
-      if (!column || !dragInfo) return;
-      event.preventDefault();
-      clearDropTargets();
-      const targetKey = column.dataset.horizonKey;
-      if (!targetKey || targetKey === dragInfo.sourceKey) {
-        dragInfo.item.classList.remove("is-dragging");
-        dragInfo = null;
-        return;
-      }
-      if (!csrfToken) {
-        window.alert("Missing CSRF token. Refresh the page and try again.");
-        return;
-      }
+    if (usePointerDrag) {
+      const placeholder = document.createElement("div");
+      placeholder.className = "horizon-drop-placeholder";
+      placeholder.setAttribute("aria-hidden", "true");
+      let dragItem = null;
+      let dragOrigin = null;
+      let dropColumn = null;
+      let dropList = null;
+      let dragging = false;
+      let pointerId = null;
+      let startX = 0;
+      let startY = 0;
+      let ghostOffsetX = 0;
+      let ghostOffsetY = 0;
+      let dragItemStyle = "";
+      const dragCursorOffsetY = 15;
+      const dragThreshold = 6;
 
-      const formData = new FormData();
-      formData.append("csrf_token", csrfToken);
-      formData.append("time_horizon", targetKey);
-
-      try {
-        const response = await fetch(
-          `/long-term/projects/${dragInfo.projectId}/horizon`,
-          {
-            method: "POST",
-            body: formData,
-            headers: { Accept: "application/json" },
-            credentials: "same-origin",
+      const getColumnFromPoint = (x, y) => {
+        const columns = horizonBoard.querySelectorAll("[data-horizon-column]");
+        for (const column of columns) {
+          const rect = column.getBoundingClientRect();
+          if (x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom) {
+            return column;
           }
-        );
-        if (!response.ok) {
-          const detail = await response.json().catch(() => ({}));
-          window.alert(detail.detail || "Unable to update horizon. Try again.");
+        }
+        return null;
+      };
+
+      const shouldIgnorePointer = (event) =>
+        Boolean(event.target.closest("input, textarea, select, button, a"));
+
+      const resetPointer = () => {
+        dragging = false;
+        pointerId = null;
+        startX = 0;
+        startY = 0;
+        ghostOffsetX = 0;
+        ghostOffsetY = 0;
+        dragItemStyle = "";
+      };
+
+      const restoreDraggedItem = () => {
+        if (!dragItem) return;
+        dragItem.classList.remove("drag-lift");
+        if (dragItemStyle) {
+          dragItem.setAttribute("style", dragItemStyle);
+        } else {
+          dragItem.removeAttribute("style");
+        }
+      };
+
+      const updateGhostPosition = (event) => {
+        if (!dragItem || !dragging) return;
+        dragItem.style.left = `${event.clientX - ghostOffsetX}px`;
+        dragItem.style.top = `${event.clientY - ghostOffsetY}px`;
+      };
+
+      const beginDrag = (event) => {
+        if (!dragItem || !event) return;
+        dragging = true;
+        horizonDragInProgress = true;
+        dragItem.classList.add("is-dragging");
+        dragItem.classList.add("drag-lift");
+        setGlobalDragging(true);
+        const rect = dragItem.getBoundingClientRect();
+        placeholder.style.height = `${rect.height}px`;
+        placeholder.style.width = `${rect.width}px`;
+        placeholder.style.display = window.getComputedStyle(dragItem).display;
+        if (dragOrigin?.list) {
+          dragOrigin.list.insertBefore(placeholder, dragItem);
+        }
+        dragItemStyle = dragItem.getAttribute("style") || "";
+        ghostOffsetX = event.clientX - rect.left;
+        ghostOffsetY = event.clientY - rect.top + dragCursorOffsetY;
+        document.body.appendChild(dragItem);
+        dragItem.style.position = "fixed";
+        dragItem.style.width = `${rect.width}px`;
+        dragItem.style.height = `${rect.height}px`;
+        dragItem.style.left = `${rect.left}px`;
+        dragItem.style.top = `${rect.top}px`;
+        dragItem.style.pointerEvents = "none";
+        updateGhostPosition(event);
+        logDrag(`horizon dragstart ${dragItem.dataset.projectId || ""}`);
+      };
+
+      const revertToOrigin = () => {
+        if (!dragOrigin?.list || !dragItem) return;
+        if (dragOrigin.nextSibling) {
+          dragOrigin.list.insertBefore(dragItem, dragOrigin.nextSibling);
+        } else {
+          dragOrigin.list.appendChild(dragItem);
+        }
+      };
+
+      const handlePointerMove = (event) => {
+        if (!dragItem || pointerId !== event.pointerId) return;
+        const dx = event.clientX - startX;
+        const dy = event.clientY - startY;
+        if (!dragging) {
+          if (Math.hypot(dx, dy) < dragThreshold) return;
+          beginDrag(event);
+        }
+        event.preventDefault();
+        updateGhostPosition(event);
+        const target =
+          event.target.closest?.("[data-horizon-column]") ||
+          getColumnFromPoint(event.clientX, event.clientY);
+        if (!target) {
+          clearDropTargets();
+          dropColumn = null;
+          dropList = null;
+          placeholder.remove();
           return;
         }
-        sessionStorage.setItem(scrollKey, String(window.scrollY || 0));
-        window.location.reload();
-      } catch (err) {
-        window.alert("Unable to update horizon. Check your connection and try again.");
-      }
-    });
+        const list = target.querySelector("[data-horizon-list]");
+        if (!list) return;
+        clearDropTargets();
+        target.classList.add("is-drop-target");
+        if (placeholder.parentNode !== list) {
+          list.appendChild(placeholder);
+        }
+        dropColumn = target;
+        dropList = list;
+      };
+
+      const finishPointerDrag = async (event, cancelled = false) => {
+        if (!dragItem || pointerId !== event.pointerId) return;
+        if (dragItem.releasePointerCapture) {
+          try {
+            dragItem.releasePointerCapture(pointerId);
+          } catch (err) {
+            // Ignore pointer capture release errors.
+          }
+        }
+        if (!dragging) {
+          dragItem = null;
+          dragOrigin = null;
+          resetPointer();
+          setGlobalDragging(false);
+          return;
+        }
+        logDrag("horizon dragend");
+        if (cancelled || !dropColumn || !dropList) {
+          restoreDraggedItem();
+          revertToOrigin();
+          placeholder.remove();
+          clearDropTargets();
+          dragItem?.classList.remove("is-dragging");
+          dragItem = null;
+          dragOrigin = null;
+          resetPointer();
+          setGlobalDragging(false);
+          setTimeout(() => {
+            horizonDragInProgress = false;
+          }, 80);
+          return;
+        }
+
+        const targetKey = dropColumn.dataset.horizonKey;
+        if (!targetKey || targetKey === dragOrigin?.sourceKey) {
+          restoreDraggedItem();
+          revertToOrigin();
+          placeholder.remove();
+          clearDropTargets();
+          dragItem?.classList.remove("is-dragging");
+          dragItem = null;
+          dragOrigin = null;
+          resetPointer();
+          setGlobalDragging(false);
+          setTimeout(() => {
+            horizonDragInProgress = false;
+          }, 80);
+          return;
+        }
+
+        if (placeholder.parentNode === dropList) {
+          dropList.insertBefore(dragItem, placeholder);
+        } else {
+          dropList.appendChild(dragItem);
+        }
+        placeholder.remove();
+        restoreDraggedItem();
+        dragItem.classList.remove("is-dragging");
+
+        if (!csrfToken) {
+          window.alert("Missing CSRF token. Refresh the page and try again.");
+          revertToOrigin();
+          dragItem = null;
+          dragOrigin = null;
+          resetPointer();
+          setGlobalDragging(false);
+          setTimeout(() => {
+            horizonDragInProgress = false;
+          }, 80);
+          return;
+        }
+
+        const formData = new FormData();
+        formData.append("csrf_token", csrfToken);
+        formData.append("time_horizon", targetKey);
+
+        try {
+          const response = await fetch(
+            `/long-term/projects/${dragOrigin?.projectId}/horizon`,
+            {
+              method: "POST",
+              body: formData,
+              headers: { Accept: "application/json" },
+              credentials: "same-origin",
+            }
+          );
+          if (!response.ok) {
+            const detail = await response.json().catch(() => ({}));
+            window.alert(detail.detail || "Unable to update horizon. Try again.");
+            revertToOrigin();
+            return;
+          }
+          sessionStorage.setItem(scrollKey, String(window.scrollY || 0));
+          window.location.reload();
+        } catch (err) {
+          window.alert("Unable to update horizon. Check your connection and try again.");
+          revertToOrigin();
+        } finally {
+          dragItem = null;
+          dragOrigin = null;
+          resetPointer();
+          setGlobalDragging(false);
+          clearDropTargets();
+          setTimeout(() => {
+            horizonDragInProgress = false;
+          }, 80);
+        }
+      };
+
+      horizonBoard.addEventListener("pointerdown", (event) => {
+        if (event.button !== 0 || event.isPrimary === false) return;
+        if (shouldIgnorePointer(event)) return;
+        const item = event.target.closest("[data-project-id]");
+        if (!item || !horizonBoard.contains(item)) return;
+        const column = item.closest("[data-horizon-column]");
+        const list = column?.querySelector("[data-horizon-list]");
+        if (!column || !list) return;
+        dragItem = item;
+        dragOrigin = {
+          list,
+          nextSibling: item.nextElementSibling,
+          sourceKey: column.dataset.horizonKey,
+          projectId: item.dataset.projectId,
+        };
+        dropColumn = null;
+        dropList = null;
+        pointerId = event.pointerId;
+        startX = event.clientX;
+        startY = event.clientY;
+        if (dragItem.setPointerCapture) {
+          try {
+            dragItem.setPointerCapture(pointerId);
+          } catch (err) {
+            // Ignore pointer capture errors.
+          }
+        }
+      });
+
+      document.addEventListener("pointermove", handlePointerMove);
+      document.addEventListener("pointerup", (event) => {
+        finishPointerDrag(event, false);
+      });
+      document.addEventListener("pointercancel", (event) => {
+        finishPointerDrag(event, true);
+      });
+    } else {
+      horizonBoard.addEventListener("dragstart", (event) => {
+        const item = event.target.closest('[data-project-id][draggable="true"]');
+        if (!item) return;
+        const column = item.closest("[data-horizon-column]");
+        if (!column) return;
+        dragInfo = {
+          item,
+          projectId: item.dataset.projectId,
+          sourceKey: column.dataset.horizonKey,
+        };
+        horizonDragInProgress = true;
+        item.classList.add("is-dragging");
+        setGlobalDragging(true);
+        event.dataTransfer.effectAllowed = "move";
+        event.dataTransfer.setData("text/plain", item.dataset.projectId || "");
+      });
+
+      horizonBoard.addEventListener("dragend", () => {
+        if (dragInfo?.item) {
+          dragInfo.item.classList.remove("is-dragging");
+        }
+        dragInfo = null;
+        clearDropTargets();
+        setGlobalDragging(false);
+        setTimeout(() => {
+          horizonDragInProgress = false;
+        }, 80);
+      });
+
+      horizonBoard.addEventListener("dragover", (event) => {
+        const column = event.target.closest("[data-horizon-column]");
+        if (!column) return;
+        event.preventDefault();
+        event.dataTransfer.dropEffect = "move";
+        column.classList.add("is-drop-target");
+      });
+
+      horizonBoard.addEventListener("dragleave", (event) => {
+        const column = event.target.closest("[data-horizon-column]");
+        if (!column) return;
+        if (!column.contains(event.relatedTarget)) {
+          column.classList.remove("is-drop-target");
+        }
+      });
+
+      horizonBoard.addEventListener("drop", async (event) => {
+        const column = event.target.closest("[data-horizon-column]");
+        if (!column || !dragInfo) return;
+        event.preventDefault();
+        clearDropTargets();
+        const targetKey = column.dataset.horizonKey;
+        if (!targetKey || targetKey === dragInfo.sourceKey) {
+          dragInfo.item.classList.remove("is-dragging");
+          dragInfo = null;
+          return;
+        }
+        if (!csrfToken) {
+          window.alert("Missing CSRF token. Refresh the page and try again.");
+          return;
+        }
+
+        const formData = new FormData();
+        formData.append("csrf_token", csrfToken);
+        formData.append("time_horizon", targetKey);
+
+        try {
+          const response = await fetch(
+            `/long-term/projects/${dragInfo.projectId}/horizon`,
+            {
+              method: "POST",
+              body: formData,
+              headers: { Accept: "application/json" },
+              credentials: "same-origin",
+            }
+          );
+          if (!response.ok) {
+            const detail = await response.json().catch(() => ({}));
+            window.alert(detail.detail || "Unable to update horizon. Try again.");
+            return;
+          }
+          sessionStorage.setItem(scrollKey, String(window.scrollY || 0));
+          window.location.reload();
+        } catch (err) {
+          window.alert("Unable to update horizon. Check your connection and try again.");
+        }
+      });
+    }
   }
 
   const draggableLists = document.querySelectorAll("[data-draggable-list]");
   if (draggableLists.length) {
+    const usePointerDrag = isTauriEnv;
     const getAfterElement = (container, y) => {
       const items = [...container.querySelectorAll(".list-item:not(.dragging)")];
       return items.reduce(
@@ -1348,33 +1997,241 @@ document.addEventListener("DOMContentLoaded", () => {
     draggableLists.forEach((list) => {
       if (list.dataset.dragReady === "true") return;
       list.dataset.dragReady = "true";
+      const isInboxList = list.querySelector("[data-inbox-item]") !== null;
+      const placeholder = document.createElement("div");
+      placeholder.className = "list-item list-placeholder";
+      placeholder.setAttribute("aria-hidden", "true");
+      let dragItem = null;
+      let pointerId = null;
+      let startX = 0;
+      let startY = 0;
+      let dragging = false;
+      let dragItemStyle = "";
+      let ghostOffsetX = 0;
+      let ghostOffsetY = 0;
+      const dragCursorOffsetY = 80;
+
       list.querySelectorAll(".list-item").forEach((item) => {
-        item.setAttribute("draggable", "true");
-      });
-
-      list.addEventListener("dragstart", (event) => {
-        const item = event.target.closest(".list-item");
-        if (!item) return;
-        item.classList.add("dragging");
-        event.dataTransfer.effectAllowed = "move";
-      });
-
-      list.addEventListener("dragend", (event) => {
-        const item = event.target.closest(".list-item");
-        item?.classList.remove("dragging");
-      });
-
-      list.addEventListener("dragover", (event) => {
-        event.preventDefault();
-        const dragging = list.querySelector(".dragging");
-        if (!dragging) return;
-        const after = getAfterElement(list, event.clientY);
-        if (!after) {
-          list.appendChild(dragging);
+        if (usePointerDrag) {
+          item.removeAttribute("draggable");
         } else {
-          list.insertBefore(dragging, after);
+          item.setAttribute("draggable", "true");
         }
       });
+
+      if (usePointerDrag) {
+        const dragThreshold = 6;
+        const shouldIgnorePointer = (event) =>
+          Boolean(
+            event.target.closest("[data-inbox-action], button, a, input, textarea, select")
+          );
+
+        const resetPointer = () => {
+          pointerId = null;
+          startX = 0;
+          startY = 0;
+          dragging = false;
+          ghostOffsetX = 0;
+          ghostOffsetY = 0;
+          dragItemStyle = "";
+        };
+
+        const updateGhostPosition = (event) => {
+          if (!dragItem || !dragging) return;
+          dragItem.style.left = `${event.clientX - ghostOffsetX}px`;
+          dragItem.style.top = `${event.clientY - ghostOffsetY}px`;
+        };
+
+        const beginDrag = (event) => {
+          if (!dragItem || !event) return;
+          dragging = true;
+          dragItem.classList.add("dragging");
+          dragItem.classList.add("drag-lift");
+          setGlobalDragging(true);
+          placeholder.style.height = `${dragItem.offsetHeight}px`;
+          list.insertBefore(placeholder, dragItem);
+          dragItemStyle = dragItem.getAttribute("style") || "";
+          const rect = dragItem.getBoundingClientRect();
+          ghostOffsetX = event.clientX - rect.left;
+          ghostOffsetY = event.clientY - rect.top + dragCursorOffsetY;
+          document.body.appendChild(dragItem);
+          dragItem.style.position = "fixed";
+          dragItem.style.width = `${rect.width}px`;
+          dragItem.style.height = `${rect.height}px`;
+          dragItem.style.left = `${rect.left}px`;
+          dragItem.style.top = `${rect.top}px`;
+          dragItem.style.pointerEvents = "none";
+          updateGhostPosition(event);
+          if (isInboxList) inboxDragInProgress = true;
+          logDrag(
+            `${isInboxList ? "inbox" : "list"} dragstart ${dragItem.dataset.taskId || ""}`
+          );
+        };
+
+        const handlePointerMove = (event) => {
+          if (!dragItem || pointerId !== event.pointerId) return;
+          const dx = event.clientX - startX;
+          const dy = event.clientY - startY;
+          if (!dragging) {
+            if (Math.hypot(dx, dy) < dragThreshold) return;
+            beginDrag(event);
+          }
+          event.preventDefault();
+          updateGhostPosition(event);
+          const rect = list.getBoundingClientRect();
+          const inside =
+            event.clientX >= rect.left &&
+            event.clientX <= rect.right &&
+            event.clientY >= rect.top &&
+            event.clientY <= rect.bottom;
+          if (!inside) {
+            placeholder.remove();
+            return;
+          }
+          const after = getAfterElement(list, event.clientY);
+          if (!after) {
+            list.appendChild(placeholder);
+          } else {
+            list.insertBefore(placeholder, after);
+          }
+        };
+
+        const finishPointerDrag = (event, cancelled = false) => {
+          if (!dragItem || pointerId !== event.pointerId) return;
+          if (dragItem.releasePointerCapture) {
+            try {
+              dragItem.releasePointerCapture(pointerId);
+            } catch (err) {
+              // Ignore pointer capture release errors.
+            }
+          }
+          if (!dragging) {
+            dragItem = null;
+            resetPointer();
+            setGlobalDragging(false);
+            return;
+          }
+          dragItem.classList.remove("drag-lift");
+          if (dragItemStyle) {
+            dragItem.setAttribute("style", dragItemStyle);
+          } else {
+            dragItem.removeAttribute("style");
+          }
+          logDrag(`${isInboxList ? "inbox" : "list"} dragend`);
+          if (!cancelled) {
+            if (placeholder.parentNode === list) {
+              list.insertBefore(dragItem, placeholder);
+            } else {
+              list.appendChild(dragItem);
+            }
+            logDrag(`${isInboxList ? "inbox" : "list"} drop`);
+          }
+          placeholder.remove();
+          dragItem.classList.remove("dragging");
+          dragItem = null;
+          setGlobalDragging(false);
+          if (isInboxList) {
+            setTimeout(() => {
+              inboxDragInProgress = false;
+            }, 80);
+          }
+          resetPointer();
+        };
+
+        list.addEventListener("pointerdown", (event) => {
+          if (event.button !== 0 || event.isPrimary === false) return;
+          if (shouldIgnorePointer(event)) return;
+          const item = event.target.closest(".list-item");
+          if (!item || !list.contains(item)) return;
+          dragItem = item;
+          pointerId = event.pointerId;
+          startX = event.clientX;
+          startY = event.clientY;
+          if (dragItem.setPointerCapture) {
+            try {
+              dragItem.setPointerCapture(pointerId);
+            } catch (err) {
+              // Ignore pointer capture errors.
+            }
+          }
+        });
+
+        document.addEventListener("pointermove", handlePointerMove);
+        document.addEventListener("pointerup", (event) => {
+          finishPointerDrag(event, false);
+        });
+        document.addEventListener("pointercancel", (event) => {
+          finishPointerDrag(event, true);
+        });
+      } else {
+        document.addEventListener("dragstart", (event) => {
+          const item = event.target.closest(".list-item");
+          if (!item || !list.contains(item)) return;
+          dragItem = item;
+          item.classList.add("dragging");
+          setGlobalDragging(true);
+          placeholder.style.height = `${item.offsetHeight}px`;
+          if (isInboxList) inboxDragInProgress = true;
+          logDrag(
+            `${isInboxList ? "inbox" : "list"} dragstart ${item.dataset.taskId || ""}`
+          );
+          if (event.dataTransfer) {
+            event.dataTransfer.effectAllowed = "move";
+            event.dataTransfer.setData("text/plain", item.dataset.taskId || "");
+          }
+        });
+
+        document.addEventListener("dragend", () => {
+          if (!dragItem) return;
+          logDrag(`${isInboxList ? "inbox" : "list"} dragend`);
+          setGlobalDragging(false);
+          dragItem.classList.remove("dragging");
+          placeholder.remove();
+          dragItem = null;
+          if (isInboxList) {
+            setTimeout(() => {
+              inboxDragInProgress = false;
+            }, 80);
+          }
+        });
+
+        document.addEventListener("dragover", (event) => {
+          if (!dragItem) return;
+          const targetList = event.target.closest("[data-draggable-list]");
+          if (!targetList || targetList !== list) return;
+          event.preventDefault();
+          if (event.dataTransfer) {
+            event.dataTransfer.dropEffect = "move";
+          }
+          const after = getAfterElement(targetList, event.clientY);
+          if (!after) {
+            targetList.appendChild(placeholder);
+          } else {
+            targetList.insertBefore(placeholder, after);
+          }
+        });
+
+        document.addEventListener("drop", (event) => {
+          if (!dragItem) return;
+          const targetList = event.target.closest("[data-draggable-list]");
+          if (!targetList || targetList !== list) return;
+          event.preventDefault();
+          if (placeholder.parentNode === targetList) {
+            targetList.insertBefore(dragItem, placeholder);
+          } else {
+            targetList.appendChild(dragItem);
+          }
+          placeholder.remove();
+          dragItem.classList.remove("dragging");
+          dragItem = null;
+          logDrag(`${isInboxList ? "inbox" : "list"} drop`);
+          if (isInboxList) {
+            setTimeout(() => {
+              inboxDragInProgress = false;
+            }, 80);
+          }
+        });
+      }
     });
   }
 

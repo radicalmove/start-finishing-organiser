@@ -1,4 +1,4 @@
-# SFO Test Plan (v0.7)
+# SFO Test Plan (v0.721)
 
 ## Goal
 Validate core flows with junk data before real use and manual Trello migration. Add automated
@@ -65,6 +65,7 @@ regression coverage for API + capture logic without touching the real database.
 ### Tasks board
 - Toggle between time and project views.
 - Edit a task, update when bucket + block type.
+- Send a non-inbox task to Inbox from the edit modal; confirm it appears on Home.
 - Complete a task, see it in completed list.
 - Archive completed tasks in bulk.
 

@@ -4,7 +4,7 @@ from datetime import datetime, date, timedelta
 from urllib.parse import quote_plus
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from sqlalchemy.orm import Session, selectinload
 
 from ..db import get_db
@@ -146,6 +146,7 @@ def tasks_archived(request: Request, db: Session = Depends(get_db)):
 
 @router.post("/tasks/update")
 def update_task(
+    request: Request,
     task_id: int = Form(...),
     verb_noun: str | None = Form(None),
     description: str | None = Form(None),
@@ -155,6 +156,7 @@ def update_task(
     duration_minutes: str | None = Form(None),
     frog: bool = Form(False),
     alignment: str | None = Form(None),
+    send_to_inbox: bool = Form(False),
     next_url: str | None = Form(None),
     db: Session = Depends(get_db),
 ):
@@ -178,11 +180,29 @@ def update_task(
     task.duration_minutes = duration_value
     task.frog = bool(frog)
     task.alignment = Alignment(alignment) if alignment else None
-    task.in_inbox = False
+    if send_to_inbox:
+        task.in_inbox = True
+        task.archived_from_inbox = False
+        task.when_bucket = WhenBucket.LATER
+    else:
+        task.in_inbox = False
 
     db.add(task)
     db.commit()
-    return _safe_redirect(next_url, "/tasks/time", "Saved")
+    accept_header = request.headers.get("accept", "")
+    wants_json = request.headers.get("x-requested-with") == "fetch" or "application/json" in accept_header
+    if wants_json:
+        return JSONResponse(
+            {
+                "status": "ok",
+                "task_id": task.id,
+                "when_bucket": task.when_bucket.value,
+                "project_id": task.project_id,
+                "in_inbox": task.in_inbox,
+            }
+        )
+    message = "Sent to Inbox" if send_to_inbox else "Saved"
+    return _safe_redirect(next_url, "/tasks/time", message)
 
 
 @router.post("/tasks/complete")

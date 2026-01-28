@@ -2,7 +2,7 @@
 
 Neon-themed, single-user organiser inspired by *Start Finishing*. Built on FastAPI, Jinja, and SQLite for quick iteration.
 
-Current version: 0.7
+Current version: 0.721
 
 ## Run locally
 
@@ -14,6 +14,36 @@ uvicorn main:app --reload
 ```
 
 Open http://localhost:8000 to see the prototype UI.
+
+## Desktop app (macOS)
+
+SFO can run as a native macOS app (Tauri shell + bundled FastAPI backend).
+
+Build the backend binary (PyInstaller) and the `.app` bundle:
+
+```bash
+scripts/build_macos_app.sh
+```
+
+Quick rebuild + open (auto-bumps the version pill):
+
+```bash
+scripts/rebuild_and_open_app.sh
+```
+
+The resulting app bundle will be in `src-tauri/target/release/bundle/macos/`.
+
+Notes:
+- The app stores data in `~/Library/Application Support/com.rcd58.sfo/` (database is `sfo.db`).
+- Gmail credentials are copied to `~/Library/Application Support/com.rcd58.sfo/gmail_credentials.json` on first run if bundled.
+- Gmail tokens will be stored in the same folder as `gmail_token.json`.
+
+Development (run backend manually):
+
+```bash
+uvicorn main:app --reload
+cargo tauri dev
+```
 
 ## Calendar feed (Cozi)
 

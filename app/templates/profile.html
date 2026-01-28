@@ -43,11 +43,11 @@
       <div class="field two">
         <label>
           <span>Workday start</span>
-          <input type="time" name="workday_start" value="{{ profile.workday_start if profile and profile.workday_start else '' }}">
+          <input type="text" name="workday_start" value="{{ profile.workday_start.strftime('%I:%M %p') if profile and profile.workday_start else '' }}" placeholder="17:00 or 5:00pm">
         </label>
         <label>
           <span>Workday end</span>
-          <input type="time" name="workday_end" value="{{ profile.workday_end if profile and profile.workday_end else '' }}">
+          <input type="text" name="workday_end" value="{{ profile.workday_end.strftime('%I:%M %p') if profile and profile.workday_end else '' }}" placeholder="17:00 or 5:00pm">
         </label>
       </div>
       <div class="field two">

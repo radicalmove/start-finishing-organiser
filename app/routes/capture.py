@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta
+from urllib.parse import quote_plus
 
 from fastapi import APIRouter, Depends, Request, Form, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
@@ -24,9 +25,17 @@ from ..utils.rules import (
 )
 from ..utils.coach import build_coach_context_json, project_summary, suggest_capture_kind
 from ..utils.projects import normalize_project_color
-from ..security import csrf_protect, require_html_auth
+from ..security import csrf_protect, require_html_auth, is_safe_redirect
 
 router = APIRouter(dependencies=[Depends(require_html_auth), Depends(csrf_protect)])
+
+
+def _safe_redirect(next_url: str | None, fallback: str, message: str | None = None) -> RedirectResponse:
+    url = next_url if is_safe_redirect(next_url) else fallback
+    if message:
+        separator = "&" if "?" in url else "?"
+        url = f"{url}{separator}success={quote_plus(message)}"
+    return RedirectResponse(url=url, status_code=303)
 
 
 @router.get("/capture", response_class=HTMLResponse)
@@ -108,6 +117,7 @@ def submit_wizard(
     item_kind: str = Form("task"),
     displacement_ack: str | None = Form(None),
     source_task_id: int | None = Form(None),
+    next_url: str | None = Form(None),
     category: ProjectCategory = Form(ProjectCategory.WORK),
     project_id: str | None = Form(""),
     project_color_scheme: str | None = Form(None),
@@ -122,8 +132,6 @@ def submit_wizard(
     db: Session = Depends(get_db),
 ):
     if item_kind in {"task", "project"} and (displacement_ack or "").lower() not in {"1", "true", "yes"}:
-        from urllib.parse import quote_plus
-
         msg = quote_plus("Confirm the displacement check before saving.")
         prefill = quote_plus(capture_text.strip())
         source = f"&source_task_id={source_task_id}" if source_task_id else ""
@@ -145,6 +153,31 @@ def submit_wizard(
         details = source_task.description
 
     try:
+        if item_kind == "decide_later":
+            cleaned_title = capture_text.strip()
+            details = capture_description.strip() if capture_description else None
+            if source_task:
+                source_task.verb_noun = cleaned_title
+                source_task.description = details
+                source_task.in_inbox = True
+                source_task.when_bucket = WhenBucket.LATER
+                source_task.status = TaskStatus.PENDING
+                source_task.completed_at = None
+            else:
+                task = Task(
+                    verb_noun=cleaned_title,
+                    project_id=None,
+                    description=details,
+                    in_inbox=True,
+                    when_bucket=WhenBucket.LATER,
+                    block_type=None,
+                    duration_minutes=None,
+                    frog=False,
+                    owner_type=owner_type,
+                )
+                db.add(task)
+            db.commit()
+            return _safe_redirect(next_url, "/", "Captured")
         if item_kind == "project":
             if active_this_week:
                 enforce_weekly_cap(db, category, True)
@@ -205,8 +238,6 @@ def submit_wizard(
                 db.add(waiting)
         db.commit()
     except HTTPException as exc:
-        from urllib.parse import quote_plus
-
         msg = compose_cap_error(exc)
         prefill = quote_plus(capture_text.strip())
         source = f"&source_task_id={source_task_id}" if source_task_id else ""
@@ -215,7 +246,7 @@ def submit_wizard(
             status_code=303,
         )
 
-    return RedirectResponse(url="/?success=Captured", status_code=303)
+    return _safe_redirect(next_url, "/", "Captured")
 
 
 @router.post("/capture/wizard/suggest")
@@ -247,6 +278,7 @@ def submit_capture(
     title: str = Form(...),
     capture_kind: str = Form("decide_later"),
     displacement_ack: str | None = Form(None),
+    next_url: str | None = Form(None),
     task_project_id: str | None = Form(""),
     task_description: str | None = Form(None),
     task_when_bucket: WhenBucket = Form(WhenBucket.TODAY),
@@ -300,7 +332,7 @@ def submit_capture(
             )
             db.add(task)
             db.commit()
-            return RedirectResponse(url="/?success=Captured", status_code=303)
+            return _safe_redirect(next_url, "/", "Captured")
 
         if capture_kind == "task":
             pid = int(task_project_id) if task_project_id not in (None, "", "null") else None
@@ -320,7 +352,7 @@ def submit_capture(
             )
             db.add(task)
             db.commit()
-            return RedirectResponse(url="/?success=Captured", status_code=303)
+            return _safe_redirect(next_url, "/", "Captured")
 
         if capture_kind == "project":
             active_this_week = (
@@ -340,7 +372,7 @@ def submit_capture(
             )
             db.add(project)
             db.commit()
-            return RedirectResponse(url="/?success=Captured", status_code=303)
+            return _safe_redirect(next_url, "/", "Captured")
 
         if capture_kind == "time_block":
             if not block_date or not block_start_time:

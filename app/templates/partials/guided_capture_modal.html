@@ -12,6 +12,7 @@
         <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
         <input type="hidden" name="displacement_ack" value="0" data-displacement-ack>
         <input type="hidden" name="source_task_id" value="{{ source_task_id or '' }}"{% if not source_task_id %} disabled{% endif %}>
+        <input type="hidden" name="next_url" value="">
         <div class="wizard-step" data-step="1">
           <div class="field">
             <span>What is it?</span>
@@ -41,6 +42,7 @@
             <div class="why-tags why-tags--stack">
               <label><input type="radio" name="item_kind" value="task" checked> Task (15–120 min)</label>
               <label><input type="radio" name="item_kind" value="project"> Project (bigger than a task)</label>
+              <label><input type="radio" name="item_kind" value="decide_later"> Decide later (send to Inbox)</label>
               <label><input type="radio" name="item_kind" value="not_sure"> Not sure yet</label>
             </div>
           </div>

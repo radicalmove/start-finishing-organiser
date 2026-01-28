@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import time
+import re
 
 from sqlalchemy.orm import Session
 
@@ -29,12 +30,23 @@ def upsert_profile(db: Session, profile: Profile | None, payload: dict) -> Profi
 def parse_time(value: str | None) -> time | None:
     if not value:
         return None
-    try:
-        parts = value.split(":")
-        if len(parts) < 2:
-            return None
-        hour = int(parts[0])
-        minute = int(parts[1])
+    cleaned = value.strip().lower().replace(".", ":")
+    match = re.match(r"^(\d{1,2})(?::(\d{2}))?\s*(am|pm)$", cleaned)
+    if match:
+        hour = int(match.group(1))
+        minute = int(match.group(2) or 0)
+        meridiem = match.group(3)
+        if meridiem == "pm" and hour < 12:
+            hour += 12
+        if meridiem == "am" and hour == 12:
+            hour = 0
         return time(hour=hour, minute=minute)
-    except (TypeError, ValueError):
-        return None
+    match = re.match(r"^(\d{1,2}):(\d{2})$", cleaned)
+    if match:
+        try:
+            hour = int(match.group(1))
+            minute = int(match.group(2))
+            return time(hour=hour, minute=minute)
+        except (TypeError, ValueError):
+            return None
+    return None

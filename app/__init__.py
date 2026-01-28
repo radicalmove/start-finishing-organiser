@@ -1,7 +1,9 @@
 import os
+import time
 from pathlib import Path
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
@@ -25,28 +27,34 @@ from .utils.gmail import start_gmail_sync_loop
 
 
 def _load_dotenv() -> None:
-    env_path = Path(__file__).resolve().parent.parent / ".env"
-    if not env_path.exists():
-        return
+    candidates: list[Path] = []
+    override = os.getenv("SFO_ENV_PATH")
+    if override:
+        candidates.append(Path(override).expanduser())
+    candidates.append(Path(__file__).resolve().parent.parent / ".env")
+    candidates.append(Path.home() / ".config" / "sfo" / ".env")
 
-    for raw_line in env_path.read_text(encoding="utf-8").splitlines():
-        line = raw_line.strip()
-        if not line or line.startswith("#"):
+    for env_path in candidates:
+        if not env_path.exists():
             continue
-        if line.startswith("export "):
-            line = line[len("export ") :].strip()
-        if "=" not in line:
-            continue
-        key, value = line.split("=", 1)
-        key = key.strip()
-        value = value.strip()
-        if not key:
-            continue
-        if (value.startswith('"') and value.endswith('"')) or (
-            value.startswith("'") and value.endswith("'")
-        ):
-            value = value[1:-1]
-        os.environ.setdefault(key, value)
+        for raw_line in env_path.read_text(encoding="utf-8").splitlines():
+            line = raw_line.strip()
+            if not line or line.startswith("#"):
+                continue
+            if line.startswith("export "):
+                line = line[len("export ") :].strip()
+            if "=" not in line:
+                continue
+            key, value = line.split("=", 1)
+            key = key.strip()
+            value = value.strip()
+            if not key:
+                continue
+            if (value.startswith('"') and value.endswith('"')) or (
+                value.startswith("'") and value.endswith("'")
+            ):
+                value = value[1:-1]
+            os.environ.setdefault(key, value)
 
 
 def create_app() -> FastAPI:
@@ -91,14 +99,32 @@ def create_app() -> FastAPI:
         max_age=max_age,
     )
 
-    app.mount("/static", StaticFiles(directory="app/static"), name="static")
+    if os.getenv("SFO_TAURI") == "1":
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=[
+                "tauri://localhost",
+                "https://tauri.localhost",
+                "http://localhost:8000",
+                "http://127.0.0.1:8000",
+            ],
+            allow_credentials=True,
+            allow_methods=["*"],
+            allow_headers=["*"],
+        )
 
-    templates = Jinja2Templates(directory="app/templates")
+    app_dir = Path(__file__).resolve().parent
+    app.mount("/static", StaticFiles(directory=str(app_dir / "static")), name="static")
+
+    templates = Jinja2Templates(directory=str(app_dir / "templates"))
     app.state.templates = templates
     templates.env.globals["csrf_token"] = ensure_csrf_token
     templates.env.globals["auth_enabled"] = ui_auth_enabled
     templates.env.globals["is_authenticated"] = is_authenticated
     templates.env.globals["current_user"] = current_user
+    templates.env.globals["static_version"] = os.getenv("SFO_STATIC_VERSION") or str(
+        int(time.time())
+    )
 
     app.include_router(auth.router)
     app.include_router(homepage.router)

@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.721 - 2026-01-28
+- Added a Send to Inbox action in the task edit modal for non-inbox tasks.
+- Rebuild script now bumps the version pill automatically.
+
 ## 0.7.0 - 2026-01-24
 - Expanded ritual check-ins with morning focus chunk, midday alignment reset, and evening shutdown/breadcrumbs.
 - Added pattern-based Charlie nudges with threshold gating and optional LLM wording.

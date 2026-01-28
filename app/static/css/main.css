@@ -19,6 +19,7 @@
   --calendar-grid-height: calc(var(--calendar-hours) * var(--calendar-hour-height));
   --calendar-label-width: 50px;
   --calendar-offset-y: 0px;
+  --panel-height-offset: 260px;
 }
 
 *,
@@ -27,21 +28,20 @@
   box-sizing: border-box;
 }
 
-html {
+html,
+body {
   height: 100%;
+  overflow: hidden;
 }
 
 body {
   margin: 0;
   min-height: 100vh;
-  height: 100%;
   font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   background: radial-gradient(circle at 20% 20%, rgba(53, 195, 255, 0.1), transparent 35%),
     radial-gradient(circle at 80% 0%, rgba(255, 43, 209, 0.14), transparent 40%),
     linear-gradient(135deg, #04030d 0%, #0a0620 50%, #04030d 100%);
   color: var(--text);
-  overflow-x: hidden;
-  overflow-y: auto;
 }
 
 a {
@@ -61,8 +61,22 @@ h4 {
   margin: 0 auto;
   padding: 40px 40px 20px;
   min-height: 100vh;
+  height: 100vh;
   display: flex;
   flex-direction: column;
+  position: relative;
+}
+
+.page-content {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+
+.page-content::-webkit-scrollbar {
+  width: 0;
+  height: 0;
 }
 
 .header {
@@ -364,11 +378,21 @@ h4 {
   flex-direction: column;
   gap: 18px;
   margin-top: 18px;
+  --long-range-panel-padding: 12px;
+  --horizon-card-padding: 8px;
+  --horizon-card-gap: 6px;
+  --horizon-item-padding: 6px;
+  --horizon-item-gap: 4px;
+  --horizon-item-meta-gap: 4px;
 }
 
 .long-range-hero {
   background: linear-gradient(135deg, rgba(255, 43, 209, 0.14), rgba(25, 135, 255, 0.16));
   border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.long-range-shell .panel {
+  padding: var(--long-range-panel-padding);
 }
 
 .long-range-nav {
@@ -396,13 +420,13 @@ h4 {
 }
 
 .horizon-card {
-  padding: 12px;
+  padding: var(--horizon-card-padding);
   border-radius: 12px;
   border: 1px solid rgba(255, 255, 255, 0.08);
   background: rgba(0, 0, 0, 0.25);
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--horizon-card-gap);
 }
 
 .horizon-card.is-drop-target {
@@ -430,14 +454,26 @@ h4 {
 }
 
 .horizon-item {
-  padding: 10px;
+  padding: var(--horizon-item-padding);
   border-radius: 12px;
   border: 1px solid rgba(255, 255, 255, 0.26);
   background: rgba(255, 255, 255, 0.1);
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--horizon-item-gap);
   position: relative;
+  cursor: grab;
+}
+
+.horizon-item * {
+  cursor: grab;
+}
+
+.horizon-item button,
+.horizon-item a,
+.horizon-item input,
+.horizon-item textarea,
+.horizon-item select {
   cursor: pointer;
 }
 
@@ -447,18 +483,36 @@ h4 {
 }
 
 .horizon-item[draggable="true"],
-.pyramid-tier-body .pill[draggable="true"] {
+.pyramid-tier-body .pill[draggable="true"],
+.pyramid-tier-body .pill[data-project-id] {
   cursor: grab;
   user-select: none;
 }
 
 .horizon-item[draggable="true"]:active,
-.pyramid-tier-body .pill[draggable="true"]:active {
+.pyramid-tier-body .pill[draggable="true"]:active,
+.pyramid-tier-body .pill[data-project-id]:active {
   cursor: grabbing;
 }
 
 .horizon-item.is-dragging {
   opacity: 0.55;
+}
+
+.horizon-item.drag-lift,
+.pyramid-tier-body .pill.drag-lift {
+  opacity: 1;
+}
+
+.pyramid-tier-body .pill.is-dragging {
+  opacity: 0.4;
+}
+
+.horizon-drop-placeholder {
+  border: 1px dashed rgba(53, 195, 255, 0.45);
+  border-radius: 12px;
+  background: rgba(9, 18, 36, 0.35);
+  box-shadow: inset 0 0 0 1px rgba(255, 43, 209, 0.1);
 }
 
 .horizon-item-actions {
@@ -503,7 +557,7 @@ h4 {
 .horizon-item-meta {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: var(--horizon-item-meta-gap);
 }
 
 .roadmap-grid {
@@ -1066,6 +1120,23 @@ h4 {
   gap: 8px;
 }
 
+.tasks-column-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.tasks-column-add {
+  opacity: 0;
+  transform: translateY(-2px);
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.tasks-column:hover .tasks-column-add {
+  opacity: 1;
+  transform: translateY(0);
+}
+
 .tasks-column-body {
   display: flex;
   flex-direction: column;
@@ -1085,6 +1156,19 @@ h4 {
 
 .task-card[data-task-card] {
   position: relative;
+  cursor: grab;
+}
+
+.task-card[data-task-card] * {
+  cursor: grab;
+}
+
+.task-card[data-task-card] [data-task-action],
+.task-card[data-task-card] button,
+.task-card[data-task-card] a,
+.task-card[data-task-card] input,
+.task-card[data-task-card] textarea,
+.task-card[data-task-card] select {
   cursor: pointer;
 }
 
@@ -1094,7 +1178,66 @@ h4 {
 }
 
 .task-card.is-dragging {
-  opacity: 0.6;
+  opacity: 0.25;
+}
+
+.task-card.drag-lift {
+  opacity: 1;
+}
+
+.drag-ghost {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 9998;
+  pointer-events: none;
+  opacity: 0.98;
+  margin: 0;
+  transform: translate(0, 0);
+  transform-origin: top left;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.35), 0 0 20px rgba(53, 195, 255, 0.2);
+}
+
+.drag-ghost.dragging,
+.drag-ghost.is-dragging {
+  opacity: 0.98;
+}
+
+.drag-lift {
+  position: fixed;
+  z-index: 9999;
+  pointer-events: none;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.35), 0 0 20px rgba(53, 195, 255, 0.25);
+}
+
+body.dragging,
+body.dragging * {
+  cursor: grabbing !important;
+}
+
+.drag-debug {
+  position: fixed;
+  left: 12px;
+  bottom: 12px;
+  z-index: 9999;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(0, 0, 0, 0.7);
+  color: #fff;
+  font-size: 12px;
+  letter-spacing: 0.2px;
+  pointer-events: none;
+  max-width: 320px;
+}
+
+.task-drop-placeholder {
+  min-height: 48px;
+  border-radius: 12px;
+  border: 1px dashed rgba(255, 255, 255, 0.35);
+  background: rgba(53, 195, 255, 0.08);
+  box-shadow: inset 0 0 12px rgba(53, 195, 255, 0.2);
+  margin: 6px 0;
 }
 
 .task-card-header {
@@ -1302,9 +1445,23 @@ h4 {
   cursor: grab;
 }
 
+[data-draggable-list] .list-item * {
+  cursor: grab;
+}
+
+[data-draggable-list] .list-item [data-inbox-action],
+[data-draggable-list] .list-item button,
+[data-draggable-list] .list-item a {
+  cursor: pointer;
+}
+
 [data-draggable-list] .list-item.dragging {
-  opacity: 0.6;
+  opacity: 0.25;
   cursor: grabbing;
+}
+
+[data-draggable-list] .list-item.drag-lift {
+  opacity: 1;
 }
 
 .tasks-list {
@@ -1724,6 +1881,12 @@ h4 {
   background: rgba(255, 255, 255, 0.1);
 }
 
+.list-placeholder {
+  border-style: dashed;
+  background: rgba(53, 195, 255, 0.08);
+  box-shadow: inset 0 0 10px rgba(53, 195, 255, 0.2);
+}
+
 .list-item .muted {
   font-size: 12px;
 }
@@ -1913,10 +2076,22 @@ button:hover,
   color: var(--muted);
 }
 
+.brand-title {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.version-inline {
+  position: static;
+  font-size: 11px;
+  letter-spacing: 0.4px;
+}
+
 .version-corner {
-  position: fixed;
-  top: 12px;
-  right: 16px;
+  position: absolute;
+  top: -6px;
+  right: 12px;
   z-index: 80;
   pointer-events: none;
 }
@@ -2319,14 +2494,14 @@ button:hover,
 }
 
 .week-shell {
-  margin-top: 20px;
+  margin-top: 12px;
   flex: 1;
   min-height: 0;
 }
 
 .week-calendar-panel {
-  height: calc(100vh - 180px);
-  max-height: calc(100vh - 180px);
+  height: calc(100vh - var(--panel-height-offset));
+  max-height: calc(100vh - var(--panel-height-offset));
   min-height: 520px;
   display: flex;
   flex-direction: column;
@@ -2342,12 +2517,12 @@ button:hover,
   height: auto;
   min-height: 0;
   align-self: stretch;
-  margin-top: 20px;
+  margin-top: 12px;
 }
 
 .inbox-panel {
-  height: calc(100vh - 180px);
-  max-height: calc(100vh - 180px);
+  height: calc(100vh - var(--panel-height-offset));
+  max-height: calc(100vh - var(--panel-height-offset));
   display: flex;
   flex-direction: column;
   justify-content: space-between;
@@ -2369,14 +2544,14 @@ button:hover,
 }
 
 .right-stack {
-  margin-top: 20px;
+  margin-top: 12px;
 }
 
 .calendar-panel {
   flex: 0 0 32%;
-  margin-top: 20px;
-  height: calc(100vh - 180px);
-  max-height: calc(100vh - 180px);
+  margin-top: 12px;
+  height: calc(100vh - var(--panel-height-offset));
+  max-height: calc(100vh - var(--panel-height-offset));
   min-height: 460px;
   display: flex;
   flex-direction: column;

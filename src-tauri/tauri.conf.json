@@ -1,0 +1,41 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Start Finishing Organiser",
+  "version": "0.7.0",
+  "identifier": "com.rcd58.sfo",
+  "build": {
+    "frontendDist": "launcher",
+    "devUrl": "http://127.0.0.1:8000/"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "Start Finishing Organiser",
+        "width": 1440,
+        "height": 900,
+        "minWidth": 1200,
+        "minHeight": 720,
+        "resizable": true,
+        "fullscreen": false
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "resources": {
+      "../client_secret_2_1055809623761-1ba9633dga88tbmfo1cgepn93m53sr3o.apps.googleusercontent.com.json": "resources/gmail_credentials.json",
+      "bin/sfo-backend": "bin/sfo-backend"
+    }
+  }
+}

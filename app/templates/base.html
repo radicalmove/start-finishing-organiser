@@ -6,12 +6,11 @@
   <title>{{ title or "Start Finishing Organiser" }}</title>
   <link rel="icon" href="{{ url_for('static', path='/img/favicon.svg') }}">
   <link rel="shortcut icon" href="{{ url_for('static', path='/img/favicon.svg') }}">
-  <link rel="stylesheet" href="{{ url_for('static', path='/css/main.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', path='/css/main.css') }}?v={{ static_version }}">
   <meta name="csrf-token" content="{{ csrf_token(request) }}">
-  <script defer src="{{ url_for('static', path='/js/main.js') }}"></script>
+  <script defer src="{{ url_for('static', path='/js/main.js') }}?v={{ static_version }}"></script>
 </head>
 <body>
-  <div class="version-pill version-corner">v0.7</div>
   <div class="page">
     <header class="header">
       <div class="brand">
@@ -28,8 +27,9 @@
         </div>
         <div class="header-center">
           <a class="brand-link" href="/">
-            <div>
+            <div class="brand-title">
               <h1>Start Finishing Organiser</h1>
+              <span class="version-pill version-inline">v0.721</span>
             </div>
           </a>
           <div class="now-slot">
@@ -91,7 +91,9 @@
         </a>
       </div>
     </header>
-    {% block content %}{% endblock %}
+    <main class="page-content">
+      {% block content %}{% endblock %}
+    </main>
   </div>
   <div class="app-modal hidden" id="app-modal" role="dialog" aria-modal="true" aria-labelledby="app-modal-title">
     <div class="app-modal-card">

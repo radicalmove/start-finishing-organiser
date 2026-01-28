@@ -44,9 +44,6 @@
             <div class="horizon-list" data-horizon-list>
               {% for project in items %}
                 <div class="horizon-item project-edit" draggable="true" data-project-id="{{ project.id }}" data-project-title="{{ project.title }}">
-                  <div class="task-card-actions task-card-actions--hover horizon-item-actions">
-                    <button class="btn ghost btn-sm btn-icon btn-icon--tiny horizon-edit-btn" type="button" data-horizon-edit-action aria-label="Edit project" title="Edit">✎</button>
-                  </div>
                   <div class="project-edit-header">
                     <div class="horizon-item-title">{{ project.title }}</div>
                   </div>

@@ -13,6 +13,7 @@
           <div class="tasks-view-nav">
             <a class="btn ghost btn-sm{% if view_mode == 'time' %} is-active{% endif %}" href="/tasks/time">By time</a>
             <a class="btn ghost btn-sm{% if view_mode == 'project' %} is-active{% endif %}" href="/tasks/project">By project</a>
+            <a class="btn pink btn-sm" href="/capture/wizard" data-guided-capture-open data-guided-next-url="{{ request.url.path }}">Add task</a>
           </div>
         </div>
         <div class="panel-actions tasks-page-nav">
@@ -33,7 +34,7 @@
               </div>
               <div class="tasks-column-body" data-tasks-column-body data-empty-message="No tasks here yet.">
                 {% for task in items %}
-                  <div class="task-card" data-task-card draggable="true" data-task-id="{{ task.id }}" data-task-title="{{ task.verb_noun|e }}" data-task-description="{{ (task.description or '')|e }}" data-task-project-id="{{ task.project_id or '' }}" data-task-when="{{ task.when_bucket.value }}" data-task-block-type="{{ task.block_type.value if task.block_type else '' }}" data-task-duration="{{ task.duration_minutes or '' }}" data-task-alignment="{{ task.alignment.value if task.alignment else '' }}" data-task-frog="{{ 'true' if task.frog else 'false' }}">
+                  <div class="task-card" data-task-card draggable="true" data-task-id="{{ task.id }}" data-task-title="{{ task.verb_noun|e }}" data-task-description="{{ (task.description or '')|e }}" data-task-project-id="{{ task.project_id or '' }}" data-task-when="{{ task.when_bucket.value }}" data-task-block-type="{{ task.block_type.value if task.block_type else '' }}" data-task-duration="{{ task.duration_minutes or '' }}" data-task-alignment="{{ task.alignment.value if task.alignment else '' }}" data-task-frog="{{ 'true' if task.frog else 'false' }}" data-task-in-inbox="{{ 'true' if task.in_inbox else 'false' }}">
                     <div class="task-card-actions task-card-actions--hover">
                       <form method="post" action="/tasks/complete" class="task-card-action" data-task-action>
                         <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
@@ -78,11 +79,14 @@
             <div class="tasks-column" data-tasks-column data-project-id="{{ project.id }}">
               <div class="tasks-column-header">
                 <span class="caps">{{ project.title }}</span>
-                <span class="pill">{{ items|length }}</span>
+                <div class="tasks-column-actions">
+                  <span class="pill">{{ items|length }}</span>
+                  <a class="btn ghost btn-sm btn-icon btn-icon--tiny tasks-column-add" href="/capture/wizard" data-guided-capture-open data-guided-project-id="{{ project.id }}" data-guided-next-url="{{ request.url.path }}" aria-label="Add task" title="Add task">+</a>
+                </div>
               </div>
               <div class="tasks-column-body" data-tasks-column-body data-empty-message="No active tasks yet.">
                 {% for task in items %}
-                  <div class="task-card" data-task-card draggable="true" data-task-id="{{ task.id }}" data-task-title="{{ task.verb_noun|e }}" data-task-description="{{ (task.description or '')|e }}" data-task-project-id="{{ task.project_id or '' }}" data-task-when="{{ task.when_bucket.value }}" data-task-block-type="{{ task.block_type.value if task.block_type else '' }}" data-task-duration="{{ task.duration_minutes or '' }}" data-task-alignment="{{ task.alignment.value if task.alignment else '' }}" data-task-frog="{{ 'true' if task.frog else 'false' }}">
+                  <div class="task-card" data-task-card draggable="true" data-task-id="{{ task.id }}" data-task-title="{{ task.verb_noun|e }}" data-task-description="{{ (task.description or '')|e }}" data-task-project-id="{{ task.project_id or '' }}" data-task-when="{{ task.when_bucket.value }}" data-task-block-type="{{ task.block_type.value if task.block_type else '' }}" data-task-duration="{{ task.duration_minutes or '' }}" data-task-alignment="{{ task.alignment.value if task.alignment else '' }}" data-task-frog="{{ 'true' if task.frog else 'false' }}" data-task-in-inbox="{{ 'true' if task.in_inbox else 'false' }}">
                     <div class="task-card-actions task-card-actions--hover">
                       <form method="post" action="/tasks/complete" class="task-card-action" data-task-action>
                         <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
@@ -120,11 +124,14 @@
           <div class="tasks-column" data-tasks-column data-project-id="">
             <div class="tasks-column-header">
               <span class="caps">No project</span>
-              <span class="pill">{{ no_project_items|length }}</span>
+              <div class="tasks-column-actions">
+                <span class="pill">{{ no_project_items|length }}</span>
+                <a class="btn ghost btn-sm btn-icon btn-icon--tiny tasks-column-add" href="/capture/wizard" data-guided-capture-open data-guided-project-id="" data-guided-next-url="{{ request.url.path }}" aria-label="Add task" title="Add task">+</a>
+              </div>
             </div>
             <div class="tasks-column-body" data-tasks-column-body data-empty-message="No active tasks yet.">
               {% for task in no_project_items %}
-                <div class="task-card" data-task-card draggable="true" data-task-id="{{ task.id }}" data-task-title="{{ task.verb_noun|e }}" data-task-description="{{ (task.description or '')|e }}" data-task-project-id="{{ task.project_id or '' }}" data-task-when="{{ task.when_bucket.value }}" data-task-block-type="{{ task.block_type.value if task.block_type else '' }}" data-task-duration="{{ task.duration_minutes or '' }}" data-task-alignment="{{ task.alignment.value if task.alignment else '' }}" data-task-frog="{{ 'true' if task.frog else 'false' }}">
+                <div class="task-card" data-task-card draggable="true" data-task-id="{{ task.id }}" data-task-title="{{ task.verb_noun|e }}" data-task-description="{{ (task.description or '')|e }}" data-task-project-id="{{ task.project_id or '' }}" data-task-when="{{ task.when_bucket.value }}" data-task-block-type="{{ task.block_type.value if task.block_type else '' }}" data-task-duration="{{ task.duration_minutes or '' }}" data-task-alignment="{{ task.alignment.value if task.alignment else '' }}" data-task-frog="{{ 'true' if task.frog else 'false' }}" data-task-in-inbox="{{ 'true' if task.in_inbox else 'false' }}">
                   <div class="task-card-actions task-card-actions--hover">
                     <form method="post" action="/tasks/complete" class="task-card-action" data-task-action>
                       <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
@@ -341,166 +348,11 @@
           </label>
         </div>
         <div class="cta-row cta-row--end">
+          <button class="btn ghost btn-sm hidden" type="submit" name="send_to_inbox" value="true" data-task-send-inbox>Send to Inbox</button>
           <button class="btn btn-sm" type="submit">Save</button>
         </div>
       </form>
     </div>
   </div>
-  <script>
-    document.addEventListener("DOMContentLoaded", () => {
-      const board = document.querySelector(".tasks-board");
-      if (!board || board.dataset.dragReady === "true") return;
-      board.dataset.dragReady = "true";
-
-      const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute("content");
-      let dragging = null;
-
-      const getAfterElement = (container, y) => {
-        const items = [...container.querySelectorAll('[data-task-card]:not(.is-dragging)')];
-        return items.reduce(
-          (closest, child) => {
-            const box = child.getBoundingClientRect();
-            const offset = y - box.top - box.height / 2;
-            if (offset < 0 && offset > closest.offset) {
-              return { offset, element: child };
-            }
-            return closest;
-          },
-          { offset: Number.NEGATIVE_INFINITY, element: null }
-        ).element;
-      };
-
-      const updateCounts = () => {
-        board.querySelectorAll("[data-tasks-column]").forEach((column) => {
-          const pill = column.querySelector(".tasks-column-header .pill");
-          if (!pill) return;
-          const count = column.querySelectorAll("[data-task-card]").length;
-          pill.textContent = String(count);
-        });
-      };
-
-      const updateEmptyStates = () => {
-        board.querySelectorAll("[data-tasks-column-body]").forEach((body) => {
-          const hasTasks = body.querySelector("[data-task-card]") !== null;
-          const empty = body.querySelector(".tasks-empty");
-          if (hasTasks && empty) {
-            empty.remove();
-            return;
-          }
-          if (!hasTasks && !empty) {
-            const message = body.dataset.emptyMessage || "No tasks yet.";
-            const placeholder = document.createElement("div");
-            placeholder.className = "muted tasks-empty";
-            placeholder.textContent = message;
-            body.appendChild(placeholder);
-          }
-        });
-      };
-
-      const updateWhenPill = (card, whenValue) => {
-        const pill = card.querySelector(".task-when-pill");
-        if (!pill || !whenValue) return;
-        pill.textContent = `${whenValue.charAt(0).toUpperCase()}${whenValue.slice(1)}`;
-      };
-
-      board.addEventListener("dragstart", (event) => {
-        const card = event.target.closest('[data-task-card][draggable="true"]');
-        if (!card) return;
-        dragging = card;
-        card.classList.add("is-dragging");
-        event.dataTransfer.effectAllowed = "move";
-      });
-
-      board.addEventListener("dragend", () => {
-        if (dragging) {
-          dragging.classList.remove("is-dragging");
-        }
-      });
-
-      board.addEventListener("dragover", (event) => {
-        if (!dragging) return;
-        const column = event.target.closest("[data-tasks-column]");
-        if (!column) return;
-        const body =
-          event.target.closest("[data-tasks-column-body]") ||
-          column.querySelector("[data-tasks-column-body]");
-        if (!body) return;
-        event.preventDefault();
-        const after = getAfterElement(body, event.clientY);
-        if (!after) {
-          body.appendChild(dragging);
-        } else {
-          body.insertBefore(dragging, after);
-        }
-      });
-
-      board.addEventListener("drop", async (event) => {
-        const column = event.target.closest("[data-tasks-column]");
-        if (!column || !dragging) return;
-        const body =
-          event.target.closest("[data-tasks-column-body]") ||
-          column.querySelector("[data-tasks-column-body]");
-        if (!body) return;
-        event.preventDefault();
-
-        const viewMode = board.dataset.view || "time";
-        const moving = dragging;
-        const taskId = moving.dataset.taskId || "";
-        const currentWhen = moving.dataset.taskWhen || "today";
-        const currentProject = moving.dataset.taskProjectId || "";
-        let targetWhen = currentWhen;
-        let targetProject = currentProject;
-
-        if (viewMode === "time") {
-          targetWhen = column.dataset.whenBucket || currentWhen;
-        } else if (viewMode === "project") {
-          targetProject = column.dataset.projectId ?? "";
-        }
-
-        updateCounts();
-        updateEmptyStates();
-
-        if (targetWhen === currentWhen && String(targetProject) === String(currentProject)) {
-          return;
-        }
-
-        if (!csrfToken) {
-          window.alert("Missing CSRF token. Refresh and try again.");
-          return;
-        }
-
-        const formData = new FormData();
-        formData.append("csrf_token", csrfToken);
-        formData.append("task_id", taskId);
-        formData.append("when_bucket", targetWhen);
-        formData.append("project_id", targetProject);
-        formData.append("next_url", window.location.pathname);
-
-        try {
-          const response = await fetch("/tasks/update", {
-            method: "POST",
-            body: formData,
-            credentials: "same-origin",
-          });
-          if (!response.ok) {
-            window.alert("Unable to move the task. Try again.");
-            return;
-          }
-          moving.dataset.taskWhen = targetWhen;
-          moving.dataset.taskProjectId = targetProject;
-          if (viewMode === "time") {
-            updateWhenPill(moving, targetWhen);
-          }
-          updateCounts();
-          updateEmptyStates();
-        } catch (err) {
-          window.alert("Unable to move the task. Check your connection and try again.");
-          updateEmptyStates();
-        } finally {
-          moving.classList.remove("is-dragging");
-          dragging = null;
-        }
-      });
-    });
-  </script>
+  {% include "partials/guided_capture_modal.html" %}
 {% endblock %}
