@@ -184,8 +184,6 @@ def update_task(
         task.in_inbox = True
         task.archived_from_inbox = False
         task.when_bucket = WhenBucket.LATER
-    else:
-        task.in_inbox = False
 
     db.add(task)
     db.commit()
