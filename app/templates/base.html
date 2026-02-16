@@ -12,6 +12,7 @@
   <script defer src="{{ url_for('static', path='/js/main.js') }}?v={{ static_version }}"></script>
 </head>
 <body>
+  <a class="skip-link" href="#main-content">Skip to content</a>
   <div class="page">
     <header class="header">
       <div class="brand">
@@ -37,7 +38,7 @@
             <div class="now-pill">
               <div class="now-row">
                 <span class="now-label">Now:</span>
-                <span class="now-text" data-now-text>{{ now_action or "Pick your One Thing" }}</span>
+                <span class="now-text" data-now-text aria-live="polite">{{ now_action or "Pick your One Thing" }}</span>
               </div>
             </div>
           </div>
@@ -70,7 +71,7 @@
               <div class="coach-header">
                 <div>
                   <div class="coach-title">Charlie</div>
-                  <div class="coach-status" data-coach-status>Ready to help</div>
+                  <div class="coach-status" data-coach-status role="status" aria-live="polite">Ready to help</div>
                 </div>
                 <button class="coach-close" type="button" data-coach-close>&times;</button>
               </div>
@@ -78,10 +79,11 @@
                 <button class="btn ghost btn-sm" type="button" data-coach-help>Help me with what I&apos;m looking at</button>
                 <button class="btn ghost btn-sm" type="button" data-coach-clear>Clear chat</button>
               </div>
-              <div class="coach-messages" data-coach-messages></div>
+              <div class="coach-messages" data-coach-messages role="log" aria-live="polite" aria-relevant="additions text"></div>
               <div class="coach-quick-actions" data-coach-quick-actions></div>
               <form class="coach-input" data-coach-form>
-                <input type="text" name="message" placeholder="Ask Charlie..." autocomplete="off" data-coach-input>
+                <label class="visually-hidden" for="coach-message-input">Message Charlie</label>
+                <input id="coach-message-input" type="text" name="message" placeholder="Ask Charlie..." autocomplete="off" data-coach-input>
                 <button class="btn pink btn-sm" type="submit">Send</button>
               </form>
             </div>
@@ -92,7 +94,7 @@
         </a>
       </div>
     </header>
-    <main class="page-content">
+    <main class="page-content" id="main-content" tabindex="-1">
       {% block content %}{% endblock %}
     </main>
   </div>

@@ -21,6 +21,20 @@ Web-first dev shortcut:
 scripts/dev_web.sh
 ```
 
+## Single-user defaults
+
+SFO is optimized for one person using one dataset. By default:
+
+- No login is required unless you set `SFO_PASSWORD`.
+- The web launcher prefers your desktop app database path when available.
+- `/export/health` reports DB readability plus applied schema migration status.
+
+Optional explicit mode flag:
+
+```
+SFO_SINGLE_USER_MODE=1
+```
+
 ## Desktop app (macOS)
 
 SFO can run as a native macOS app (Tauri shell + bundled FastAPI backend).
@@ -84,6 +98,19 @@ SFO_HTTPS_ONLY=true
 SFO_SESSION_SAMESITE=lax
 SFO_SESSION_MAX_AGE=1209600
 ```
+
+For local-only single-user use, leave auth vars unset.
+
+## Schema migrations (lightweight)
+
+SFO applies tracked schema migrations at startup and records each revision in
+`schema_migrations` inside your SQLite database.
+
+- Revisions are applied once and are idempotent.
+- Current migration status is visible at `/export/health`.
+- Rollback guidance is stored per revision as `rollback_hint`.
+
+Before any manual DB rollback, take a full export backup first.
 
 ## Gmail inbox capture (optional)
 

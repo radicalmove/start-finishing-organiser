@@ -33,3 +33,5 @@ def test_export_health_endpoint_reports_ready(client, api_headers):
     payload = res.json()
     assert payload["ok"] is True
     assert payload["database"]["readable"] is True
+    assert payload["schema_migrations"]["applied_count"] >= 1
+    assert isinstance(payload["mode"]["single_user"], bool)

@@ -44,9 +44,48 @@ body {
   color: var(--text);
 }
 
+.skip-link {
+  position: absolute;
+  left: 14px;
+  top: -48px;
+  z-index: 3000;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: rgba(9, 12, 30, 0.98);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  color: #fff;
+  transition: top 0.12s ease;
+}
+
+.skip-link:focus-visible {
+  top: 10px;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 a {
   color: var(--accent-cyan);
   text-decoration: none;
+}
+
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[role="button"]:focus-visible {
+  outline: 2px solid rgba(73, 246, 163, 0.85);
+  outline-offset: 2px;
 }
 
 h1,
@@ -3122,7 +3161,7 @@ input[type="radio"] {
 .quick-capture-form input[type="text"],
 .quick-capture-form textarea,
 .quick-capture-form select {
-  width: 66%;
+  width: min(66%, 560px);
   margin-right: auto;
 }
 
@@ -3222,6 +3261,17 @@ textarea {
 
   .rhythm-card {
     min-height: 0;
+  }
+}
+
+@media (max-width: 900px) {
+  .capture-shell input[type="text"],
+  .capture-shell textarea,
+  .capture-shell select,
+  .quick-capture-form input[type="text"],
+  .quick-capture-form textarea,
+  .quick-capture-form select {
+    width: 100%;
   }
 }
 

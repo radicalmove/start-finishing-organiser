@@ -15,7 +15,7 @@ from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
 from sqlalchemy import text
 from sqlalchemy.orm import Session, selectinload
 
-from ..db import get_db
+from ..db import get_db, list_schema_migrations
 from ..models import (
     Block,
     CoachMessage,
@@ -421,13 +421,27 @@ def export_health(db: Session = Depends(get_db)):
     can_read = bool(db_path and os.path.exists(db_path) and os.path.isfile(db_path))
     size_bytes = os.path.getsize(db_path) if can_read else None
     bind = db.bind
+    migrations = list_schema_migrations()
+    single_user_mode = os.getenv("SFO_SINGLE_USER_MODE", "1").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+        "on",
+    )
     payload = {
         "ok": can_read,
+        "mode": {
+            "single_user": single_user_mode,
+        },
         "database": {
             "engine": str(bind.url) if bind else None,
             "path": db_path,
             "readable": can_read,
             "size_bytes": size_bytes,
+        },
+        "schema_migrations": {
+            "applied_count": len(migrations),
+            "latest_revision": migrations[-1]["revision"] if migrations else None,
         },
     }
     status = 200 if can_read else 503

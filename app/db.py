@@ -1,5 +1,8 @@
 # Database configuration for Start Finishing Organiser
 import os
+from dataclasses import dataclass
+from datetime import datetime, timezone
+from typing import Callable
 
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import declarative_base, sessionmaker
@@ -25,6 +28,14 @@ def init_engine(db_url: str | None = None):
 
 engine = init_engine(SQLALCHEMY_DATABASE_URL)
 Base = declarative_base()
+
+
+@dataclass(frozen=True)
+class SchemaMigration:
+    revision: str
+    name: str
+    apply: Callable[[], None]
+    rollback_hint: str
 
 
 def get_db():
@@ -236,6 +247,139 @@ def ensure_core_indexes():
             conn.execute(text(statement))
 
 
+def _ensure_schema_migrations_table():
+    with engine.begin() as conn:
+        conn.execute(
+            text(
+                """
+                CREATE TABLE IF NOT EXISTS schema_migrations (
+                    revision TEXT PRIMARY KEY,
+                    name TEXT NOT NULL,
+                    applied_at DATETIME NOT NULL,
+                    rollback_hint TEXT NOT NULL
+                )
+                """
+            )
+        )
+
+
+def _applied_migration_revisions() -> set[str]:
+    _ensure_schema_migrations_table()
+    with engine.connect() as conn:
+        rows = conn.execute(
+            text("SELECT revision FROM schema_migrations ORDER BY revision ASC")
+        ).fetchall()
+    return {str(row[0]) for row in rows}
+
+
+SCHEMA_MIGRATIONS: tuple[SchemaMigration, ...] = (
+    SchemaMigration(
+        revision="20260216_001_task_owner_column",
+        name="Ensure tasks.owner_type exists",
+        apply=ensure_task_owner_column,
+        rollback_hint="No rollback required (safe additive column).",
+    ),
+    SchemaMigration(
+        revision="20260216_002_task_resurface_columns",
+        name="Ensure tasks.resurface_on and tasks.duration_minutes exist",
+        apply=ensure_task_resurface_columns,
+        rollback_hint="No rollback required (safe additive columns).",
+    ),
+    SchemaMigration(
+        revision="20260216_003_block_title_column",
+        name="Ensure blocks.title exists",
+        apply=ensure_block_title_column,
+        rollback_hint="No rollback required (safe additive column).",
+    ),
+    SchemaMigration(
+        revision="20260216_004_ritual_table",
+        name="Ensure ritual_entries table exists",
+        apply=ensure_ritual_table,
+        rollback_hint="Keep table; do not drop without full backup restore plan.",
+    ),
+    SchemaMigration(
+        revision="20260216_005_ritual_columns",
+        name="Ensure ritual_entries optional fields exist",
+        apply=ensure_ritual_columns,
+        rollback_hint="No rollback required (safe additive columns).",
+    ),
+    SchemaMigration(
+        revision="20260216_006_guidance_snoozed_until",
+        name="Ensure guidance_reminders.snoozed_until exists",
+        apply=ensure_guidance_reminder_columns,
+        rollback_hint="No rollback required (safe additive column).",
+    ),
+    SchemaMigration(
+        revision="20260216_007_task_inbox_column",
+        name="Ensure tasks.in_inbox exists",
+        apply=ensure_task_inbox_column,
+        rollback_hint="No rollback required (safe additive column).",
+    ),
+    SchemaMigration(
+        revision="20260216_008_task_archived_from_inbox_column",
+        name="Ensure tasks.archived_from_inbox exists",
+        apply=ensure_task_archived_from_inbox_column,
+        rollback_hint="No rollback required (safe additive column).",
+    ),
+    SchemaMigration(
+        revision="20260216_009_project_color_column",
+        name="Ensure projects.color_scheme exists",
+        apply=ensure_project_color_column,
+        rollback_hint="No rollback required (safe additive column).",
+    ),
+    SchemaMigration(
+        revision="20260216_010_core_indexes",
+        name="Ensure core task/calendar/coach indexes exist",
+        apply=ensure_core_indexes,
+        rollback_hint="Drop indexes manually only if query plans regress.",
+    ),
+)
+
+
+def apply_schema_migrations() -> list[str]:
+    """Apply pending schema migrations and return newly applied revision ids."""
+    applied = _applied_migration_revisions()
+    applied_now: list[str] = []
+    for migration in SCHEMA_MIGRATIONS:
+        if migration.revision in applied:
+            continue
+        migration.apply()
+        with engine.begin() as conn:
+            conn.execute(
+                text(
+                    """
+                    INSERT INTO schema_migrations (revision, name, applied_at, rollback_hint)
+                    VALUES (:revision, :name, :applied_at, :rollback_hint)
+                    """
+                ),
+                {
+                    "revision": migration.revision,
+                    "name": migration.name,
+                    "applied_at": datetime.now(timezone.utc).isoformat(),
+                    "rollback_hint": migration.rollback_hint,
+                },
+            )
+        applied_now.append(migration.revision)
+        applied.add(migration.revision)
+    return applied_now
+
+
+def list_schema_migrations() -> list[dict[str, str]]:
+    """Return applied schema migrations ordered by revision."""
+    _ensure_schema_migrations_table()
+    with engine.connect() as conn:
+        rows = conn.execute(
+            text(
+                """
+                SELECT revision, name, applied_at, rollback_hint
+                FROM schema_migrations
+                ORDER BY revision ASC
+                """
+            )
+        ).mappings().all()
+    return [dict(row) for row in rows]
+
+
 __all__ = [
     "engine",
     "SessionLocal",
@@ -252,4 +396,7 @@ __all__ = [
     "ensure_task_archived_from_inbox_column",
     "ensure_project_color_column",
     "ensure_core_indexes",
+    "apply_schema_migrations",
+    "list_schema_migrations",
+    "SCHEMA_MIGRATIONS",
 ]

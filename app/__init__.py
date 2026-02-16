@@ -11,16 +11,7 @@ from starlette.middleware.sessions import SessionMiddleware
 
 from .db import (
     Base,
-    ensure_task_owner_column,
-    ensure_task_resurface_columns,
-    ensure_block_title_column,
-    ensure_ritual_table,
-    ensure_ritual_columns,
-    ensure_guidance_reminder_columns,
-    ensure_task_inbox_column,
-    ensure_task_archived_from_inbox_column,
-    ensure_project_color_column,
-    ensure_core_indexes,
+    apply_schema_migrations,
 )
 from .routes import homepage, api, capture, blocks, resurface, weekly, waiting, ritual, auth, coach, long_range, nudges, health, profile, onboarding, tasks, export
 from .security import ensure_csrf_token, current_user, is_authenticated, ui_auth_enabled
@@ -71,16 +62,7 @@ def create_app() -> FastAPI:
     from . import db as db_module
 
     Base.metadata.create_all(bind=db_module.engine)
-    ensure_task_owner_column()
-    ensure_task_resurface_columns()
-    ensure_block_title_column()
-    ensure_ritual_table()
-    ensure_ritual_columns()
-    ensure_guidance_reminder_columns()
-    ensure_task_inbox_column()
-    ensure_task_archived_from_inbox_column()
-    ensure_project_color_column()
-    ensure_core_indexes()
+    apply_schema_migrations()
     ensure_health_metrics()
 
     app = FastAPI(title="Start Finishing Organiser", version="0.7.0")
