@@ -12,6 +12,7 @@ from datetime import datetime, timezone
 from email.utils import parseaddr, parsedate_to_datetime
 
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
 
 from ..db import SessionLocal
 from ..models import EmailMessage, EmailSyncState, Task, WhenBucket
@@ -141,7 +142,7 @@ def sync_gmail_inbox(db: Session, settings: GmailSettings) -> dict:
         }
 
     try:
-        message_ids, latest_history_id, truncated = _history_message_ids(
+        message_ids, checkpoint_history_id, truncated = _history_message_ids(
             service,
             state.last_history_id,
             settings.max_per_sync,
@@ -163,8 +164,8 @@ def sync_gmail_inbox(db: Session, settings: GmailSettings) -> dict:
         else:
             errors += 1
 
-    if latest_history_id and not truncated:
-        state.last_history_id = latest_history_id
+    if checkpoint_history_id:
+        state.last_history_id = checkpoint_history_id
         history_updated = True
     state.last_sync_at = datetime.now(timezone.utc)
     db.add(state)
@@ -258,7 +259,7 @@ def _history_message_ids(service, start_history_id: str, max_results: int):
     message_ids: list[str] = []
     seen: set[str] = set()
     page_token = None
-    latest_history_id = None
+    checkpoint_history_id = start_history_id
     truncated = False
 
     while True:
@@ -284,25 +285,35 @@ def _history_message_ids(service, start_history_id: str, max_results: int):
                 raise GmailHistoryTooOld() from exc
             raise
 
-        latest_history_id = resp.get("historyId") or latest_history_id
-        for history in resp.get("history", []):
+        response_history_id = resp.get("historyId")
+        history_rows = resp.get("history", [])
+        if not history_rows and response_history_id:
+            checkpoint_history_id = str(response_history_id)
+
+        for history in history_rows:
+            if len(message_ids) >= max_results:
+                truncated = True
+                break
+            history_id = history.get("id")
             for added in history.get("messagesAdded", []):
                 message = added.get("message") or {}
                 message_id = message.get("id")
                 if message_id and message_id not in seen:
                     seen.add(message_id)
                     message_ids.append(message_id)
-                if len(message_ids) >= max_results:
-                    truncated = True
-                    break
-            if truncated:
+            if history_id is not None:
+                checkpoint_history_id = str(history_id)
+            if len(message_ids) >= max_results:
+                truncated = True
                 break
 
         page_token = resp.get("nextPageToken")
         if truncated or not page_token:
+            if not truncated and response_history_id:
+                checkpoint_history_id = str(response_history_id)
             break
 
-    return message_ids, latest_history_id, truncated
+    return message_ids, checkpoint_history_id, truncated
 
 
 def _backfill_messages(service, db: Session, settings: GmailSettings) -> dict:
@@ -417,6 +428,14 @@ def _import_message(service, db: Session, message_id: str, settings: GmailSettin
 
     try:
         db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        detail = str(exc).lower()
+        if "unique constraint failed: email_messages.message_id" in detail:
+            logger.info("Gmail message %s already imported by another sync worker; skipping.", message_id)
+            return "skipped"
+        logger.exception("Failed to store Gmail message %s", message_id)
+        return "error"
     except Exception:
         db.rollback()
         logger.exception("Failed to store Gmail message %s", message_id)

@@ -65,7 +65,7 @@ def create_app() -> FastAPI:
     apply_schema_migrations()
     ensure_health_metrics()
 
-    app = FastAPI(title="Start Finishing Organiser", version="0.7.0")
+    app = FastAPI(title="Start Finishing Organiser", version="0.73.0")
     app.state.startup_error = None
     app.state.startup_warnings = []
 

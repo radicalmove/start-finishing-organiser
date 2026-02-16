@@ -1,4 +1,4 @@
-# Start Finishing Organiser (SFO) — Functional Overview (v0.722)
+# Start Finishing Organiser (SFO) — Functional Overview (v0.73)
 
 This document explains how SFO works from a user and product perspective: screens, cards,
 information types, and the flow of work through the system.
@@ -397,4 +397,3 @@ If auth is enabled, users log in with password (and optionally username).
 - **Now**: The current focus strip and active block on Home.
 - **One Thing**: The highest-value task for the day.
 - **Frog**: The dread-heavy task you want to tackle early.
-
