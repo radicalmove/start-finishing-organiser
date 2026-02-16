@@ -38,6 +38,22 @@ def _safe_redirect(next_url: str | None, fallback: str, message: str | None = No
     return RedirectResponse(url=url, status_code=303)
 
 
+def _clean_title(title: str | None) -> str | None:
+    if title is None:
+        return None
+    cleaned = title.strip()
+    return cleaned or None
+
+
+def _project_horizon(value: str) -> str:
+    normalized = (value or "").strip().lower()
+    if normalized in {"week", "month", "quarter", "later"}:
+        return normalized
+    if normalized == "today":
+        return "week"
+    return "later"
+
+
 @router.get("/capture", response_class=HTMLResponse)
 def capture(request: Request, db: Session = Depends(get_db)):
     templates = request.app.state.templates
@@ -131,9 +147,18 @@ def submit_wizard(
     waiting_person: str | None = Form(None),
     db: Session = Depends(get_db),
 ):
+    cleaned_title = _clean_title(capture_text)
+    if not cleaned_title:
+        msg = quote_plus("Title is required.")
+        source = f"&source_task_id={source_task_id}" if source_task_id else ""
+        return RedirectResponse(
+            url=f"/capture/wizard?error={msg}{source}",
+            status_code=303,
+        )
+
     if item_kind in {"task", "project"} and (displacement_ack or "").lower() not in {"1", "true", "yes"}:
         msg = quote_plus("Confirm the displacement check before saving.")
-        prefill = quote_plus(capture_text.strip())
+        prefill = quote_plus(cleaned_title)
         source = f"&source_task_id={source_task_id}" if source_task_id else ""
         return RedirectResponse(
             url=f"/capture/wizard?error={msg}&prefill={prefill}{source}",
@@ -154,13 +179,13 @@ def submit_wizard(
 
     try:
         if item_kind == "decide_later":
-            cleaned_title = capture_text.strip()
             details = capture_description.strip() if capture_description else None
             if source_task:
                 source_task.verb_noun = cleaned_title
                 source_task.description = details
                 source_task.in_inbox = True
                 source_task.when_bucket = WhenBucket.LATER
+                source_task.archived_from_inbox = False
                 source_task.status = TaskStatus.PENDING
                 source_task.completed_at = None
             else:
@@ -182,10 +207,12 @@ def submit_wizard(
             if active_this_week:
                 enforce_weekly_cap(db, category, True)
             project = Project(
-                title=capture_text.strip(),
+                title=cleaned_title,
                 category=category,
                 active_this_week=active_this_week,
-                time_horizon=horizon.value if isinstance(horizon, WhenBucket) else horizon,
+                time_horizon=_project_horizon(
+                    horizon.value if isinstance(horizon, WhenBucket) else str(horizon)
+                ),
                 why_link_text=compose_why_text(why_link_text, why_tags),
                 color_scheme=normalize_project_color(project_color_scheme),
                 description=details,
@@ -193,14 +220,16 @@ def submit_wizard(
             db.add(project)
             if source_task:
                 source_task.in_inbox = False
+                source_task.archived_from_inbox = True
                 source_task.status = TaskStatus.ARCHIVED
         else:
             if source_task:
                 task = source_task
-                task.verb_noun = capture_text.strip()
+                task.verb_noun = cleaned_title
                 task.project_id = pid
                 task.description = details
                 task.in_inbox = False
+                task.archived_from_inbox = False
                 task.when_bucket = horizon
                 task.block_type = btype
                 task.duration_minutes = duration_value
@@ -214,7 +243,7 @@ def submit_wizard(
                 task.completed_at = None
             else:
                 task = Task(
-                    verb_noun=capture_text.strip(),
+                    verb_noun=cleaned_title,
                     project_id=pid,
                     description=details,
                     in_inbox=False,
@@ -230,16 +259,28 @@ def submit_wizard(
                 )
                 db.add(task)
             if owner_type == OwnerType.OPP:
-                waiting = WaitingOn(
-                    description=capture_text.strip(),
-                    person=waiting_person or None,
-                    project_id=pid,
+                person = waiting_person.strip() if waiting_person else None
+                waiting_exists = (
+                    db.query(WaitingOn)
+                    .filter(
+                        WaitingOn.description == cleaned_title,
+                        WaitingOn.project_id == pid,
+                        WaitingOn.person == person,
+                    )
+                    .first()
+                    is not None
                 )
-                db.add(waiting)
+                if not waiting_exists:
+                    waiting = WaitingOn(
+                        description=cleaned_title,
+                        person=person,
+                        project_id=pid,
+                    )
+                    db.add(waiting)
         db.commit()
     except HTTPException as exc:
         msg = compose_cap_error(exc)
-        prefill = quote_plus(capture_text.strip())
+        prefill = quote_plus(cleaned_title)
         source = f"&source_task_id={source_task_id}" if source_task_id else ""
         return RedirectResponse(
             url=f"/capture/wizard?error={msg}&prefill={prefill}{source}",
@@ -300,7 +341,7 @@ def submit_capture(
     block_notes: str | None = Form(None),
     db: Session = Depends(get_db),
 ):
-    cleaned_title = title.strip()
+    cleaned_title = _clean_title(title) or ""
     if not cleaned_title:
         return RedirectResponse(url="/capture?error=Title+is+required", status_code=303)
 
@@ -349,6 +390,11 @@ def submit_capture(
                 block_type=parse_block_type(btype),
                 duration_minutes=duration_value,
                 frog=task_frog,
+                resurface_on=compute_resurface_on(
+                    task_when_bucket.value
+                    if hasattr(task_when_bucket, "value")
+                    else str(task_when_bucket)
+                ),
             )
             db.add(task)
             db.commit()
@@ -365,7 +411,7 @@ def submit_capture(
                 title=cleaned_title,
                 category=project_category,
                 active_this_week=active_this_week,
-                time_horizon=project_time_horizon,
+                time_horizon=_project_horizon(project_time_horizon),
                 why_link_text=compose_why_text(project_why_link_text, project_why_tags),
                 color_scheme=normalize_project_color(project_color_scheme),
                 description=project_description or None,

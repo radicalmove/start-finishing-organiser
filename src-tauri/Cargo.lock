@@ -3083,7 +3083,7 @@ dependencies = [
 
 [[package]]
 name = "sfo"
-version = "0.7.0"
+version = "0.721.0"
 dependencies = [
  "log",
  "serde",

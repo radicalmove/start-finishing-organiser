@@ -1,13 +1,18 @@
 from __future__ import annotations
 
 import csv
+import hashlib
 import io
 import json
+import os
+import sqlite3
+import tempfile
 import zipfile
 from datetime import date, datetime, time, timedelta
 
 from fastapi import APIRouter, Depends, Form, Request
-from fastapi.responses import HTMLResponse, StreamingResponse
+from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
+from sqlalchemy import text
 from sqlalchemy.orm import Session, selectinload
 
 from ..db import get_db
@@ -63,6 +68,86 @@ def _csv_bytes(rows: list[dict], fieldnames: list[str]) -> bytes:
 
 def _json_bytes(payload: object) -> bytes:
     return json.dumps(payload, ensure_ascii=True, default=str, indent=2).encode("utf-8")
+
+
+def _is_truthy(value: str | None) -> bool:
+    if value is None:
+        return False
+    return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _sqlite_db_path(db: Session) -> str | None:
+    bind = db.bind
+    if bind is None or bind.dialect.name != "sqlite":
+        return None
+    # Works for SQLite-backed deployments and returns None for in-memory DBs.
+    row = db.execute(text("PRAGMA database_list")).fetchone()
+    if not row:
+        return None
+    db_path = row[2] if len(row) >= 3 else None
+    if not db_path:
+        return None
+    return os.path.abspath(str(db_path))
+
+
+def _sqlite_backup_bytes(db_path: str) -> bytes | None:
+    if not db_path or not os.path.exists(db_path):
+        return None
+    with tempfile.NamedTemporaryFile(suffix=".sqlite3") as tmp:
+        src = sqlite3.connect(db_path)
+        dst = sqlite3.connect(tmp.name)
+        try:
+            src.backup(dst)
+        finally:
+            dst.close()
+            src.close()
+        with open(tmp.name, "rb") as fh:
+            return fh.read()
+
+
+def _table_counts(db: Session) -> dict[str, int]:
+    bind = db.bind
+    if bind is None:
+        return {}
+    if bind.dialect.name != "sqlite":
+        return {}
+    rows = db.execute(
+        text(
+            "SELECT name FROM sqlite_master "
+            "WHERE type='table' AND name NOT LIKE 'sqlite_%' "
+            "ORDER BY name ASC"
+        )
+    ).fetchall()
+    counts: dict[str, int] = {}
+    for row in rows:
+        table_name = str(row[0])
+        try:
+            count_row = db.execute(text(f'SELECT COUNT(*) AS n FROM "{table_name}"')).fetchone()
+            counts[table_name] = int(count_row[0]) if count_row else 0
+        except Exception:
+            counts[table_name] = -1
+    return counts
+
+
+def _checksummed_manifest(files: dict[str, bytes], metadata: dict[str, object]) -> bytes:
+    manifest_rows = []
+    for filename in sorted(files.keys()):
+        data = files[filename]
+        digest = hashlib.sha256(data).hexdigest()
+        manifest_rows.append(
+            {
+                "name": filename,
+                "size_bytes": len(data),
+                "sha256": digest,
+            }
+        )
+    payload = {
+        "metadata": metadata,
+        "generated_at": datetime.utcnow().isoformat(),
+        "file_count": len(manifest_rows),
+        "files": manifest_rows,
+    }
+    return _json_bytes(payload)
 
 
 def _profile_payload(profile: Profile | None) -> list[dict]:
@@ -330,6 +415,25 @@ def export_page(request: Request, db: Session = Depends(get_db)):
     )
 
 
+@router.get("/export/health")
+def export_health(db: Session = Depends(get_db)):
+    db_path = _sqlite_db_path(db)
+    can_read = bool(db_path and os.path.exists(db_path) and os.path.isfile(db_path))
+    size_bytes = os.path.getsize(db_path) if can_read else None
+    bind = db.bind
+    payload = {
+        "ok": can_read,
+        "database": {
+            "engine": str(bind.url) if bind else None,
+            "path": db_path,
+            "readable": can_read,
+            "size_bytes": size_bytes,
+        },
+    }
+    status = 200 if can_read else 503
+    return JSONResponse(payload, status_code=status)
+
+
 @router.post("/export")
 def export_data(
     range_choice: str = Form("all"),
@@ -342,21 +446,23 @@ def export_data(
     include_health: str | None = Form(None),
     include_coach: str | None = Form(None),
     include_guidance: str | None = Form(None),
+    include_full_backup: str | None = Form("1"),
     db: Session = Depends(get_db),
 ):
     start_date, end_date = _date_range(range_choice)
     start_dt, end_dt = _dt_bounds(start_date, end_date)
     created_at = datetime.utcnow().isoformat()
 
-    include_profile = bool(include_profile)
-    include_projects = bool(include_projects)
-    include_tasks = bool(include_tasks)
-    include_blocks = bool(include_blocks)
-    include_rituals = bool(include_rituals)
-    include_waiting = bool(include_waiting)
-    include_health = bool(include_health)
-    include_coach = bool(include_coach)
-    include_guidance = bool(include_guidance)
+    include_profile = _is_truthy(include_profile)
+    include_projects = _is_truthy(include_projects)
+    include_tasks = _is_truthy(include_tasks)
+    include_blocks = _is_truthy(include_blocks)
+    include_rituals = _is_truthy(include_rituals)
+    include_waiting = _is_truthy(include_waiting)
+    include_health = _is_truthy(include_health)
+    include_coach = _is_truthy(include_coach)
+    include_guidance = _is_truthy(include_guidance)
+    include_full_backup = _is_truthy(include_full_backup)
 
     payload = {"metadata": {"created_at": created_at, "range": range_choice}}
     files: dict[str, bytes] = {}
@@ -524,6 +630,24 @@ def export_data(
         ],
     }
     files["summary.json"] = _json_bytes(summary)
+    db_path = _sqlite_db_path(db)
+    if include_full_backup and db_path:
+        backup_bytes = _sqlite_backup_bytes(db_path)
+        if backup_bytes:
+            files["database.sqlite3"] = backup_bytes
+    backup_metadata = {
+        "app_version": "0.7.0",
+        "range": range_choice,
+        "table_counts": _table_counts(db),
+        "includes_full_database_snapshot": "database.sqlite3" in files,
+    }
+    files["backup_manifest.json"] = _checksummed_manifest(files, backup_metadata)
+    files["restore_notes.txt"] = (
+        "Backup package generated by Start Finishing Organiser.\n"
+        "1. Verify checksums in backup_manifest.json before restoring.\n"
+        "2. If database.sqlite3 is present, restore by replacing your SQLite DB file.\n"
+        "3. Keep at least one untouched backup copy.\n"
+    ).encode("utf-8")
 
     buffer = io.BytesIO()
     with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as zf:

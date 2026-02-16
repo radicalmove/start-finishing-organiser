@@ -33,3 +33,20 @@ def test_quick_capture_decide_later_creates_inbox_task(client, api_headers, db_s
     assert res.status_code == 303
     task = db_session.query(Task).filter(Task.verb_noun == "Inbox item").one()
     assert task.in_inbox is True
+
+
+def test_quick_capture_task_sets_resurface_for_future_bucket(client, api_headers, db_session):
+    res = client.post(
+        "/capture",
+        data={
+            "title": "Future task",
+            "capture_kind": "task",
+            "displacement_ack": "yes",
+            "task_when_bucket": "month",
+        },
+        headers=api_headers,
+        follow_redirects=False,
+    )
+    assert res.status_code == 303
+    task = db_session.query(Task).filter(Task.verb_noun == "Future task").one()
+    assert task.resurface_on is not None

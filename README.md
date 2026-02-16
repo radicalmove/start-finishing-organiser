@@ -2,7 +2,7 @@
 
 Neon-themed, single-user organiser inspired by *Start Finishing*. Built on FastAPI, Jinja, and SQLite for quick iteration.
 
-Current version: 0.721
+Current version: 0.722
 
 ## Run locally
 
@@ -15,9 +15,16 @@ uvicorn main:app --reload
 
 Open http://localhost:8000 to see the prototype UI.
 
+Web-first dev shortcut:
+
+```bash
+scripts/dev_web.sh
+```
+
 ## Desktop app (macOS)
 
 SFO can run as a native macOS app (Tauri shell + bundled FastAPI backend).
+Current focus is web-first development; desktop build steps are optional for now.
 
 Build the backend binary (PyInstaller) and the `.app` bundle:
 

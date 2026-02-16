@@ -34,6 +34,301 @@ document.addEventListener("DOMContentLoaded", () => {
     dragDebugEl.textContent = `${timestamp} ${message}`;
   };
 
+  const pageContent = document.querySelector(".page-content");
+  const scrollKey = `sfo:scroll:${window.location.pathname}`;
+  const scrollPendingKey = `${scrollKey}:pending`;
+  const getScrollTop = () =>
+    pageContent ? pageContent.scrollTop : window.scrollY || 0;
+  const getMaxScroll = () => {
+    if (pageContent) {
+      return Math.max(0, pageContent.scrollHeight - pageContent.clientHeight);
+    }
+    const root = document.documentElement;
+    return Math.max(0, (root?.scrollHeight || 0) - window.innerHeight);
+  };
+  const setScrollTop = (value) => {
+    if (pageContent) {
+      pageContent.scrollTop = value;
+      return;
+    }
+    window.scrollTo(0, value);
+  };
+  const persistScroll = () => {
+    sessionStorage.setItem(scrollKey, String(getScrollTop()));
+    sessionStorage.setItem(scrollPendingKey, "1");
+  };
+
+  const savedScroll = sessionStorage.getItem(scrollKey);
+  if (savedScroll !== null) {
+    const parsed = Number.parseInt(savedScroll, 10);
+    if (!Number.isNaN(parsed)) {
+      const attemptRestore = (tries = 0) => {
+        const maxScroll = getMaxScroll();
+        const target = Math.max(0, Math.min(parsed, maxScroll));
+        setScrollTop(target);
+        const current = getScrollTop();
+        const closeEnough = Math.abs(current - target) <= 2;
+        if (closeEnough || tries >= 8) {
+          sessionStorage.removeItem(scrollKey);
+          sessionStorage.removeItem(scrollPendingKey);
+          return;
+        }
+        requestAnimationFrame(() => attemptRestore(tries + 1));
+      };
+      const scheduleRestore = () => attemptRestore();
+      requestAnimationFrame(scheduleRestore);
+      window.addEventListener("load", scheduleRestore, { once: true });
+      setTimeout(scheduleRestore, 120);
+    } else {
+      sessionStorage.removeItem(scrollKey);
+      sessionStorage.removeItem(scrollPendingKey);
+    }
+  }
+
+  document.addEventListener(
+    "submit",
+    (event) => {
+      const formEl = event.target instanceof HTMLFormElement ? event.target : null;
+      if (!formEl) return;
+      if (!formEl.matches("[data-preserve-scroll]")) return;
+      if (formEl.matches("[data-async]")) return;
+      persistScroll();
+    },
+    true
+  );
+
+  document.addEventListener("click", (event) => {
+    const target = event.target instanceof Element ? event.target : null;
+    if (!target) return;
+    const submitEl = target.closest(
+      "[data-preserve-scroll] button[type=\"submit\"], [data-preserve-scroll] input[type=\"submit\"]"
+    );
+    if (!submitEl) return;
+    const formEl = submitEl.closest("form");
+    if (formEl?.matches("[data-async]")) return;
+    persistScroll();
+  });
+
+  window.addEventListener("pagehide", () => {
+    if (sessionStorage.getItem(scrollPendingKey) === "1") {
+      sessionStorage.setItem(scrollKey, String(getScrollTop()));
+    }
+  });
+
+  const ensureToastStack = () => {
+    let stack = document.getElementById("toast-stack");
+    if (stack) return stack;
+    stack = document.createElement("div");
+    stack.id = "toast-stack";
+    stack.className = "toast-stack";
+    document.body.appendChild(stack);
+    return stack;
+  };
+
+  const showToast = (message, options = {}) => {
+    const text = `${message || ""}`.trim();
+    if (!text) return;
+    const { variant = "success", timeout = 4200 } = options;
+    const stack = ensureToastStack();
+    const toast = document.createElement("div");
+    toast.className = `toast ${variant}`.trim();
+    toast.textContent = text;
+    toast.setAttribute("role", "status");
+    stack.appendChild(toast);
+    requestAnimationFrame(() => toast.classList.add("is-visible"));
+
+    const dismiss = () => {
+      toast.classList.remove("is-visible");
+      toast.classList.add("is-exiting");
+      setTimeout(() => toast.remove(), 220);
+    };
+
+    let timer = null;
+    if (timeout > 0) {
+      timer = window.setTimeout(dismiss, timeout);
+    }
+    toast.addEventListener("click", () => {
+      if (timer) window.clearTimeout(timer);
+      dismiss();
+    });
+  };
+
+  const moveExistingToasts = () => {
+    const existing = Array.from(document.querySelectorAll(".toast"));
+    if (!existing.length) return false;
+    const stack = ensureToastStack();
+    existing.forEach((toast) => {
+      if (toast.closest("#toast-stack")) return;
+      stack.appendChild(toast);
+      requestAnimationFrame(() => toast.classList.add("is-visible"));
+      const timer = window.setTimeout(() => {
+        toast.classList.remove("is-visible");
+        toast.classList.add("is-exiting");
+        setTimeout(() => toast.remove(), 220);
+      }, 4200);
+      toast.addEventListener("click", () => {
+        window.clearTimeout(timer);
+        toast.classList.remove("is-visible");
+        toast.classList.add("is-exiting");
+        setTimeout(() => toast.remove(), 220);
+      });
+    });
+    return true;
+  };
+
+  const clearFlashQueryParams = () => {
+    const url = new URL(window.location.href);
+    const params = url.searchParams;
+    const hadFlash = params.has("success") || params.has("error");
+    if (!hadFlash) return;
+    params.delete("success");
+    params.delete("error");
+    url.search = params.toString();
+    window.history.replaceState({}, "", url);
+  };
+
+  const showFlashToasts = () => {
+    const moved = moveExistingToasts();
+    const params = new URLSearchParams(window.location.search);
+    if (!moved) {
+      const success = params.get("success");
+      if (success) showToast(success, { variant: "success" });
+    }
+    const error = params.get("error");
+    if (error) showToast(error, { variant: "error" });
+    if (params.has("success") || params.has("error")) {
+      clearFlashQueryParams();
+    }
+  };
+
+  showFlashToasts();
+  window.showToast = showToast;
+
+  const updateInboxCount = (count) => {
+    if (typeof count !== "number") return;
+    const pill = document.querySelector(".inbox-count");
+    if (!pill) return;
+    pill.textContent = String(count);
+  };
+
+  const updateInboxEmptyState = () => {
+    const list = document.querySelector(".inbox-panel .list");
+    if (!list) return;
+    const hasItems = list.querySelector("[data-inbox-item]") !== null;
+    const emptyEl = list.querySelector(":scope > .inbox-empty, :scope > .muted");
+    if (hasItems) {
+      emptyEl?.remove();
+      return;
+    }
+    if (!emptyEl) {
+      const empty = document.createElement("div");
+      empty.className = "muted inbox-empty";
+      empty.textContent = "Inbox clear.";
+      list.appendChild(empty);
+    }
+  };
+
+  const updateInboxDescription = (taskId, description) => {
+    if (!taskId) return;
+    const item = document.querySelector(
+      `[data-inbox-item][data-task-id="${taskId}"]`
+    );
+    if (!item) return;
+    const descEl = item.querySelector("[data-inbox-desc]");
+    if (descEl) {
+      descEl.textContent = description || "";
+    }
+  };
+
+  const removeInboxItem = (taskId) => {
+    if (!taskId) return;
+    const item = document.querySelector(
+      `[data-inbox-item][data-task-id="${taskId}"]`
+    );
+    if (item) item.remove();
+    updateInboxEmptyState();
+  };
+
+  const handleAsyncFormSubmit = async (form, event) => {
+    if (form.dataset.asyncPending === "1") return;
+    event.preventDefault();
+    form.dataset.asyncPending = "1";
+    const submitButtons = form.querySelectorAll(
+      "button[type=\"submit\"], input[type=\"submit\"]"
+    );
+    submitButtons.forEach((btn) => {
+      btn.disabled = true;
+    });
+
+    try {
+      const action = form.getAttribute("action") || window.location.pathname;
+      const method = (form.getAttribute("method") || "post").toUpperCase();
+      const formData = new FormData(form);
+      const response = await fetch(action, {
+        method,
+        body: formData,
+        headers: {
+          "X-Requested-With": "fetch",
+          Accept: "application/json",
+        },
+      });
+      const contentType = response.headers.get("content-type") || "";
+      if (!contentType.includes("application/json")) {
+        form.submit();
+        return;
+      }
+      const payload = await response.json();
+      if (!response.ok || payload.ok === false || payload.status === "error") {
+        showToast(payload.message || payload.error || "Something went wrong.", {
+          variant: "error",
+        });
+        return;
+      }
+
+      if (payload.message) {
+        showToast(payload.message, { variant: "success" });
+      }
+
+      if (typeof payload.inbox_count === "number") {
+        updateInboxCount(payload.inbox_count);
+      }
+
+      if (payload.description !== undefined && payload.task_id) {
+        updateInboxDescription(payload.task_id, payload.description);
+        document.dispatchEvent(
+          new CustomEvent("inbox:updated", { detail: { taskId: payload.task_id } })
+        );
+      }
+
+      if (payload.removed && payload.task_id) {
+        const removeClosest = form.dataset.removeClosest;
+        if (removeClosest) {
+          form.closest(removeClosest)?.remove();
+          updateInboxEmptyState();
+        } else {
+          removeInboxItem(payload.task_id);
+        }
+        document.dispatchEvent(
+          new CustomEvent("inbox:archived", { detail: { taskId: payload.task_id } })
+        );
+      }
+    } catch (error) {
+      showToast("Something went wrong. Please try again.", { variant: "error" });
+    } finally {
+      form.dataset.asyncPending = "";
+      submitButtons.forEach((btn) => {
+        btn.disabled = false;
+      });
+    }
+  };
+
+  document.addEventListener("submit", (event) => {
+    const form = event.target instanceof HTMLFormElement ? event.target : null;
+    if (!form) return;
+    if (!form.matches("[data-async]")) return;
+    handleAsyncFormSubmit(form, event);
+  });
+
   const setGlobalDragging = (isDragging) => {
     document.body.classList.toggle("dragging", Boolean(isDragging));
   };
@@ -703,6 +998,19 @@ document.addEventListener("DOMContentLoaded", () => {
       setEditing(false);
     };
 
+    const matchesOpenTask = (taskId) =>
+      Boolean(taskId && idField && idField.value === String(taskId));
+
+    document.addEventListener("inbox:updated", (event) => {
+      if (!matchesOpenTask(event.detail?.taskId)) return;
+      closeInboxDetail();
+    });
+
+    document.addEventListener("inbox:archived", (event) => {
+      if (!matchesOpenTask(event.detail?.taskId)) return;
+      closeInboxDetail();
+    });
+
     processLink?.addEventListener("click", (event) => {
       const taskId = processLink.dataset.guidedSource;
       const prefill = processLink.dataset.guidedPrefill || "";
@@ -854,6 +1162,22 @@ document.addEventListener("DOMContentLoaded", () => {
   const clockTime = document.querySelector("#clock-time");
   const clockDate = document.querySelector("#clock-date");
   const nowLine = document.querySelector("[data-now-line]");
+  const dayCalendarScroll = document.querySelector(".day-calendar-scroll");
+  let dayCalendarAutoScrolled = false;
+
+  const scrollDayCalendarToNow = () => {
+    if (dayCalendarAutoScrolled) return;
+    if (!dayCalendarScroll || !nowLine) return;
+    if (dayCalendarScroll.scrollHeight <= dayCalendarScroll.clientHeight + 1) return;
+
+    // Keep current time slightly below the top edge so surrounding context is visible.
+    const nowOffsetTop = nowLine.offsetTop;
+    const topBuffer = Math.round(dayCalendarScroll.clientHeight * 0.35);
+    const maxScroll = dayCalendarScroll.scrollHeight - dayCalendarScroll.clientHeight;
+    const targetScroll = Math.max(0, Math.min(maxScroll, nowOffsetTop - topBuffer));
+    dayCalendarScroll.scrollTop = targetScroll;
+    dayCalendarAutoScrolled = true;
+  };
 
   const updateClock = () => {
     // Digital clock (header) + dynamic now-line on the calendar
@@ -884,11 +1208,17 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   };
   updateClock();
+  requestAnimationFrame(() => {
+    requestAnimationFrame(scrollDayCalendarToNow);
+  });
+  window.addEventListener("load", scrollDayCalendarToNow, { once: true });
+  setTimeout(scrollDayCalendarToNow, 120);
   setInterval(updateClock, 1000);
 
-  // Auto-refresh calendar views every minute to pick up new events (avoid disrupting forms).
+  // Avoid disruptive hard reloads; nudge for manual refresh if the calendar may be stale.
   const hasCalendar = document.querySelector(".calendar-panel, .week-calendar-panel");
   if (hasCalendar) {
+    let refreshHintShown = false;
     const shouldSkipAutoRefresh = () => {
       if (document.hidden) return true;
       if (document.querySelector(".coach-widget.is-open")) return true;
@@ -906,7 +1236,12 @@ document.addEventListener("DOMContentLoaded", () => {
     };
     setInterval(() => {
       if (shouldSkipAutoRefresh()) return;
-      window.location.reload();
+      if (refreshHintShown) return;
+      showToast("Calendar may have changed. Refresh when convenient.", {
+        variant: "success",
+        timeout: 4800,
+      });
+      refreshHintShown = true;
     }, 60 * 1000);
   }
 
@@ -1232,7 +1567,7 @@ document.addEventListener("DOMContentLoaded", () => {
       }
 
       if (!csrfToken) {
-        window.alert("Missing CSRF token. Refresh and try again.");
+        showToast("Missing CSRF token. Refresh and try again.", { variant: "error" });
         revertToOrigin();
         updateColumnCounts();
         updateEmptyStates();
@@ -1285,7 +1620,10 @@ document.addEventListener("DOMContentLoaded", () => {
           },
         });
         if (!response.ok) {
-          window.alert("Unable to move the task. Try again.");
+          const detail = await response.json().catch(() => ({}));
+          showToast(detail.detail || "Unable to move the task. Try again.", {
+            variant: "error",
+          });
           revertToOrigin();
           updateColumnCounts();
           updateEmptyStates();
@@ -1300,7 +1638,9 @@ document.addEventListener("DOMContentLoaded", () => {
         updateColumnCounts();
         updateEmptyStates();
       } catch (err) {
-        window.alert("Unable to move the task. Check your connection and try again.");
+        showToast("Unable to move the task. Check your connection and try again.", {
+          variant: "error",
+        });
         revertToOrigin();
         updateColumnCounts();
         updateEmptyStates();
@@ -1589,17 +1929,41 @@ document.addEventListener("DOMContentLoaded", () => {
   if (horizonBoard) {
     const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute("content");
     const usePointerDrag = isTauriEnv;
-    const scrollKey = "sfo:long-range-scroll";
-    const storedScroll = sessionStorage.getItem(scrollKey);
-    if (storedScroll) {
-      const pos = parseInt(storedScroll, 10);
-      if (!Number.isNaN(pos)) {
-        window.scrollTo({ top: pos, behavior: "auto" });
-      }
-      sessionStorage.removeItem(scrollKey);
-    }
 
     let dragInfo = null;
+    const longRangeError = (message) =>
+      showToast(message || "Unable to update horizon. Try again.", { variant: "error" });
+
+    const postProjectHorizon = async (projectId, targetKey) => {
+      if (!csrfToken) {
+        return { ok: false, detail: "Missing CSRF token. Refresh and try again." };
+      }
+      if (!projectId || !targetKey) {
+        return { ok: false, detail: "Missing project or horizon target." };
+      }
+      const formData = new FormData();
+      formData.append("csrf_token", csrfToken);
+      formData.append("time_horizon", targetKey);
+
+      try {
+        const response = await fetch(`/long-term/projects/${projectId}/horizon`, {
+          method: "POST",
+          body: formData,
+          headers: { Accept: "application/json" },
+          credentials: "same-origin",
+        });
+        if (!response.ok) {
+          const detail = await response.json().catch(() => ({}));
+          return { ok: false, detail: detail.detail || "Unable to update horizon. Try again." };
+        }
+        return { ok: true };
+      } catch (err) {
+        return {
+          ok: false,
+          detail: "Unable to update horizon. Check your connection and try again.",
+        };
+      }
+    };
 
     const clearDropTargets = () => {
       horizonBoard
@@ -1800,44 +2164,14 @@ document.addEventListener("DOMContentLoaded", () => {
         restoreDraggedItem();
         dragItem.classList.remove("is-dragging");
 
-        if (!csrfToken) {
-          window.alert("Missing CSRF token. Refresh the page and try again.");
-          revertToOrigin();
-          dragItem = null;
-          dragOrigin = null;
-          resetPointer();
-          setGlobalDragging(false);
-          setTimeout(() => {
-            horizonDragInProgress = false;
-          }, 80);
-          return;
-        }
-
-        const formData = new FormData();
-        formData.append("csrf_token", csrfToken);
-        formData.append("time_horizon", targetKey);
-
         try {
-          const response = await fetch(
-            `/long-term/projects/${dragOrigin?.projectId}/horizon`,
-            {
-              method: "POST",
-              body: formData,
-              headers: { Accept: "application/json" },
-              credentials: "same-origin",
-            }
-          );
-          if (!response.ok) {
-            const detail = await response.json().catch(() => ({}));
-            window.alert(detail.detail || "Unable to update horizon. Try again.");
+          const result = await postProjectHorizon(dragOrigin?.projectId, targetKey);
+          if (!result.ok) {
+            longRangeError(result.detail);
             revertToOrigin();
             return;
           }
-          sessionStorage.setItem(scrollKey, String(window.scrollY || 0));
-          window.location.reload();
-        } catch (err) {
-          window.alert("Unable to update horizon. Check your connection and try again.");
-          revertToOrigin();
+          showToast("Project horizon updated.", { variant: "success", timeout: 2400 });
         } finally {
           dragItem = null;
           dragOrigin = null;
@@ -1943,35 +2277,12 @@ document.addEventListener("DOMContentLoaded", () => {
           dragInfo = null;
           return;
         }
-        if (!csrfToken) {
-          window.alert("Missing CSRF token. Refresh the page and try again.");
+        const result = await postProjectHorizon(dragInfo.projectId, targetKey);
+        if (!result.ok) {
+          longRangeError(result.detail);
           return;
         }
-
-        const formData = new FormData();
-        formData.append("csrf_token", csrfToken);
-        formData.append("time_horizon", targetKey);
-
-        try {
-          const response = await fetch(
-            `/long-term/projects/${dragInfo.projectId}/horizon`,
-            {
-              method: "POST",
-              body: formData,
-              headers: { Accept: "application/json" },
-              credentials: "same-origin",
-            }
-          );
-          if (!response.ok) {
-            const detail = await response.json().catch(() => ({}));
-            window.alert(detail.detail || "Unable to update horizon. Try again.");
-            return;
-          }
-          sessionStorage.setItem(scrollKey, String(window.scrollY || 0));
-          window.location.reload();
-        } catch (err) {
-          window.alert("Unable to update horizon. Check your connection and try again.");
-        }
+        showToast("Project horizon updated.", { variant: "success", timeout: 2400 });
       });
     }
   }
@@ -2249,17 +2560,20 @@ document.addEventListener("DOMContentLoaded", () => {
     const statusEl = coachRoot.querySelector("[data-coach-status]");
     const contextEl = document.getElementById("coach-context");
     const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute("content");
+    const coachSubmitBtn = formEl?.querySelector('button[type="submit"]');
     const storageKey = "sfo:coach-open";
     const clearKey = "sfo:coach-clear";
     const historyKey = "sfo:coach-history";
     const nudgeRoot = coachRoot.querySelector("[data-coach-nudges]");
     const modalEl = document.getElementById("app-modal");
+    const coachTimeoutMs = 45000;
 
     let context = {};
     let historyLoaded = false;
     let historyCache = [];
     let displacementAckHandler = null;
     let modalResolve = null;
+    let coachBusy = false;
 
     if (contextEl?.textContent) {
       try {
@@ -2271,6 +2585,35 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const setStatus = (text) => {
       if (statusEl) statusEl.textContent = text;
+    };
+
+    const setCoachBusy = (busy) => {
+      coachBusy = busy;
+      if (coachSubmitBtn) coachSubmitBtn.disabled = busy;
+      if (inputEl) inputEl.setAttribute("aria-busy", busy ? "true" : "false");
+    };
+
+    const fetchJson = async (url, options = {}) => {
+      const controller = new AbortController();
+      const timeoutHandle = window.setTimeout(() => controller.abort(), coachTimeoutMs);
+      try {
+        const response = await fetch(url, {
+          ...options,
+          signal: controller.signal,
+        });
+        const raw = await response.text();
+        let data = {};
+        if (raw) {
+          try {
+            data = JSON.parse(raw);
+          } catch (err) {
+            data = {};
+          }
+        }
+        return { response, data };
+      } finally {
+        window.clearTimeout(timeoutHandle);
+      }
     };
 
     const persistHistory = () => {
@@ -2523,9 +2866,24 @@ document.addEventListener("DOMContentLoaded", () => {
     const loadNudges = async () => {
       if (!nudgeRoot) return;
       try {
-        const res = await fetch("/nudges", { headers: { Accept: "application/json" } });
-        if (!res.ok) return;
-        const data = await res.json();
+        let data = null;
+        if (csrfToken) {
+          const refreshRes = await fetch("/nudges/refresh", {
+            method: "POST",
+            headers: {
+              "x-csrf-token": csrfToken || "",
+              Accept: "application/json",
+            },
+          });
+          if (refreshRes.ok) {
+            data = await refreshRes.json();
+          }
+        }
+        if (!data) {
+          const res = await fetch("/nudges", { headers: { Accept: "application/json" } });
+          if (!res.ok) return;
+          data = await res.json();
+        }
         clearServerNudges();
         (data.nudges || []).forEach(renderServerNudge);
       } catch (err) {
@@ -2699,15 +3057,286 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     };
 
+    const coachEscapeHtml = (value) =>
+      `${value || ""}`.replace(/[&<>"']/g, (ch) => {
+        switch (ch) {
+          case "&":
+            return "&amp;";
+          case "<":
+            return "&lt;";
+          case ">":
+            return "&gt;";
+          case '"':
+            return "&quot;";
+          case "'":
+            return "&#39;";
+          default:
+            return ch;
+        }
+      });
+
+    const parseTimeToMinutes = (value) => {
+      if (!value) return null;
+      const parts = `${value}`.split(":");
+      if (parts.length < 2) return null;
+      const hour = Number.parseInt(parts[0], 10);
+      const minute = Number.parseInt(parts[1], 10);
+      if (Number.isNaN(hour) || Number.isNaN(minute)) return null;
+      return hour * 60 + minute;
+    };
+
+    const formatTimeLabel = (value) => {
+      const total = parseTimeToMinutes(value);
+      if (total === null) return "";
+      const hour24 = Math.floor(total / 60) % 24;
+      const minute = total % 60;
+      const ampm = hour24 >= 12 ? "PM" : "AM";
+      const hour12 = hour24 % 12 || 12;
+      return `${hour12}:${String(minute).padStart(2, "0")} ${ampm}`;
+    };
+
+    const syncListHtml = (doc, selector) => {
+      const current = document.querySelector(selector);
+      const next = doc.querySelector(selector);
+      if (!current || !next) return false;
+      current.innerHTML = next.innerHTML;
+      current.querySelectorAll(".list-item").forEach((item) => {
+        if (isTauriEnv) {
+          item.removeAttribute("draggable");
+        } else {
+          item.setAttribute("draggable", "true");
+        }
+      });
+      return true;
+    };
+
+    const refreshHomePanelsInline = async () => {
+      if (window.location.pathname !== "/") return false;
+      try {
+        const response = await fetch("/", {
+          headers: { Accept: "text/html", "x-requested-with": "fetch" },
+          credentials: "same-origin",
+        });
+        if (!response.ok) return false;
+        const html = await response.text();
+        const doc = new DOMParser().parseFromString(html, "text/html");
+
+        const currentInboxCount = document.querySelector(".inbox-count");
+        const nextInboxCount = doc.querySelector(".inbox-count");
+        if (currentInboxCount && nextInboxCount) {
+          currentInboxCount.textContent = nextInboxCount.textContent;
+        }
+
+        syncListHtml(doc, "[data-home-inbox-list]");
+        syncListHtml(doc, "[data-home-today-list]");
+
+        const currentNowPanel = document.querySelector("[data-home-now-panel]");
+        const nextNowPanel = doc.querySelector("[data-home-now-panel]");
+        if (currentNowPanel && nextNowPanel) {
+          currentNowPanel.innerHTML = nextNowPanel.innerHTML;
+        }
+
+        const currentNowText = document.querySelector("[data-now-text]");
+        const nextNowText = doc.querySelector("[data-now-text]");
+        if (currentNowText && nextNowText) {
+          currentNowText.textContent = nextNowText.textContent;
+        }
+
+        const nextContext = doc.getElementById("coach-context");
+        if (nextContext?.textContent) {
+          try {
+            context = JSON.parse(nextContext.textContent);
+          } catch (err) {
+            // Keep prior context if parsing fails.
+          }
+        }
+        return true;
+      } catch (err) {
+        return false;
+      }
+    };
+
+    const refreshTasksPanelsInline = async () => {
+      if (!window.location.pathname.startsWith("/tasks")) return false;
+      try {
+        const response = await fetch(window.location.pathname, {
+          headers: { Accept: "text/html", "x-requested-with": "fetch" },
+          credentials: "same-origin",
+        });
+        if (!response.ok) return false;
+        const html = await response.text();
+        const doc = new DOMParser().parseFromString(html, "text/html");
+        let applied = false;
+
+        const currentPageNav = document.querySelector(".tasks-page-nav");
+        const nextPageNav = doc.querySelector(".tasks-page-nav");
+        if (currentPageNav && nextPageNav) {
+          currentPageNav.innerHTML = nextPageNav.innerHTML;
+          applied = true;
+        }
+
+        const currentViewNav = document.querySelector(".tasks-view-nav");
+        const nextViewNav = doc.querySelector(".tasks-view-nav");
+        if (currentViewNav && nextViewNav) {
+          currentViewNav.innerHTML = nextViewNav.innerHTML;
+          applied = true;
+        }
+
+        const currentBoard = document.querySelector(".tasks-board");
+        const nextBoard = doc.querySelector(".tasks-board");
+        if (currentBoard && nextBoard) {
+          currentBoard.dataset.view = nextBoard.dataset.view || currentBoard.dataset.view || "time";
+          currentBoard.innerHTML = nextBoard.innerHTML;
+          currentBoard.querySelectorAll("[data-task-card]").forEach((card) => {
+            if (isTauriEnv) {
+              card.removeAttribute("draggable");
+            } else {
+              card.setAttribute("draggable", "true");
+            }
+          });
+          applied = true;
+        } else {
+          const currentShell = document.querySelector(".tasks-shell");
+          const nextShell = doc.querySelector(".tasks-shell");
+          if (currentShell && nextShell) {
+            currentShell.innerHTML = nextShell.innerHTML;
+            applied = true;
+          }
+        }
+
+        const nextContext = doc.getElementById("coach-context");
+        if (nextContext?.textContent) {
+          try {
+            context = JSON.parse(nextContext.textContent);
+          } catch (err) {
+            // Keep prior context if parsing fails.
+          }
+        }
+        return applied;
+      } catch (err) {
+        return false;
+      }
+    };
+
+    const addCoachBlockToCalendar = (effectBlock) => {
+      if (window.location.pathname !== "/") return false;
+      if (!effectBlock || !effectBlock.id || !effectBlock.date) return false;
+      const eventsEl = document.querySelector("[data-home-calendar-events]");
+      if (!eventsEl) return false;
+      if (eventsEl.querySelector(`[data-block-id="${effectBlock.id}"]`)) return true;
+
+      const todayIso = new Date().toISOString().slice(0, 10);
+      if (effectBlock.date !== todayIso) return false;
+
+      const nowLineEl = document.querySelector("[data-now-line]");
+      const dayStart = Number.parseInt(nowLineEl?.dataset.startMinutes || "360", 10);
+      const dayTotal = Number.parseInt(nowLineEl?.dataset.totalMinutes || "1020", 10);
+      const dayEnd = dayStart + dayTotal;
+
+      const startMin = parseTimeToMinutes(effectBlock.start_time);
+      const endMin = parseTimeToMinutes(effectBlock.end_time);
+      if (startMin === null || endMin === null || endMin <= startMin) return false;
+
+      const effectiveStart = Math.max(dayStart, startMin);
+      const effectiveEnd = Math.min(dayEnd, endMin);
+      if (effectiveEnd <= dayStart || effectiveStart >= dayEnd) return false;
+
+      const topPct = Math.max(0, ((effectiveStart - dayStart) / dayTotal) * 100);
+      const heightPct = Math.max(5, ((effectiveEnd - effectiveStart) / dayTotal) * 100);
+      const blockType = `${effectBlock.block_type || "focus"}`.toLowerCase();
+      const title = effectBlock.title || `${blockType.charAt(0).toUpperCase()}${blockType.slice(1)} block`;
+      const startLabel = formatTimeLabel(effectBlock.start_time);
+      const endLabel = formatTimeLabel(effectBlock.end_time);
+
+      const blockEl = document.createElement("div");
+      blockEl.className = `event-block ${blockType}`;
+      blockEl.dataset.blockId = String(effectBlock.id);
+      blockEl.style.top = `${topPct}%`;
+      blockEl.style.height = `${heightPct}%`;
+      blockEl.innerHTML = `
+        <div class="event-top">
+          <div class="event-time">${coachEscapeHtml(startLabel)}${endLabel ? ` - ${coachEscapeHtml(endLabel)}` : ""}</div>
+        </div>
+        <div class="event-label">${coachEscapeHtml(title)}</div>
+      `;
+      eventsEl.appendChild(blockEl);
+      return true;
+    };
+
+    const applyOneThingInline = (oneThing) => {
+      const title = `${oneThing || ""}`.trim();
+      if (!title) return false;
+      let applied = false;
+
+      const nowText = document.querySelector("[data-now-text]");
+      if (nowText) {
+        nowText.textContent = title;
+        applied = true;
+      }
+
+      const oneThingCard = document.querySelector("[data-home-one-thing-card]");
+      const oneThingRow = document.querySelector("[data-home-one-thing-row]");
+      const oneThingText = document.querySelector("[data-home-one-thing-text]");
+      if (oneThingCard && oneThingRow && oneThingText) {
+        oneThingCard.classList.remove("hidden");
+        oneThingRow.classList.remove("hidden");
+        oneThingText.textContent = title;
+        applied = true;
+      }
+
+      const noBlockCopy = document.querySelector("[data-home-no-block-copy]");
+      if (noBlockCopy) {
+        noBlockCopy.textContent =
+          "No block active right now. One Thing is set. Pick a Frog and protect a block.";
+        applied = true;
+      }
+
+      return applied;
+    };
+
+    const applyCoachEffects = async (effects) => {
+      if (!effects?.refresh) return false;
+      let applied = false;
+      const screenId = context?.screen?.id || "";
+      if (effects.type === "one_thing_updated" && effects.one_thing) {
+        const updatedOneThing = applyOneThingInline(effects.one_thing);
+        applied = updatedOneThing || applied;
+      }
+      if (screenId === "home" || window.location.pathname === "/") {
+        const refreshed = await refreshHomePanelsInline();
+        applied = refreshed || applied;
+      }
+      if (
+        (screenId === "tasks" || window.location.pathname.startsWith("/tasks")) &&
+        effects.type === "task_created"
+      ) {
+        const refreshedTasks = await refreshTasksPanelsInline();
+        applied = refreshedTasks || applied;
+      }
+      if (effects.type === "block_created" && effects.block) {
+        const inserted = addCoachBlockToCalendar(effects.block);
+        applied = inserted || applied;
+      }
+      return applied;
+    };
+
     const sendMessage = async (text) => {
       const message = (text || "").trim();
       if (!message) return;
+      if (coachBusy) {
+        showToast("Charlie is still replying. Please wait a moment.", {
+          variant: "error",
+          timeout: 2600,
+        });
+        return;
+      }
       addMessage("user", message);
       if (inputEl) inputEl.value = "";
+      setCoachBusy(true);
       setStatus("Thinking...");
       const pending = addMessage("assistant", "Thinking...", { persist: false });
       try {
-        const res = await fetch("/coach/message", {
+        const { response, data } = await fetchJson("/coach/message", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -2715,8 +3344,9 @@ document.addEventListener("DOMContentLoaded", () => {
           },
           body: JSON.stringify({ message, screen_context: context }),
         });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.detail || "Coach error");
+        if (!response.ok) {
+          throw new Error(data.detail || `Coach error (${response.status})`);
+        }
         const replyText = data.reply || "No response yet.";
         if (pending) pending.textContent = replyText;
         recordHistory({
@@ -2734,11 +3364,30 @@ document.addEventListener("DOMContentLoaded", () => {
               : "Coach-lite";
         setStatus(engineLabel);
         if (data.effects?.refresh) {
-          setTimeout(() => window.location.reload(), 500);
+          const appliedInline = await applyCoachEffects(data.effects);
+          showToast(
+            appliedInline
+              ? "Saved and updated."
+              : "Saved. Refresh when you want to see updated panels.",
+            { variant: "success", timeout: 3200 }
+          );
         }
       } catch (err) {
-        if (pending) pending.textContent = "Couldn't reach Charlie just now. Try again.";
-        setStatus("Offline");
+        const timeout = err?.name === "AbortError";
+        if (pending) {
+          pending.textContent = timeout
+            ? "Charlie took too long to respond. Please try again."
+            : "Couldn't reach Charlie just now. Try again.";
+        }
+        setStatus(timeout ? "Timed out" : "Offline");
+        showToast(
+          timeout
+            ? "Charlie timed out. Your request was not lost, but please retry."
+            : "Coach request failed. Check connection and try again.",
+          { variant: "error", timeout: 3400 }
+        );
+      } finally {
+        setCoachBusy(false);
       }
     };
 

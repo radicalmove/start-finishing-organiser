@@ -547,12 +547,42 @@ def _pattern_candidates(db: Session, today: date) -> list[dict[str, object]]:
     return patterns
 
 
-@router.get("/nudges")
-def list_nudges(db: Session = Depends(get_db)):
+def _reminder_definition(code: str) -> dict | None:
+    return next((d for d in REMINDER_DEFS if d["code"] == code), None)
+
+
+def _serialize_nudges(
+    reminders: list[GuidanceReminder],
+    pattern_defs: dict[str, dict[str, object]] | None = None,
+) -> list[dict[str, object]]:
+    payload: list[dict[str, object]] = []
+    resolved_patterns = pattern_defs or {}
+    for reminder in reminders:
+        definition = _reminder_definition(reminder.code)
+        pattern_def = resolved_patterns.get(reminder.code, {})
+        payload.append(
+            {
+                "id": reminder.id,
+                "code": reminder.code,
+                "title": reminder.title,
+                "body": reminder.body,
+                "link_label": pattern_def.get("link_label")
+                if pattern_def
+                else definition.get("link_label") if definition else None,
+                "link_url": pattern_def.get("link_url")
+                if pattern_def
+                else definition.get("link_url") if definition else None,
+            }
+        )
+    return payload
+
+
+def _refresh_nudges(db: Session) -> tuple[list[GuidanceReminder], dict[str, dict[str, object]]]:
     today = date.today()
     now = datetime.utcnow()
     reminders: list[GuidanceReminder] = []
     dirty = False
+    pattern_defs: dict[str, dict[str, object]] = {}
 
     for definition in REMINDER_DEFS:
         code = definition["code"]
@@ -610,7 +640,6 @@ def list_nudges(db: Session = Depends(get_db)):
     if dirty:
         db.commit()
 
-    pattern_defs: dict[str, dict[str, object]] = {}
     pattern_candidates = _pattern_candidates(db, today)
     if pattern_candidates:
         watch = [p for p in pattern_candidates if p.get("tone") == "watch"]
@@ -661,32 +690,44 @@ def list_nudges(db: Session = Depends(get_db)):
     if dirty:
         db.commit()
 
-    payload = []
     for reminder in reminders:
-        definition = next((d for d in REMINDER_DEFS if d["code"] == reminder.code), None)
         pattern_def = pattern_defs.get(reminder.code, {})
-        payload.append(
-            {
-                "id": reminder.id,
-                "code": reminder.code,
-                "title": reminder.title,
-                "body": reminder.body,
-                "link_label": pattern_def.get("link_label")
-                if pattern_def
-                else definition.get("link_label") if definition else None,
-                "link_url": pattern_def.get("link_url")
-                if pattern_def
-                else definition.get("link_url") if definition else None,
-            }
-        )
-        if pattern_def.get("auto_complete"):
-            reminder.completed_at = reminder.completed_at or now
-            reminder.acknowledged_at = reminder.acknowledged_at or reminder.completed_at
-            dirty = True
+        if not pattern_def.get("auto_complete"):
+            continue
+        reminder.completed_at = reminder.completed_at or now
+        reminder.acknowledged_at = reminder.acknowledged_at or reminder.completed_at
+        dirty = True
 
     if dirty:
         db.commit()
 
+    return reminders, pattern_defs
+
+
+@router.get("/nudges")
+def list_nudges(db: Session = Depends(get_db)):
+    # Read-only endpoint: navigation fetches should not mutate reminder state.
+    today = date.today()
+    now = datetime.utcnow()
+    reminders = (
+        db.query(GuidanceReminder)
+        .filter(
+            GuidanceReminder.completed_at.is_(None),
+            (GuidanceReminder.snoozed_until.is_(None)) | (GuidanceReminder.snoozed_until <= now),
+            (GuidanceReminder.due_on.is_(None)) | (GuidanceReminder.due_on <= today),
+        )
+        .order_by(GuidanceReminder.due_on.asc(), GuidanceReminder.id.asc())
+        .limit(8)
+        .all()
+    )
+    payload = _serialize_nudges(reminders)
+    return JSONResponse({"nudges": payload})
+
+
+@router.post("/nudges/refresh")
+def refresh_nudges(db: Session = Depends(get_db)):
+    reminders, pattern_defs = _refresh_nudges(db)
+    payload = _serialize_nudges(reminders, pattern_defs)
     return JSONResponse({"nudges": payload})
 
 

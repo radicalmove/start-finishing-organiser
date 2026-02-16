@@ -23,11 +23,14 @@ from ..utils.coach import generate_coach_reply, suggest_quick_actions
 
 router = APIRouter(dependencies=[Depends(require_html_auth), Depends(csrf_protect)])
 
-_TIME_TOKEN = r"(\\d{1,2})(?::(\\d{2}))?\\s*(am|pm)?"
+_TIME_TOKEN = r"(\d{1,2})(?::(\d{2}))?\s*(am|pm)?"
 _TIME_RANGE = re.compile(
-    rf"(?:from\\s*)?{_TIME_TOKEN}\\s*(?:to|till|until|–|-|—)\\s*{_TIME_TOKEN}",
+    rf"(?:from\s*)?{_TIME_TOKEN}\s*(?:to|till|until|–|-|—)\s*{_TIME_TOKEN}",
     re.IGNORECASE,
 )
+_STORAGE_LIST_LIMIT = 6
+_STORAGE_SCREEN_LIST_LIMIT = 4
+_STORAGE_MAX_BYTES = 24_000
 
 
 def _parse_task_action(message: str) -> dict | None:
@@ -103,8 +106,8 @@ def _parse_one_thing_action(message: str) -> str | None:
     if "one thing" not in lowered:
         return None
     patterns = (
-        r"(?:set|make|update)\\s+(?:my\\s+)?one thing\\s+(?:to|as)\\s+(.+)",
-        r"(?:my\\s+)?one thing\\s+(?:is|=)\\s+(.+)",
+        r"(?:set|make|update)\s+(?:my\s+)?one thing\s+(?:to|as)\s+(.+)",
+        r"(?:my\s+)?one thing\s+(?:is|=)\s+(.+)",
     )
     for pattern in patterns:
         match = re.search(pattern, text, flags=re.IGNORECASE)
@@ -116,7 +119,7 @@ def _parse_one_thing_action(message: str) -> str | None:
 
 
 def _parse_time_token(raw: str, default_ampm: str | None = None) -> time | None:
-    match = re.match(r"^(\\d{1,2})(?::(\\d{2}))?\\s*(am|pm)?$", raw.strip(), re.IGNORECASE)
+    match = re.match(r"^(\d{1,2})(?::(\d{2}))?\s*(am|pm)?$", raw.strip(), re.IGNORECASE)
     if not match:
         return None
     hour = int(match.group(1))
@@ -176,13 +179,13 @@ def _parse_time_block_action(message: str) -> dict | None:
 
     remainder = _TIME_RANGE.sub("", text).strip()
     remainder = re.sub(
-        r"^(can you|please|add|create|schedule|book|block|time block|make|put)\\b",
+        r"^(can you|please|add|create|schedule|book|block|time block|make|put)\b",
         "",
         remainder,
         flags=re.IGNORECASE,
     ).strip()
     title = None
-    for pattern in (r"\\bfor\\s+(.+)$", r"\\bto\\s+(.+)$"):
+    for pattern in (r"\bfor\s+(.+)$", r"\bto\s+(.+)$"):
         match = re.search(pattern, remainder, flags=re.IGNORECASE)
         if match:
             title = match.group(1).strip().strip(".")
@@ -214,6 +217,61 @@ def _block_action_reply(title: str, block_date: date, start_time: time, end_time
         f"Added a block for \"{title}\" on {date_label}, {start_label}-{end_label}. "
         "Want it tied to a task?"
     )
+
+
+def _trim_storage_value(value: object, limit: int) -> tuple[object, int]:
+    if not isinstance(value, list):
+        return value, 0
+    if len(value) <= limit:
+        return value, 0
+    return value[:limit], len(value) - limit
+
+
+def _compact_context_for_storage(context: dict | None) -> dict | None:
+    if not isinstance(context, dict):
+        return None
+
+    compact: dict[str, object] = {
+        "screen": context.get("screen"),
+        "generated_at": context.get("generated_at"),
+    }
+
+    screen_data = context.get("screen_data")
+    if isinstance(screen_data, dict):
+        compact_screen: dict[str, object] = {}
+        for key, value in screen_data.items():
+            trimmed, extra = _trim_storage_value(value, _STORAGE_SCREEN_LIST_LIMIT)
+            compact_screen[key] = trimmed
+            if extra:
+                compact_screen[f"{key}_more"] = extra
+        compact["screen_data"] = compact_screen
+
+    lists = context.get("lists")
+    if isinstance(lists, dict):
+        compact_lists: dict[str, object] = {}
+        profile = lists.get("profile")
+        if isinstance(profile, dict):
+            compact_lists["profile"] = profile
+        for key in ("projects", "tasks", "blocks", "waiting_on", "ritual_entries"):
+            value = lists.get(key)
+            trimmed, extra = _trim_storage_value(value, _STORAGE_LIST_LIMIT)
+            if isinstance(trimmed, list):
+                compact_lists[key] = trimmed
+                if extra:
+                    compact_lists[f"{key}_more"] = extra
+        compact["lists"] = compact_lists
+
+    payload = json.dumps(compact, ensure_ascii=True)
+    if len(payload.encode("utf-8")) <= _STORAGE_MAX_BYTES:
+        return compact
+
+    fallback = {
+        "screen": compact.get("screen"),
+        "screen_data": compact.get("screen_data", {}),
+        "generated_at": compact.get("generated_at"),
+        "context_notice": "trimmed_for_storage",
+    }
+    return fallback
 
 
 def _history_limit() -> int:
@@ -293,7 +351,7 @@ async def coach_message(request: Request, db: Session = Depends(get_db)):
         .all()
     )
 
-    effects: dict[str, bool] = {}
+    effects: dict[str, object] = {}
     action = _parse_task_action(message)
     one_thing = None if action else _parse_one_thing_action(message)
     block_action = None if (action or one_thing) else _parse_time_block_action(message)
@@ -309,6 +367,13 @@ async def coach_message(request: Request, db: Session = Depends(get_db)):
         actions = suggest_quick_actions(context)
         engine = "action"
         effects["refresh"] = True
+        effects["type"] = "task_created"
+        effects["task"] = {
+            "id": task.id,
+            "title": task.verb_noun,
+            "in_inbox": task.in_inbox,
+            "when_bucket": task.when_bucket.value if task.when_bucket else None,
+        }
     elif one_thing:
         today = date.today()
         entry = (
@@ -326,6 +391,8 @@ async def coach_message(request: Request, db: Session = Depends(get_db)):
         actions = suggest_quick_actions(context)
         engine = "action"
         effects["refresh"] = True
+        effects["type"] = "one_thing_updated"
+        effects["one_thing"] = one_thing
     elif block_action:
         block = Block(
             title=block_action["title"],
@@ -348,6 +415,15 @@ async def coach_message(request: Request, db: Session = Depends(get_db)):
         actions = suggest_quick_actions(context)
         engine = "action"
         effects["refresh"] = True
+        effects["type"] = "block_created"
+        effects["block"] = {
+            "id": block.id,
+            "title": block.title,
+            "date": block.date.isoformat() if block.date else None,
+            "start_time": block.start_time.isoformat() if block.start_time else None,
+            "end_time": block.end_time.isoformat() if block.end_time else None,
+            "block_type": block.block_type.value if block.block_type else None,
+        }
     else:
         reply, actions, engine = generate_coach_reply(
             message=message,
@@ -355,7 +431,8 @@ async def coach_message(request: Request, db: Session = Depends(get_db)):
             history=history,
         )
 
-    context_json = json.dumps(context, ensure_ascii=True) if context else None
+    context_for_storage = _compact_context_for_storage(context)
+    context_json = json.dumps(context_for_storage, ensure_ascii=True) if context_for_storage else None
     actions_json = json.dumps(actions, ensure_ascii=True) if actions else None
 
     user_msg = CoachMessage(

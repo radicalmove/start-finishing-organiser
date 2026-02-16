@@ -216,6 +216,26 @@ def ensure_project_color_column():
             conn.execute(text("ALTER TABLE projects ADD COLUMN color_scheme VARCHAR(24) NULL"))
 
 
+def ensure_core_indexes():
+    """Create lightweight indexes for frequently used single-user query paths."""
+    statements = (
+        "CREATE INDEX IF NOT EXISTS idx_tasks_inbox_status_created_at "
+        "ON tasks (in_inbox, status, created_at)",
+        "CREATE INDEX IF NOT EXISTS idx_tasks_bucket_status_created_at "
+        "ON tasks (when_bucket, status, created_at)",
+        "CREATE INDEX IF NOT EXISTS idx_tasks_resurface_on ON tasks (resurface_on)",
+        "CREATE INDEX IF NOT EXISTS idx_tasks_scheduled_for ON tasks (scheduled_for)",
+        "CREATE INDEX IF NOT EXISTS idx_blocks_date_start_time ON blocks (date, start_time)",
+        "CREATE INDEX IF NOT EXISTS idx_waiting_on_last_followup ON waiting_on (last_followup)",
+        "CREATE INDEX IF NOT EXISTS idx_ritual_entries_type_date ON ritual_entries (ritual_type, entry_date)",
+        "CREATE INDEX IF NOT EXISTS idx_coach_messages_convo_created "
+        "ON coach_messages (conversation_id, created_at)",
+    )
+    with engine.begin() as conn:
+        for statement in statements:
+            conn.execute(text(statement))
+
+
 __all__ = [
     "engine",
     "SessionLocal",
@@ -231,4 +251,5 @@ __all__ = [
     "ensure_task_inbox_column",
     "ensure_task_archived_from_inbox_column",
     "ensure_project_color_column",
+    "ensure_core_indexes",
 ]

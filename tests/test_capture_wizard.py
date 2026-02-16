@@ -12,6 +12,21 @@ def test_guided_capture_requires_displacement_ack(client, api_headers):
     assert "Confirm+the+displacement+check+before+saving." in res.headers["location"]
 
 
+def test_guided_capture_requires_title(client, api_headers):
+    res = client.post(
+        "/capture/wizard",
+        data={
+            "capture_text": "   ",
+            "item_kind": "task",
+            "displacement_ack": "yes",
+        },
+        headers=api_headers,
+        follow_redirects=False,
+    )
+    assert res.status_code == 303
+    assert "Title+is+required." in res.headers["location"]
+
+
 def test_guided_capture_creates_task(client, api_headers, db_session):
     res = client.post(
         "/capture/wizard",

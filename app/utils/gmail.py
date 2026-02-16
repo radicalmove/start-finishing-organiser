@@ -18,6 +18,7 @@ from ..models import EmailMessage, EmailSyncState, Task, WhenBucket
 
 try:
     from google.auth.transport.requests import Request
+    from google.auth.exceptions import RefreshError
     from google.oauth2.credentials import Credentials
     from google_auth_oauthlib.flow import InstalledAppFlow
     from googleapiclient.discovery import build
@@ -29,6 +30,7 @@ except Exception:  # pragma: no cover - optional dependency guard
     Credentials = None
     InstalledAppFlow = None
     Request = None
+    RefreshError = Exception
     build = None
     HttpError = Exception
 
@@ -203,11 +205,31 @@ def _load_credentials(settings: GmailSettings):
         return None
     if not os.path.exists(settings.token_path):
         return None
-    creds = Credentials.from_authorized_user_file(settings.token_path, GMAIL_SCOPES)
+    try:
+        creds = Credentials.from_authorized_user_file(settings.token_path, GMAIL_SCOPES)
+    except Exception:
+        logger.warning(
+            "Gmail token file could not be read at %s. Re-authorize with python3 scripts/gmail_auth.py",
+            settings.token_path,
+        )
+        return None
     if creds and creds.expired and creds.refresh_token:
-        creds.refresh(Request())
-        _save_credentials(settings.token_path, creds)
+        try:
+            creds.refresh(Request())
+            _save_credentials(settings.token_path, creds)
+        except RefreshError as exc:
+            logger.warning(
+                "Gmail token refresh failed (%s). Re-authorize with python3 scripts/gmail_auth.py",
+                exc,
+            )
+            return None
+        except Exception:
+            logger.exception("Unexpected Gmail token refresh failure.")
+            return None
     if not creds or not creds.valid:
+        logger.warning(
+            "Gmail token is invalid. Re-authorize with python3 scripts/gmail_auth.py"
+        )
         return None
     return creds
 

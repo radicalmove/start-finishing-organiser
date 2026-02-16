@@ -6,7 +6,7 @@ from urllib.request import Request as UrlRequest, urlopen
 import certifi
 
 from fastapi import APIRouter, Depends, Request, Form, HTTPException
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from sqlalchemy.orm import Session, selectinload
 from icalendar import Calendar
 
@@ -35,6 +35,12 @@ CALENDAR_START_HOUR = 6
 CALENDAR_END_HOUR = 23
 CALENDAR_HOURS = CALENDAR_END_HOUR - CALENDAR_START_HOUR
 CALENDAR_HOUR_HEIGHT_PX = 48
+ACTIVE_TASK_STATUSES = (TaskStatus.PENDING, TaskStatus.IN_PROGRESS)
+
+
+def _wants_json(request: Request) -> bool:
+    accept_header = request.headers.get("accept", "")
+    return request.headers.get("x-requested-with") == "fetch" or "application/json" in accept_header
 
 
 def _split_cozi_label(label: str) -> tuple[str | None, str | None]:
@@ -292,7 +298,7 @@ def landing(request: Request, db: Session = Depends(get_db)):
         .options(selectinload(Task.project))
         .filter(
             Task.when_bucket == WhenBucket.TODAY,
-            Task.status.notin_([TaskStatus.DONE, TaskStatus.ARCHIVED, TaskStatus.CANCELLED]),
+            Task.status.in_(ACTIVE_TASK_STATUSES),
         )
         .order_by(Task.block_type.asc().nulls_last(), Task.priority.asc().nulls_last())
         .all()
@@ -302,15 +308,16 @@ def landing(request: Request, db: Session = Depends(get_db)):
         .options(selectinload(Task.project))
         .filter(
             Task.in_inbox.is_(True),
-            Task.status.notin_([TaskStatus.DONE, TaskStatus.ARCHIVED, TaskStatus.CANCELLED]),
+            Task.status.in_(ACTIVE_TASK_STATUSES),
         )
         .order_by(Task.created_at.desc())
         .all()
     )
-    week_blocks = (
+    todays_blocks = (
         db.query(Block)
         .options(selectinload(Block.project))
-        .order_by(Block.date.asc(), Block.start_time.asc().nulls_last())
+        .filter(Block.date == today)
+        .order_by(Block.start_time.asc().nulls_last())
         .all()
     )
 
@@ -319,18 +326,6 @@ def landing(request: Request, db: Session = Depends(get_db)):
     weekly_personal = [
         p for p in projects if p.active_this_week and p.category == ProjectCategory.PERSONAL
     ]
-    sched_ready = (
-        db.query(Task)
-        .options(selectinload(Task.project))
-        .filter(
-            Task.block_type.isnot(None),
-            Task.duration_minutes.isnot(None),
-            Task.scheduled_for.is_(None),
-            Task.status.notin_([TaskStatus.DONE, TaskStatus.ARCHIVED, TaskStatus.CANCELLED]),
-        )
-        .order_by(Task.when_bucket.asc(), Task.created_at.desc())
-        .all()
-    )
     ritual_entries = (
         db.query(RitualEntry)
         .filter(RitualEntry.entry_date == today)
@@ -378,7 +373,6 @@ def landing(request: Request, db: Session = Depends(get_db)):
     morning_entry = ritual_by_type.get("morning")
     today_one_thing = morning_entry.one_thing if morning_entry else None
     today_frog = morning_entry.frog if morning_entry else None
-    todays_blocks = [b for b in week_blocks if b.date == today]
     cozi_all_events, cozi_status = _fetch_cozi_calendar()
     cozi_events_today = _cozi_events_touching_day(cozi_all_events, today)
     cozi_last_updated = None
@@ -444,6 +438,12 @@ def landing(request: Request, db: Session = Depends(get_db)):
                     "type": b.block_type.value,
                 }
             )
+
+    if not now_action:
+        if today_one_thing:
+            now_action = today_one_thing
+        elif today_frog:
+            now_action = f"Frog: {today_frog}"
 
     for ev in cozi_events_today:
         start_dt = ev["start"]
@@ -525,7 +525,6 @@ def landing(request: Request, db: Session = Depends(get_db)):
             "projects": projects,
             "today_tasks": today_tasks,
             "inbox_tasks": inbox_tasks,
-            "week_blocks": week_blocks,
             "todays_blocks": todays_blocks,
             "current_block": current_block,
             "upcoming_blocks": upcoming_blocks,
@@ -544,7 +543,6 @@ def landing(request: Request, db: Session = Depends(get_db)):
             "weekly_personal_count": len(weekly_personal),
             "form_error": request.query_params.get("error"),
             "form_success": request.query_params.get("success"),
-            "sched_ready": sched_ready,
             "cozi_error": cozi_error,
             "calendar_start_hour": CALENDAR_START_HOUR,
             "calendar_end_hour": CALENDAR_END_HOUR,
@@ -723,31 +721,72 @@ def create_task(
 
 @router.post("/inbox/update")
 def update_inbox_item(
+    request: Request,
     task_id: int = Form(...),
     description: str | None = Form(None),
     db: Session = Depends(get_db),
 ):
     task = db.get(Task, task_id)
     if not task or not task.in_inbox:
+        if _wants_json(request):
+            return JSONResponse(
+                {"ok": False, "message": "Inbox item not found"},
+                status_code=404,
+            )
         return RedirectResponse(url="/?error=Inbox+item+not+found", status_code=303)
     if description is not None:
         task.description = description.strip() or None
     db.add(task)
     db.commit()
+    if _wants_json(request):
+        return JSONResponse(
+            {
+                "ok": True,
+                "message": "Saved",
+                "task_id": task.id,
+                "description": task.description or "",
+            }
+        )
     return RedirectResponse(url="/?success=Saved", status_code=303)
 
 
 @router.post("/inbox/archive")
 def archive_inbox_item(
+    request: Request,
     task_id: int = Form(...),
     db: Session = Depends(get_db),
 ):
     task = db.get(Task, task_id)
     if not task or not task.in_inbox:
+        if _wants_json(request):
+            return JSONResponse(
+                {"ok": False, "message": "Inbox item not found"},
+                status_code=404,
+            )
         return RedirectResponse(url="/?error=Inbox+item+not+found", status_code=303)
     task.status = TaskStatus.ARCHIVED
     task.in_inbox = False
     task.archived_from_inbox = True
     db.add(task)
     db.commit()
+    if _wants_json(request):
+        inbox_count = (
+            db.query(Task)
+            .filter(
+                Task.in_inbox.is_(True),
+                Task.status.notin_(
+                    [TaskStatus.DONE, TaskStatus.ARCHIVED, TaskStatus.CANCELLED]
+                ),
+            )
+            .count()
+        )
+        return JSONResponse(
+            {
+                "ok": True,
+                "message": "Moved to Recycle Bin",
+                "task_id": task.id,
+                "inbox_count": inbox_count,
+                "removed": True,
+            }
+        )
     return RedirectResponse(url="/?success=Moved+to+Recycle+Bin", status_code=303)

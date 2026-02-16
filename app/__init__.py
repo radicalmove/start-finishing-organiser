@@ -1,5 +1,6 @@
 import os
 import time
+import logging
 from pathlib import Path
 
 from fastapi import FastAPI
@@ -19,11 +20,14 @@ from .db import (
     ensure_task_inbox_column,
     ensure_task_archived_from_inbox_column,
     ensure_project_color_column,
+    ensure_core_indexes,
 )
 from .routes import homepage, api, capture, blocks, resurface, weekly, waiting, ritual, auth, coach, long_range, nudges, health, profile, onboarding, tasks, export
 from .security import ensure_csrf_token, current_user, is_authenticated, ui_auth_enabled
 from .utils.health import ensure_health_metrics
 from .utils.gmail import start_gmail_sync_loop
+
+logger = logging.getLogger(__name__)
 
 
 def _load_dotenv() -> None:
@@ -76,9 +80,12 @@ def create_app() -> FastAPI:
     ensure_task_inbox_column()
     ensure_task_archived_from_inbox_column()
     ensure_project_color_column()
+    ensure_core_indexes()
     ensure_health_metrics()
 
     app = FastAPI(title="Start Finishing Organiser", version="0.7.0")
+    app.state.startup_error = None
+    app.state.startup_warnings = []
 
     def _parse_bool(value: str | None) -> bool:
         return bool(value) and value.strip().lower() in ("1", "true", "yes", "on")
@@ -144,6 +151,11 @@ def create_app() -> FastAPI:
     app.include_router(export.router)
     app.include_router(api.router, prefix="/api")
 
-    start_gmail_sync_loop()
+    try:
+        start_gmail_sync_loop()
+    except Exception as exc:
+        warning = f"Gmail sync did not start: {type(exc).__name__}: {exc}"
+        app.state.startup_warnings.append(warning)
+        logger.exception("Gmail sync startup failed")
 
     return app

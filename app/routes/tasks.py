@@ -23,21 +23,38 @@ from ..utils.rules import parse_block_type, parse_optional_int
 router = APIRouter(dependencies=[Depends(require_html_auth), Depends(csrf_protect)])
 
 
-def _task_is_active(task: Task) -> bool:
-    return task.status in {TaskStatus.PENDING, TaskStatus.IN_PROGRESS}
+ACTIVE_TASK_STATUSES = (TaskStatus.PENDING, TaskStatus.IN_PROGRESS)
+ARCHIVED_TASK_STATUSES = (TaskStatus.ARCHIVED, TaskStatus.CANCELLED)
+
 
 def _build_tasks_context(request: Request, db: Session) -> dict:
     templates = request.app.state.templates
     projects = db.query(Project).order_by(Project.created_at.desc()).all()
-    rows = (
+    active_tasks = (
         db.query(Task)
         .options(selectinload(Task.project))
+        .filter(Task.status.in_(ACTIVE_TASK_STATUSES))
+        .order_by(
+            Task.when_bucket.asc(),
+            Task.priority.asc().nulls_last(),
+            Task.created_at.desc(),
+        )
+        .all()
+    )
+    completed_tasks = (
+        db.query(Task)
+        .options(selectinload(Task.project))
+        .filter(Task.status == TaskStatus.DONE)
+        .order_by(Task.completed_at.desc().nulls_last(), Task.created_at.desc())
+        .all()
+    )
+    archived_tasks = (
+        db.query(Task)
+        .options(selectinload(Task.project))
+        .filter(Task.status.in_(ARCHIVED_TASK_STATUSES))
         .order_by(Task.created_at.desc())
         .all()
     )
-    active_tasks = [t for t in rows if _task_is_active(t)]
-    completed_tasks = [t for t in rows if t.status == TaskStatus.DONE]
-    archived_tasks = [t for t in rows if t.status in {TaskStatus.ARCHIVED, TaskStatus.CANCELLED}]
 
     buckets = {
         WhenBucket.TODAY: [],
@@ -73,7 +90,6 @@ def _build_tasks_context(request: Request, db: Session) -> dict:
     return {
         "templates": templates,
         "projects": projects,
-        "rows": rows,
         "active_tasks": active_tasks,
         "completed_tasks": completed_tasks,
         "archived_tasks": archived_tasks,

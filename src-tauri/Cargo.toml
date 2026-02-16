@@ -1,6 +1,6 @@
 [package]
 name = "sfo"
-version = "0.721.0"
+version = "0.722.0"
 description = "Start Finishing Organiser desktop shell"
 authors = ["you"]
 license = ""

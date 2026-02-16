@@ -29,9 +29,19 @@ def _seed_projects(
     titles: list[str],
     category: ProjectCategory,
     active_limit: int,
-) -> None:
+) -> int:
+    existing_titles = {
+        (row[0] or "").strip().lower()
+        for row in db.query(Project.title).filter(Project.category == category).all()
+    }
     active_count = 0
+    created = 0
+    seen: set[str] = set()
     for title in titles:
+        normalized = title.strip().lower()
+        if not normalized or normalized in seen or normalized in existing_titles:
+            continue
+        seen.add(normalized)
         make_active = active_count < active_limit
         horizon = "week" if make_active else "later"
         project = Project(
@@ -42,8 +52,10 @@ def _seed_projects(
             description=None,
         )
         db.add(project)
+        created += 1
         if make_active:
             active_count += 1
+    return created
 
 
 @router.get("/onboarding", response_class=HTMLResponse)
@@ -98,11 +110,12 @@ def submit_onboarding(
 
     work_list = _parse_lines(work_projects)
     personal_list = _parse_lines(personal_projects)
+    created_count = 0
     if work_list:
-        _seed_projects(db, work_list, ProjectCategory.WORK, 4)
+        created_count += _seed_projects(db, work_list, ProjectCategory.WORK, 4)
     if personal_list:
-        _seed_projects(db, personal_list, ProjectCategory.PERSONAL, 3)
-    if work_list or personal_list:
+        created_count += _seed_projects(db, personal_list, ProjectCategory.PERSONAL, 3)
+    if created_count > 0:
         db.commit()
 
     return RedirectResponse(url="/?success=Welcome", status_code=303)

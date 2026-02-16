@@ -10,12 +10,13 @@
         </div>
       </div>
       <div class="muted">
-        Download a ZIP that includes JSON + CSV snapshots. Defaults keep sensitive logs excluded unless you opt in.
+        Download a ZIP that includes JSON + CSV snapshots plus a full SQLite backup and checksum manifest.
       </div>
       <div class="export-tags">
         <span class="pill">JSON</span>
         <span class="pill">CSV</span>
         <span class="pill">ZIP</span>
+        <span class="pill">SHA-256</span>
       </div>
     </div>
 
@@ -145,7 +146,7 @@
 
       <div class="panel export-footer">
         <div class="muted">
-          Completed tasks and archived projects are excluded by default. Goals are included when created or targeted in range.
+          Includes a full database snapshot for restore safety. Check backup health at <a href="/export/health">/export/health</a>.
         </div>
         <div class="cta-row cta-row--end">
           <button class="btn pink btn-sm" type="submit">Download export</button>

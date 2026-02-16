@@ -16,6 +16,22 @@ from ..models import Block, CoachMessage, Profile, Project, RitualEntry, Task, W
 _DEFAULT_QUOTE_CHANCE = 0.12
 _DEFAULT_HISTORY_LIMIT = 120
 _DEFAULT_LLM_TIMEOUT = 15
+_DEFAULT_SCREEN_ITEM_LIMIT = 8
+_DEFAULT_CONTEXT_PROJECT_LIMIT = 18
+_DEFAULT_CONTEXT_TASK_LIMIT = 40
+_DEFAULT_CONTEXT_BLOCK_LIMIT = 28
+_DEFAULT_CONTEXT_WAITING_LIMIT = 20
+_DEFAULT_CONTEXT_RITUAL_LIMIT = 12
+_DEFAULT_TEXT_PREVIEW_LIMIT = 160
+_DEFAULT_CONTEXT_MAX_BYTES = 120_000
+
+
+def _env_int(name: str, default: int, minimum: int = 1, maximum: int = 500_000) -> int:
+    raw = os.getenv(name)
+    if not raw or not raw.isdigit():
+        return default
+    value = int(raw)
+    return max(minimum, min(maximum, value))
 
 
 def _to_iso(value: date | datetime | time | None) -> str | None:
@@ -60,10 +76,23 @@ def _trim_screen_data(screen_data: dict[str, Any], limit: int = 6) -> dict[str, 
     return trimmed
 
 
+def _text_preview(value: str | None, max_len: int = _DEFAULT_TEXT_PREVIEW_LIMIT) -> str | None:
+    if value is None:
+        return None
+    cleaned = value.strip()
+    if not cleaned:
+        return None
+    if len(cleaned) <= max_len:
+        return cleaned
+    if max_len <= 3:
+        return cleaned[:max_len]
+    return f"{cleaned[: max_len - 3]}..."
+
+
 def project_summary(project: Project) -> dict[str, Any]:
     return {
         "id": project.id,
-        "title": project.title,
+        "title": _text_preview(project.title, 80),
         "category": project.category.value if project.category else None,
         "status": project.status.value if project.status else None,
         "size": project.size.value if project.size else None,
@@ -72,7 +101,7 @@ def project_summary(project: Project) -> dict[str, Any]:
         "start_date": _to_iso(project.start_date),
         "target_date": _to_iso(project.target_date),
         "level_of_success": project.level_of_success.value if project.level_of_success else None,
-        "why_link_text": project.why_link_text,
+        "why_link_text": _text_preview(project.why_link_text, 120),
         "active_this_week": project.active_this_week,
         "created_at": _to_iso(project.created_at),
     }
@@ -81,10 +110,10 @@ def project_summary(project: Project) -> dict[str, Any]:
 def task_summary(task: Task) -> dict[str, Any]:
     return {
         "id": task.id,
-        "verb_noun": task.verb_noun,
-        "description": task.description,
+        "verb_noun": _text_preview(task.verb_noun, 100),
+        "description": _text_preview(task.description, 220),
         "project_id": task.project_id,
-        "project_title": task.project.title if task.project else None,
+        "project_title": _text_preview(task.project.title if task.project else None, 80),
         "in_inbox": task.in_inbox,
         "when_bucket": task.when_bucket.value if task.when_bucket else None,
         "block_type": task.block_type.value if task.block_type else None,
@@ -92,7 +121,7 @@ def task_summary(task: Task) -> dict[str, Any]:
         "priority": task.priority,
         "frog": task.frog,
         "alignment": task.alignment.value if task.alignment else None,
-        "first_action": task.first_action,
+        "first_action": _text_preview(task.first_action, 120),
         "status": task.status.value if task.status else None,
         "scheduled_for": _to_iso(task.scheduled_for),
         "owner_type": task.owner_type.value if task.owner_type else None,
@@ -185,35 +214,112 @@ def profile_summary(profile: Profile | None) -> dict[str, Any] | None:
 
 
 def collect_global_context(db: Session) -> dict[str, Any]:
+    project_limit = _env_int("SFO_COACH_CONTEXT_PROJECT_LIMIT", _DEFAULT_CONTEXT_PROJECT_LIMIT, maximum=300)
+    task_limit = _env_int("SFO_COACH_CONTEXT_TASK_LIMIT", _DEFAULT_CONTEXT_TASK_LIMIT, maximum=500)
+    block_limit = _env_int("SFO_COACH_CONTEXT_BLOCK_LIMIT", _DEFAULT_CONTEXT_BLOCK_LIMIT, maximum=500)
+    waiting_limit = _env_int("SFO_COACH_CONTEXT_WAITING_LIMIT", _DEFAULT_CONTEXT_WAITING_LIMIT, maximum=300)
+    ritual_limit = _env_int("SFO_COACH_CONTEXT_RITUAL_LIMIT", _DEFAULT_CONTEXT_RITUAL_LIMIT, maximum=120)
+
     profile = db.query(Profile).order_by(Profile.id.asc()).first()
-    projects = db.query(Project).order_by(Project.created_at.desc()).all()
+    projects = (
+        db.query(Project)
+        .order_by(Project.active_this_week.desc(), Project.created_at.desc())
+        .limit(project_limit)
+        .all()
+    )
     tasks = (
         db.query(Task)
         .options(selectinload(Task.project))
         .order_by(Task.created_at.desc())
+        .limit(task_limit)
         .all()
     )
     blocks = (
         db.query(Block)
         .options(selectinload(Block.project))
         .order_by(Block.date.desc(), Block.start_time.desc().nulls_last())
+        .limit(block_limit)
         .all()
     )
     waiting = (
         db.query(WaitingOn)
         .options(selectinload(WaitingOn.project))
         .order_by(WaitingOn.created_at.desc())
+        .limit(waiting_limit)
         .all()
     )
-    rituals = db.query(RitualEntry).order_by(RitualEntry.created_at.desc()).all()
+    rituals = (
+        db.query(RitualEntry)
+        .order_by(RitualEntry.created_at.desc())
+        .limit(ritual_limit)
+        .all()
+    )
 
     return {
         "profile": profile_summary(profile),
-        "projects": [project_summary(p) for p in projects],
-        "tasks": [task_summary(t) for t in tasks],
-        "blocks": [block_summary(b) for b in blocks],
-        "waiting_on": [waiting_summary(w) for w in waiting],
-        "ritual_entries": [ritual_summary(r) for r in rituals],
+        "projects": [
+            {
+                "id": p.id,
+                "title": _text_preview(p.title, 80),
+                "category": p.category.value if p.category else None,
+                "status": p.status.value if p.status else None,
+                "time_horizon": p.time_horizon,
+                "target_date": _to_iso(p.target_date),
+                "active_this_week": p.active_this_week,
+            }
+            for p in projects
+        ],
+        "tasks": [
+            {
+                "id": t.id,
+                "verb_noun": _text_preview(t.verb_noun, 100),
+                "project_id": t.project_id,
+                "project_title": _text_preview(t.project.title if t.project else None, 80),
+                "in_inbox": t.in_inbox,
+                "when_bucket": t.when_bucket.value if t.when_bucket else None,
+                "block_type": t.block_type.value if t.block_type else None,
+                "duration_minutes": t.duration_minutes,
+                "status": t.status.value if t.status else None,
+                "scheduled_for": _to_iso(t.scheduled_for),
+                "frog": t.frog,
+            }
+            for t in tasks
+        ],
+        "blocks": [
+            {
+                "id": b.id,
+                "title": _text_preview(b.title or "", 80) or None,
+                "date": _to_iso(b.date),
+                "start_time": _to_iso(b.start_time),
+                "end_time": _to_iso(b.end_time),
+                "block_type": b.block_type.value if b.block_type else None,
+                "project_id": b.project_id,
+                "project_title": _text_preview(b.project.title if b.project else None, 80),
+            }
+            for b in blocks
+        ],
+        "waiting_on": [
+            {
+                "id": w.id,
+                "description": _text_preview(w.description, 100),
+                "person": _text_preview(w.person, 60),
+                "project_id": w.project_id,
+                "project_title": _text_preview(w.project.title if w.project else None, 80),
+                "last_followup": _to_iso(w.last_followup),
+            }
+            for w in waiting
+        ],
+        "ritual_entries": [
+            {
+                "id": r.id,
+                "ritual_type": r.ritual_type.value if r.ritual_type else None,
+                "entry_date": _to_iso(r.entry_date),
+                "one_thing": _text_preview(r.one_thing, 100),
+                "frog": _text_preview(r.frog, 100),
+                "wins": _text_preview(r.wins, 120),
+            }
+            for r in rituals
+        ],
     }
 
 
@@ -225,13 +331,19 @@ def build_coach_context(
     screen_data: dict[str, Any],
     global_context: dict[str, Any],
 ) -> dict[str, Any]:
+    screen_limit = _env_int(
+        "SFO_COACH_SCREEN_ITEM_LIMIT",
+        _DEFAULT_SCREEN_ITEM_LIMIT,
+        minimum=1,
+        maximum=40,
+    )
     return {
         "screen": {
             "id": screen_id,
             "title": screen_title,
             "path": request_path,
         },
-        "screen_data": screen_data,
+        "screen_data": _trim_screen_data(screen_data, limit=screen_limit),
         "lists": global_context,
         "generated_at": datetime.now().isoformat(),
     }
@@ -253,6 +365,17 @@ def build_coach_context_json(
         global_context=collect_global_context(db),
     )
     payload = json.dumps(context, ensure_ascii=True, default=_json_default)
+    max_bytes = _env_int(
+        "SFO_COACH_CONTEXT_MAX_BYTES",
+        _DEFAULT_CONTEXT_MAX_BYTES,
+        minimum=20_000,
+        maximum=500_000,
+    )
+    if len(payload.encode("utf-8")) > max_bytes:
+        context["lists"] = {"profile": context.get("lists", {}).get("profile")}
+        context["screen_data"] = _trim_screen_data(context.get("screen_data", {}), limit=4)
+        context["context_notice"] = "trimmed_for_size"
+        payload = json.dumps(context, ensure_ascii=True, default=_json_default)
     return payload.replace("</", "<\\/")
 
 
