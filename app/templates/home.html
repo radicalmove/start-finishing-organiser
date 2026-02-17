@@ -29,23 +29,50 @@
           </div>
           <div class="panel-actions">
             <button class="btn pink btn-sm btn-match-header" type="button" data-quick-capture-open>Quick</button>
-            <a class="btn ghost btn-sm btn-match-header" href="/capture/wizard" data-guided-capture-open>Guided</a>
-            <a class="btn ghost btn-sm btn-match-header" href="/waiting">Waiting</a>
-            <a class="btn ghost btn-icon btn-match-header inbox-bin-btn" href="/tasks#archived" aria-label="Recycle bin" title="Recycle bin">
-              <span class="recycle-icon" aria-hidden="true">&#x267B;&#xFE0E;</span>
-            </a>
+            <a class="btn ghost btn-sm btn-match-header" href="/capture/wizard" data-guided-capture-open>Process</a>
+            <details class="inbox-header-menu">
+              <summary class="btn ghost btn-sm btn-match-header inbox-header-menu-toggle">Lists</summary>
+              <div class="inbox-header-menu-panel">
+                <a class="inbox-header-menu-item" href="/inbox/containers?tab=learning">Learning</a>
+                <a class="inbox-header-menu-item" href="/inbox/containers?tab=enjoy">Enjoy</a>
+                <a class="inbox-header-menu-item" href="/inbox/containers?tab=parked">Parked</a>
+                <a class="inbox-header-menu-item" href="/inbox/containers?tab=recycle">Recycle bin</a>
+                <a class="inbox-header-menu-item inbox-header-menu-item--footer" href="/waiting">Waiting</a>
+              </div>
+            </details>
           </div>
         </div>
+        <div class="muted inbox-shortcuts-hint">P process, L learning, E enjoy, K park, D recycle bin.</div>
         <div class="list" style="margin-top: 10px;" data-draggable-list data-home-inbox-list>
           {% for t in inbox_tasks %}
             <div class="list-item inbox-item" data-inbox-item data-task-id="{{ t.id }}" data-inbox-title="{{ t.verb_noun|e }}">
               <div class="hidden" data-inbox-desc>{{ t.description or '' }}</div>
-              <div class="task-card-actions task-card-actions--hover inbox-item-actions">
-                <a class="btn ghost btn-sm btn-icon btn-icon--tiny inbox-process-icon" href="/capture/process/{{ t.id }}" data-inbox-action data-guided-capture-open data-guided-prefill="{{ t.verb_noun|e }}" data-guided-source="{{ t.id }}" aria-label="Process" title="Process">➜</a>
+              <div class="task-card-actions task-card-actions--hover inbox-item-trash-actions">
                 <form method="post" action="/inbox/archive" class="task-card-action" data-inbox-action data-preserve-scroll data-async data-remove-closest="[data-inbox-item]">
                   <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
                   <input type="hidden" name="task_id" value="{{ t.id }}">
-                  <button class="btn ghost btn-sm btn-icon btn-icon--tiny inbox-trash-btn" type="submit" aria-label="Move to recycle bin" title="Move to recycle bin">🗑</button>
+                  <button class="btn ghost btn-sm btn-icon btn-icon--tiny inbox-trash-btn" type="submit" data-inbox-shortcut="d" aria-label="Move to recycle bin" title="Move to recycle bin">🗑</button>
+                </form>
+              </div>
+              <div class="task-card-actions task-card-actions--hover inbox-item-actions inbox-item-bottom-actions">
+                <a class="btn ghost btn-sm btn-icon btn-icon--tiny inbox-process-icon" href="/capture/process/{{ t.id }}" data-inbox-action data-inbox-shortcut="p" aria-label="Process" title="Process">P</a>
+                <form method="post" action="/inbox/route" class="task-card-action" data-inbox-action data-preserve-scroll data-async data-remove-closest="[data-inbox-item]">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+                  <input type="hidden" name="task_id" value="{{ t.id }}">
+                  <input type="hidden" name="intent" value="learn_explore">
+                  <button class="btn ghost btn-sm btn-icon btn-icon--tiny inbox-intent-btn" type="submit" data-inbox-shortcut="l" aria-label="Save to Learning" title="Save to Learning">L</button>
+                </form>
+                <form method="post" action="/inbox/route" class="task-card-action" data-inbox-action data-preserve-scroll data-async data-remove-closest="[data-inbox-item]">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+                  <input type="hidden" name="task_id" value="{{ t.id }}">
+                  <input type="hidden" name="intent" value="enjoy_recover">
+                  <button class="btn ghost btn-sm btn-icon btn-icon--tiny inbox-intent-btn" type="submit" data-inbox-shortcut="e" aria-label="Save to Enjoy" title="Save to Enjoy">E</button>
+                </form>
+                <form method="post" action="/inbox/route" class="task-card-action" data-inbox-action data-preserve-scroll data-async data-remove-closest="[data-inbox-item]">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+                  <input type="hidden" name="task_id" value="{{ t.id }}">
+                  <input type="hidden" name="intent" value="park_let_go">
+                  <button class="btn ghost btn-sm btn-icon btn-icon--tiny inbox-intent-btn" type="submit" data-inbox-shortcut="k" aria-label="Park" title="Park">K</button>
                 </form>
               </div>
               <div class="task-card-header">
@@ -250,6 +277,24 @@
       <div class="quick-capture-actions">
         <button class="btn pink btn-sm" type="submit" form="inbox-detail-form">Save</button>
         <a class="btn ghost btn-sm" href="#" data-inbox-detail-process>Process</a>
+        <form method="post" action="/inbox/route" data-inbox-detail-route-form data-preserve-scroll data-async>
+          <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+          <input type="hidden" name="task_id" value="">
+          <input type="hidden" name="intent" value="learn_explore">
+          <button class="btn ghost btn-sm" type="submit">Learning</button>
+        </form>
+        <form method="post" action="/inbox/route" data-inbox-detail-route-form data-preserve-scroll data-async>
+          <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+          <input type="hidden" name="task_id" value="">
+          <input type="hidden" name="intent" value="enjoy_recover">
+          <button class="btn ghost btn-sm" type="submit">Enjoy</button>
+        </form>
+        <form method="post" action="/inbox/route" data-inbox-detail-route-form data-preserve-scroll data-async>
+          <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+          <input type="hidden" name="task_id" value="">
+          <input type="hidden" name="intent" value="park_let_go">
+          <button class="btn ghost btn-sm" type="submit">Park</button>
+        </form>
       </div>
     </div>
   </div>

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from datetime import datetime, date, timedelta
+import math
+from datetime import date, datetime, time, timedelta
 from urllib.parse import quote_plus
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Request
@@ -18,22 +19,73 @@ from ..models import (
 )
 from ..security import csrf_protect, require_html_auth
 from ..utils.coach import build_coach_context_json, project_summary, task_summary
+from ..utils.inbox_intents import (
+    INBOX_INTENT_ENJOY_RECOVER,
+    INBOX_INTENT_LEARN_EXPLORE,
+    INBOX_INTENT_PARK_LET_GO,
+    reset_to_unprocessed_inbox,
+)
 from ..utils.rules import parse_block_type, parse_optional_int
+from ..utils.time import utc_now
 
 router = APIRouter(dependencies=[Depends(require_html_auth), Depends(csrf_protect)])
 
 
 ACTIVE_TASK_STATUSES = (TaskStatus.PENDING, TaskStatus.IN_PROGRESS)
 ARCHIVED_TASK_STATUSES = (TaskStatus.ARCHIVED, TaskStatus.CANCELLED)
+NON_WORK_CONTAINERS = (
+    INBOX_INTENT_LEARN_EXPLORE,
+    INBOX_INTENT_ENJOY_RECOVER,
+    INBOX_INTENT_PARK_LET_GO,
+)
+TASK_HISTORY_PAGE_SIZE = 40
+
+
+def _parse_page(raw: str | None) -> int:
+    try:
+        page = int(raw or "1")
+    except ValueError:
+        return 1
+    return page if page > 0 else 1
+
+
+def _paginate(total_count: int, requested_page: int, page_size: int = TASK_HISTORY_PAGE_SIZE) -> dict[str, int | bool]:
+    if total_count <= 0:
+        return {
+            "page": 1,
+            "page_size": page_size,
+            "total_pages": 1,
+            "has_prev": False,
+            "has_next": False,
+            "prev_page": 1,
+            "next_page": 1,
+        }
+
+    total_pages = max(1, math.ceil(total_count / page_size))
+    page = max(1, min(requested_page, total_pages))
+    return {
+        "page": page,
+        "page_size": page_size,
+        "total_pages": total_pages,
+        "has_prev": page > 1,
+        "has_next": page < total_pages,
+        "prev_page": page - 1 if page > 1 else 1,
+        "next_page": page + 1 if page < total_pages else total_pages,
+    }
 
 
 def _build_tasks_context(request: Request, db: Session) -> dict:
     templates = request.app.state.templates
+    completed_requested_page = _parse_page(request.query_params.get("completed_page"))
+    archived_requested_page = _parse_page(request.query_params.get("archived_page"))
     projects = db.query(Project).order_by(Project.created_at.desc()).all()
     active_tasks = (
         db.query(Task)
         .options(selectinload(Task.project))
-        .filter(Task.status.in_(ACTIVE_TASK_STATUSES))
+        .filter(
+            Task.status.in_(ACTIVE_TASK_STATUSES),
+            Task.intake_container.notin_(NON_WORK_CONTAINERS),
+        )
         .order_by(
             Task.when_bucket.asc(),
             Task.priority.asc().nulls_last(),
@@ -41,18 +93,32 @@ def _build_tasks_context(request: Request, db: Session) -> dict:
         )
         .all()
     )
+    completed_total_count = db.query(Task).filter(Task.status == TaskStatus.DONE).count()
+    completed_pagination = _paginate(completed_total_count, completed_requested_page)
+    completed_offset = (int(completed_pagination["page"]) - 1) * TASK_HISTORY_PAGE_SIZE
     completed_tasks = (
         db.query(Task)
         .options(selectinload(Task.project))
         .filter(Task.status == TaskStatus.DONE)
         .order_by(Task.completed_at.desc().nulls_last(), Task.created_at.desc())
+        .offset(completed_offset)
+        .limit(TASK_HISTORY_PAGE_SIZE)
         .all()
     )
+    archived_total_count = (
+        db.query(Task)
+        .filter(Task.status.in_(ARCHIVED_TASK_STATUSES))
+        .count()
+    )
+    archived_pagination = _paginate(archived_total_count, archived_requested_page)
+    archived_offset = (int(archived_pagination["page"]) - 1) * TASK_HISTORY_PAGE_SIZE
     archived_tasks = (
         db.query(Task)
         .options(selectinload(Task.project))
         .filter(Task.status.in_(ARCHIVED_TASK_STATUSES))
         .order_by(Task.created_at.desc())
+        .offset(archived_offset)
+        .limit(TASK_HISTORY_PAGE_SIZE)
         .all()
     )
 
@@ -71,9 +137,17 @@ def _build_tasks_context(request: Request, db: Session) -> dict:
         by_project.setdefault(task.project_id, []).append(task)
 
     week_start = date.today() - timedelta(days=date.today().weekday())
-    completed_this_week = [
-        t for t in completed_tasks if t.completed_at and t.completed_at.date() >= week_start
-    ]
+    week_start_dt = datetime.combine(week_start, time.min)
+    completed_this_week = (
+        db.query(Task)
+        .filter(
+            Task.status == TaskStatus.DONE,
+            Task.completed_at.isnot(None),
+            Task.completed_at >= week_start_dt,
+        )
+        .order_by(Task.completed_at.desc())
+        .all()
+    )
 
     coach_context_json = build_coach_context_json(
         request_path=str(request.url.path),
@@ -82,7 +156,7 @@ def _build_tasks_context(request: Request, db: Session) -> dict:
         screen_data={
             "projects": [project_summary(p) for p in projects],
             "tasks": [task_summary(t) for t in active_tasks],
-            "completed_count": len(completed_tasks),
+            "completed_count": completed_total_count,
         },
         db=db,
     )
@@ -92,7 +166,11 @@ def _build_tasks_context(request: Request, db: Session) -> dict:
         "projects": projects,
         "active_tasks": active_tasks,
         "completed_tasks": completed_tasks,
+        "completed_total_count": completed_total_count,
+        "completed_pagination": completed_pagination,
         "archived_tasks": archived_tasks,
+        "archived_total_count": archived_total_count,
+        "archived_pagination": archived_pagination,
         "buckets": buckets,
         "by_project": by_project,
         "completed_this_week": completed_this_week,
@@ -103,6 +181,7 @@ def _build_tasks_context(request: Request, db: Session) -> dict:
 def _render_tasks_page(request: Request, context: dict, page_mode: str, view_mode: str | None = None):
     templates = context["templates"]
     return templates.TemplateResponse(
+        request,
         "tasks.html",
         {
             "request": request,
@@ -111,8 +190,12 @@ def _render_tasks_page(request: Request, context: dict, page_mode: str, view_mod
             "by_project": context["by_project"],
             "active_tasks": context["active_tasks"],
             "completed_tasks": context["completed_tasks"],
+            "completed_total_count": context["completed_total_count"],
+            "completed_pagination": context["completed_pagination"],
             "completed_this_week": context["completed_this_week"],
             "archived_tasks": context["archived_tasks"],
+            "archived_total_count": context["archived_total_count"],
+            "archived_pagination": context["archived_pagination"],
             "form_success": request.query_params.get("success"),
             "coach_context_json": context["coach_context_json"],
             "alignments": [a.value for a in Alignment],
@@ -197,9 +280,7 @@ def update_task(
     task.frog = bool(frog)
     task.alignment = Alignment(alignment) if alignment else None
     if send_to_inbox:
-        task.in_inbox = True
-        task.archived_from_inbox = False
-        task.when_bucket = WhenBucket.LATER
+        reset_to_unprocessed_inbox(task)
 
     db.add(task)
     db.commit()
@@ -229,7 +310,7 @@ def complete_task(
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
     task.status = TaskStatus.DONE
-    task.completed_at = datetime.utcnow()
+    task.completed_at = utc_now()
     task.in_inbox = False
     db.add(task)
     db.commit()
@@ -299,9 +380,7 @@ def restore_task(
     task.status = TaskStatus.PENDING
     task.completed_at = None
     if task.archived_from_inbox:
-        task.in_inbox = True
-        task.when_bucket = WhenBucket.LATER
-        task.archived_from_inbox = False
+        reset_to_unprocessed_inbox(task)
     else:
         task.in_inbox = False
     db.add(task)

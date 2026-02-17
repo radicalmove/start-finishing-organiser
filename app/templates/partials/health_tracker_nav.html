@@ -1,0 +1,7 @@
+{% if tracker_nav_items %}
+  <div class="health-subnav">
+    {% for item in tracker_nav_items %}
+      <a class="btn ghost btn-sm {% if active_tracker_tab == item.key %}is-active{% endif %}" href="{{ item.path }}" {% if active_tracker_tab == item.key %}aria-current="page"{% endif %}>{{ item.label }}</a>
+    {% endfor %}
+  </div>
+{% endif %}

@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <section class="health-shell">
+    {% set hero_title = "Supplements" %}
+    {% set hero_subtitle = "Track what you take and when you take it." %}
+    {% include "partials/health_nav.html" %}
+
+    {% if form_error %}
+      <div class="panel health-alert">{{ form_error }}</div>
+    {% endif %}
+
+    <div class="health-dashboard-grid">
+      <div class="panel">
+        <div class="panel-title-row">
+          <h3>Add supplement</h3>
+        </div>
+        <form class="form" method="post" action="/health/supplements">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+          <input type="hidden" name="return_to" value="/health/supplements">
+          <div class="field two">
+            <label>
+              Supplement
+              <input type="text" name="name" placeholder="Example: Magnesium glycinate" required>
+            </label>
+            <label>
+              Dose
+              <input type="text" name="dose" placeholder="Example: 300 mg">
+            </label>
+          </div>
+          <div class="field two">
+            <label>
+              When
+              <select name="timing" required>
+                {% for option in supplement_timing_options %}
+                  <option value="{{ option }}">{{ option.replace('_', ' ')|title }}</option>
+                {% endfor %}
+              </select>
+            </label>
+            <label>
+              Timing details
+              <input type="text" name="timing_detail" placeholder="Optional: after breakfast, weekdays only">
+            </label>
+          </div>
+          <label class="field">
+            Notes
+            <input type="text" name="notes" placeholder="Optional context">
+          </label>
+          <div class="cta-row cta-row--end">
+            <button class="btn pink btn-sm" type="submit">Save supplement</button>
+          </div>
+        </form>
+      </div>
+
+      <div class="panel">
+        <div class="panel-title-row">
+          <h3>Active supplements</h3>
+        </div>
+        <div class="health-supplement-list">
+          {% for supplement in active_supplements %}
+            <div class="health-supplement-row">
+              <div>
+                <div class="health-supplement-title">
+                  {{ supplement.name }}
+                  {% if supplement.dose %}
+                    <span class="pill">{{ supplement.dose }}</span>
+                  {% endif %}
+                </div>
+                <div class="health-supplement-meta">
+                  <span class="pill">{{ supplement.timing.replace('_', ' ')|title }}</span>
+                  {% if supplement.timing_detail %}
+                    <span class="muted">{{ supplement.timing_detail }}</span>
+                  {% endif %}
+                </div>
+                {% if supplement.notes %}
+                  <div class="muted">{{ supplement.notes }}</div>
+                {% endif %}
+              </div>
+              <form method="post" action="/health/supplements/deactivate">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+                <input type="hidden" name="return_to" value="/health/supplements">
+                <input type="hidden" name="supplement_id" value="{{ supplement.id }}">
+                <button class="btn ghost btn-sm" type="submit">Stop</button>
+              </form>
+            </div>
+          {% else %}
+            <div class="muted">No active supplements logged yet.</div>
+          {% endfor %}
+        </div>
+
+        {% if recent_inactive_supplements %}
+          <div class="health-supplement-inactive">
+            <div class="muted">Recently stopped</div>
+            <div class="health-supplement-meta">
+              {% for supplement in recent_inactive_supplements %}
+                <span class="pill">{{ supplement.name }}</span>
+              {% endfor %}
+            </div>
+          </div>
+        {% endif %}
+      </div>
+    </div>
+  </section>
+{% endblock %}

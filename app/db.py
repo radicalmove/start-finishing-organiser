@@ -219,12 +219,168 @@ def ensure_task_archived_from_inbox_column():
             )
 
 
+def ensure_task_intake_columns():
+    """Ensure tasks intake intent/container fields exist for inbox routing."""
+    with engine.begin() as conn:
+        cols = {row[1] for row in conn.execute(text("PRAGMA table_info(tasks);")).fetchall()}
+        if "intake_intent" not in cols:
+            conn.execute(
+                text(
+                    "ALTER TABLE tasks "
+                    "ADD COLUMN intake_intent VARCHAR(32) NOT NULL DEFAULT 'unprocessed'"
+                )
+            )
+        if "intake_container" not in cols:
+            conn.execute(
+                text(
+                    "ALTER TABLE tasks "
+                    "ADD COLUMN intake_container VARCHAR(32) NOT NULL DEFAULT 'unprocessed'"
+                )
+            )
+        if "intake_processed_at" not in cols:
+            conn.execute(
+                text(
+                    "ALTER TABLE tasks "
+                    "ADD COLUMN intake_processed_at DATETIME NULL"
+                )
+            )
+        conn.execute(
+            text(
+                "UPDATE tasks "
+                "SET intake_intent = 'unprocessed' "
+                "WHERE intake_intent IS NULL OR TRIM(intake_intent) = ''"
+            )
+        )
+        conn.execute(
+            text(
+                "UPDATE tasks "
+                "SET intake_container = 'unprocessed' "
+                "WHERE intake_container IS NULL OR TRIM(intake_container) = ''"
+            )
+        )
+
+
 def ensure_project_color_column():
     """Ensure projects.color_scheme exists for optional color tagging."""
     with engine.connect() as conn:
         cols = {row[1] for row in conn.execute(text("PRAGMA table_info(projects);")).fetchall()}
         if "color_scheme" not in cols:
             conn.execute(text("ALTER TABLE projects ADD COLUMN color_scheme VARCHAR(24) NULL"))
+
+
+def ensure_health_supplements_table():
+    with engine.begin() as conn:
+        conn.execute(
+            text(
+                """
+                CREATE TABLE IF NOT EXISTS health_supplements (
+                    id INTEGER PRIMARY KEY,
+                    name VARCHAR(120) NOT NULL,
+                    dose VARCHAR(80) NULL,
+                    timing VARCHAR(32) NOT NULL DEFAULT 'morning',
+                    timing_detail TEXT NULL,
+                    notes TEXT NULL,
+                    is_active BOOLEAN NOT NULL DEFAULT 1,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL,
+                    updated_at DATETIME NULL
+                )
+                """
+            )
+        )
+        conn.execute(
+            text(
+                "CREATE INDEX IF NOT EXISTS idx_health_supplements_active_name "
+                "ON health_supplements (is_active, name)"
+            )
+        )
+
+
+def ensure_health_exercise_sessions_table():
+    with engine.begin() as conn:
+        conn.execute(
+            text(
+                """
+                CREATE TABLE IF NOT EXISTS health_exercise_sessions (
+                    id INTEGER PRIMARY KEY,
+                    day_of_week VARCHAR(12) NOT NULL,
+                    focus_area VARCHAR(16) NOT NULL,
+                    title VARCHAR(160) NOT NULL,
+                    start_time TIME NULL,
+                    duration_minutes INTEGER NULL,
+                    notes TEXT NULL,
+                    is_active BOOLEAN NOT NULL DEFAULT 1,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL,
+                    updated_at DATETIME NULL
+                )
+                """
+            )
+        )
+        conn.execute(
+            text(
+                "CREATE INDEX IF NOT EXISTS idx_health_exercise_active_day_time "
+                "ON health_exercise_sessions (is_active, day_of_week, start_time)"
+            )
+        )
+
+
+def ensure_health_training_plans_table():
+    with engine.begin() as conn:
+        conn.execute(
+            text(
+                """
+                CREATE TABLE IF NOT EXISTS health_training_plans (
+                    id INTEGER PRIMARY KEY,
+                    title VARCHAR(160) NOT NULL,
+                    start_date DATE NULL,
+                    end_date DATE NULL,
+                    focus_goal TEXT NULL,
+                    notes TEXT NULL,
+                    is_active BOOLEAN NOT NULL DEFAULT 1,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL,
+                    updated_at DATETIME NULL
+                )
+                """
+            )
+        )
+        conn.execute(
+            text(
+                "CREATE INDEX IF NOT EXISTS idx_health_training_plans_active_created "
+                "ON health_training_plans (is_active, created_at)"
+            )
+        )
+
+
+def ensure_health_training_set_logs_table():
+    with engine.begin() as conn:
+        conn.execute(
+            text(
+                """
+                CREATE TABLE IF NOT EXISTS health_training_set_logs (
+                    id INTEGER PRIMARY KEY,
+                    session_id INTEGER NULL REFERENCES health_exercise_sessions(id),
+                    log_date DATE NOT NULL,
+                    exercise_name VARCHAR(160) NULL,
+                    reps INTEGER NULL,
+                    load_text VARCHAR(64) NULL,
+                    duration_seconds INTEGER NULL,
+                    notes TEXT NULL,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL
+                )
+                """
+            )
+        )
+        conn.execute(
+            text(
+                "CREATE INDEX IF NOT EXISTS idx_health_training_set_logs_date_created "
+                "ON health_training_set_logs (log_date, created_at)"
+            )
+        )
+        conn.execute(
+            text(
+                "CREATE INDEX IF NOT EXISTS idx_health_training_set_logs_session "
+                "ON health_training_set_logs (session_id)"
+            )
+        )
 
 
 def ensure_core_indexes():
@@ -234,6 +390,10 @@ def ensure_core_indexes():
         "ON tasks (in_inbox, status, created_at)",
         "CREATE INDEX IF NOT EXISTS idx_tasks_bucket_status_created_at "
         "ON tasks (when_bucket, status, created_at)",
+        "CREATE INDEX IF NOT EXISTS idx_tasks_intake_container_created_at "
+        "ON tasks (intake_container, created_at)",
+        "CREATE INDEX IF NOT EXISTS idx_tasks_intake_processed_at "
+        "ON tasks (intake_processed_at)",
         "CREATE INDEX IF NOT EXISTS idx_tasks_resurface_on ON tasks (resurface_on)",
         "CREATE INDEX IF NOT EXISTS idx_tasks_scheduled_for ON tasks (scheduled_for)",
         "CREATE INDEX IF NOT EXISTS idx_blocks_date_start_time ON blocks (date, start_time)",
@@ -333,6 +493,36 @@ SCHEMA_MIGRATIONS: tuple[SchemaMigration, ...] = (
         apply=ensure_core_indexes,
         rollback_hint="Drop indexes manually only if query plans regress.",
     ),
+    SchemaMigration(
+        revision="20260216_011_task_intake_columns",
+        name="Ensure tasks intake intent/container fields exist",
+        apply=ensure_task_intake_columns,
+        rollback_hint="No rollback required (safe additive columns).",
+    ),
+    SchemaMigration(
+        revision="20260217_012_health_supplements_table",
+        name="Ensure health_supplements table exists",
+        apply=ensure_health_supplements_table,
+        rollback_hint="Keep table; do not drop without confirming exports include supplements.",
+    ),
+    SchemaMigration(
+        revision="20260217_013_health_exercise_sessions_table",
+        name="Ensure health_exercise_sessions table exists",
+        apply=ensure_health_exercise_sessions_table,
+        rollback_hint="Keep table; do not drop without confirming exports include exercise sessions.",
+    ),
+    SchemaMigration(
+        revision="20260217_014_health_training_plans_table",
+        name="Ensure health_training_plans table exists",
+        apply=ensure_health_training_plans_table,
+        rollback_hint="Keep table; do not drop without confirming exports include training plans.",
+    ),
+    SchemaMigration(
+        revision="20260217_015_health_training_set_logs_table",
+        name="Ensure health_training_set_logs table exists",
+        apply=ensure_health_training_set_logs_table,
+        rollback_hint="Keep table; do not drop without confirming exports include training logs.",
+    ),
 )
 
 
@@ -394,8 +584,12 @@ __all__ = [
     "ensure_guidance_reminder_columns",
     "ensure_task_inbox_column",
     "ensure_task_archived_from_inbox_column",
+    "ensure_task_intake_columns",
     "ensure_project_color_column",
     "ensure_core_indexes",
+    "ensure_health_exercise_sessions_table",
+    "ensure_health_training_plans_table",
+    "ensure_health_training_set_logs_table",
     "apply_schema_migrations",
     "list_schema_migrations",
     "SCHEMA_MIGRATIONS",

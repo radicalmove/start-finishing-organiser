@@ -26,6 +26,7 @@ def profile_page(request: Request, db: Session = Depends(get_db)):
         db=db,
     )
     return templates.TemplateResponse(
+        request,
         "profile.html",
         {
             "request": request,

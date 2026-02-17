@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
+from app.version import APP_VERSION
 
 startup_error: str | None = None
 try:
@@ -8,7 +9,7 @@ try:
     app = create_app()
 except Exception as exc:
     startup_error = f"{type(exc).__name__}: {exc}"
-    app = FastAPI(title="Start Finishing Organiser")
+    app = FastAPI(title="Start Finishing Organiser", version=APP_VERSION)
     app.state.startup_error = startup_error
 
 

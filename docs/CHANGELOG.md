@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.732 - 2026-02-17
+- Consolidated app version to a single source (`app/version.py`) and wired it into app metadata, header UI version pill, and export manifest metadata.
+- Removed deprecated `datetime.utcnow()` usage with shared UTC helpers for timezone-safe timestamps.
+- Migrated template rendering to the modern `TemplateResponse(request, template, context)` signature across route handlers.
+- Removed inbox container GET-side effects by making recycle cleanup explicit (`POST /inbox/recycle/purge-expired`) instead of mutating during page navigation.
+- Added lightweight TTL caching for coach global context to reduce repeated high-volume context queries on rapid page transitions.
+- Reduced Cozi request-path blocking risk with shorter configurable HTTP timeout and retry backoff after fetch failures.
+- Extracted Training Live inline JS into `app/static/js/health-training-live.js` to improve frontend maintainability.
+- Added server-side pagination for task history pages (Completed and Archived) with explicit page controls in the UI.
+- Added API pagination envelopes for `/api/projects` and `/api/tasks` with metadata (`items`, `page`, `page_size`, `total`, `total_pages`).
+- Expanded accessibility regression checks beyond Home to include key views, dialog semantics, and training live controls.
+- Refactored home `landing` route into helper builders for ritual and calendar state assembly to reduce controller complexity.
+
+## 0.731 - 2026-02-16
+- Rolled out Phase 1 inbox intent handling for single-user flow: `Process`, `Learning`, `Enjoy`, and `Park` routing from Inbox.
+- Added dedicated inbox containers view and kept recycle-bin delete as a distinct action (separate from Park / Let Go).
+- Added undo toast behavior for quick inbox routing to reduce accidental item moves.
+- Simplified Inbox header actions to reduce clutter (primary actions + `Lists` menu for secondary destinations).
+- Improved guided processing flow: clearer support-project dependency, stronger block-type guidance, and reduced modal overflow friction.
+- Improved Home UX details: Today calendar auto-scrolls to current time, panel spacing/height tuning, and glow clipping fix.
+- Hardened Gmail/dev reliability paths (virtualenv selection for Gmail-enabled web runs, clearer auth/sync handling).
+- Updated docs to reflect current inbox intent strategy and waiting behavior.
+
 ## 0.721 - 2026-01-28
 - Added a Send to Inbox action in the task edit modal for non-inbox tasks.
 - Rebuild script now bumps the version pill automatically.

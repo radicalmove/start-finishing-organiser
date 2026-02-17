@@ -23,6 +23,7 @@ def login(request: Request):
     templates = request.app.state.templates
     next_url = request.query_params.get("next")
     return templates.TemplateResponse(
+        request,
         "login.html",
         {
             "request": request,
@@ -46,6 +47,7 @@ def login_submit(
     if not verify_credentials(username, password):
         templates = request.app.state.templates
         return templates.TemplateResponse(
+            request,
             "login.html",
             {
                 "request": request,

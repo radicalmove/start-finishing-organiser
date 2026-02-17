@@ -54,6 +54,7 @@ def weekly_review(request: Request, db: Session = Depends(get_db)):
     )
 
     return templates.TemplateResponse(
+        request,
         "weekly_review.html",
         {
             "request": request,
@@ -119,6 +120,7 @@ def weekly_wizard(request: Request, db: Session = Depends(get_db)):
         db=db,
     )
     return templates.TemplateResponse(
+        request,
         "weekly_wizard.html",
         {
             "request": request,

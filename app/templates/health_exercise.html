@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <section class="health-shell">
+    {% set hero_title = "Exercise plan" %}
+    {% set hero_subtitle = "Build your weekly fitness, strength, and flexibility rhythm." %}
+    {% include "partials/health_nav.html" %}
+
+    {% if form_error %}
+      <div class="panel health-alert">{{ form_error }}</div>
+    {% endif %}
+
+    <div class="health-dashboard-grid">
+      <div class="panel">
+        <div class="panel-title-row">
+          <h3>Add recurring session</h3>
+        </div>
+        <form class="form" method="post" action="/health/exercise/sessions">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+          <input type="hidden" name="return_to" value="/health/exercise">
+          <div class="field two">
+            <label>
+              Day
+              <select name="day_of_week" required>
+                {% for day in exercise_day_options %}
+                  <option value="{{ day }}">{{ day.title() }}</option>
+                {% endfor %}
+              </select>
+            </label>
+            <label>
+              Focus
+              <select name="focus_area" required>
+                {% for focus in exercise_focus_options %}
+                  <option value="{{ focus }}">{{ focus.title() }}</option>
+                {% endfor %}
+              </select>
+            </label>
+          </div>
+          <label class="field">
+            Session title
+            <input type="text" name="title" placeholder="Example: Lower body strength circuit" required>
+          </label>
+          <div class="field two">
+            <label>
+              Start time
+              <input type="time" name="start_time">
+            </label>
+            <label>
+              Duration (min)
+              <input type="number" name="duration_minutes" min="5" step="5" placeholder="45">
+            </label>
+          </div>
+          <label class="field">
+            Notes
+            <input type="text" name="notes" placeholder="Optional: focus cues, intensity, constraints">
+          </label>
+          <div class="cta-row cta-row--end">
+            <button class="btn pink btn-sm" type="submit">Save session</button>
+          </div>
+        </form>
+
+        <div class="health-exercise-link-grid">
+          {% for focus in exercise_focus_options %}
+            {% set link = exercise_focus_links[focus] %}
+            <a class="btn ghost btn-sm" href="{{ link.path }}">Open {{ link.label }}</a>
+          {% endfor %}
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-title-row">
+          <h3>Weekly schedule</h3>
+        </div>
+        <div class="health-exercise-days">
+          {% for day in sessions_by_day %}
+            <div class="health-exercise-day">
+              <div class="health-exercise-day-title">{{ day.day_label }}</div>
+              {% if day.sessions %}
+                <div class="health-exercise-session-list">
+                  {% for session in day.sessions %}
+                    {% set link = exercise_focus_links.get(session.focus_area, exercise_focus_links["fitness"]) %}
+                    <div class="health-exercise-session-row">
+                      <div>
+                        <div class="health-supplement-title">{{ session.title }}</div>
+                        <div class="health-supplement-meta">
+                          <span class="pill">{{ session.focus_area.replace('_', ' ')|title }}</span>
+                          {% if session.start_time %}
+                            <span class="pill">{{ session.start_time.strftime("%I:%M %p").lstrip("0") }}</span>
+                          {% else %}
+                            <span class="pill">Any time</span>
+                          {% endif %}
+                          {% if session.duration_minutes %}
+                            <span class="pill">{{ session.duration_minutes }} min</span>
+                          {% endif %}
+                        </div>
+                        {% if session.notes %}
+                          <div class="muted">{{ session.notes }}</div>
+                        {% endif %}
+                      </div>
+                      <div class="health-exercise-session-actions">
+                        <a class="btn ghost btn-sm" href="{{ link.path }}">{{ link.label }}</a>
+                        <form method="post" action="/health/exercise/sessions/deactivate">
+                          <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+                          <input type="hidden" name="return_to" value="/health/exercise">
+                          <input type="hidden" name="session_id" value="{{ session.id }}">
+                          <button class="btn ghost btn-sm" type="submit">Remove</button>
+                        </form>
+                      </div>
+                    </div>
+                  {% endfor %}
+                </div>
+              {% else %}
+                <div class="muted">No session set.</div>
+              {% endif %}
+            </div>
+          {% endfor %}
+        </div>
+
+        {% if recent_inactive_sessions %}
+          <div class="health-supplement-inactive">
+            <div class="muted">Recently removed</div>
+            <div class="health-supplement-meta">
+              {% for session in recent_inactive_sessions %}
+                <span class="pill">{{ session.day_of_week.title() }} · {{ session.title }}</span>
+              {% endfor %}
+            </div>
+          </div>
+        {% endif %}
+      </div>
+    </div>
+  </section>
+{% endblock %}

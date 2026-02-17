@@ -3,7 +3,9 @@
 {% block content %}
   <section class="health-shell">
     {% set hero_title = "Diet + nutrition" %}
+    {% set hero_subtitle = "Tracker detail view. Use this page for diet-specific logging and trends." %}
     {% include "partials/health_nav.html" %}
+    {% include "partials/health_tracker_nav.html" %}
 
     {% if form_error %}
       <div class="panel health-alert">{{ form_error }}</div>

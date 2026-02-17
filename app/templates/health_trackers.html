@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <section class="health-shell">
+    {% set hero_title = "Trackers" %}
+    {% set hero_subtitle = "All detailed tracking areas in one place. Use this hub to jump to logging and trend pages." %}
+    {% include "partials/health_nav.html" %}
+
+    {% if form_error %}
+      <div class="panel health-alert">{{ form_error }}</div>
+    {% endif %}
+
+    <div class="health-dashboard-grid">
+      <div class="panel">
+        <div class="panel-title-row">
+          <h3>Tracker areas</h3>
+        </div>
+        <div class="health-tracker-grid">
+          {% for card in tracker_cards %}
+            <div class="health-tracker-card">
+              <div class="panel-title-row">
+                <h3>{{ card.label }}</h3>
+                <div class="panel-actions">
+                  <a class="btn ghost btn-sm" href="{{ card.path }}">Open</a>
+                </div>
+              </div>
+              <div class="muted">{{ card.description }}</div>
+              <div class="health-goal-meta">
+                <span class="pill">{{ card.metric_count }} metrics</span>
+                <span class="pill">{{ card.recent_entries_count }} entries (7d)</span>
+                {% if card.latest_entry_date %}
+                  <span class="pill">Last update {{ card.latest_entry_date }}</span>
+                {% else %}
+                  <span class="pill">No entries yet</span>
+                {% endif %}
+              </div>
+            </div>
+          {% endfor %}
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-title-row">
+          <h3>Related areas</h3>
+        </div>
+        <div class="health-exercise-link-grid">
+          <a class="btn ghost btn-sm" href="/health/training">Open Training Live</a>
+          <a class="btn ghost btn-sm" href="/health/exercise">Open Exercise Plan</a>
+          <a class="btn ghost btn-sm" href="/health/supplements">Open Supplements</a>
+          <a class="btn ghost btn-sm" href="/health">Open Dashboard</a>
+        </div>
+        <div class="muted">Tip: keep daily work in Training Live, and use Trackers for deeper trend review.</div>
+      </div>
+    </div>
+  </section>
+{% endblock %}

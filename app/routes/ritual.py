@@ -30,7 +30,7 @@ def _render(
     }
     if extra_context:
         context.update(extra_context)
-    return templates.TemplateResponse("ritual.html", context)
+    return templates.TemplateResponse(request, "ritual.html", context)
 
 
 def _get_last(db: Session, ritual_type: RitualType) -> RitualEntry | None:

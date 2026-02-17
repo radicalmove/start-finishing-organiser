@@ -41,6 +41,7 @@ def blocks(request: Request, db: Session = Depends(get_db)):
         db=db,
     )
     return templates.TemplateResponse(
+        request,
         "blocks.html",
         {
             "request": request,

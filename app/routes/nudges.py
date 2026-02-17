@@ -24,6 +24,7 @@ from ..models import (
 )
 from ..security import csrf_protect, require_html_auth
 from ..utils.coach import refine_nudge_text
+from ..utils.time import utc_now
 
 router = APIRouter(dependencies=[Depends(require_html_auth), Depends(csrf_protect)])
 
@@ -268,7 +269,7 @@ def _health_trends(
 
 def _pattern_candidates(db: Session, today: date) -> list[dict[str, object]]:
     patterns: list[dict[str, object]] = []
-    now = datetime.utcnow()
+    now = utc_now()
 
     ritual_entries = _rituals_since(db, today - timedelta(days=6))
     ritual_by_day = _ritual_day_map(ritual_entries)
@@ -579,7 +580,7 @@ def _serialize_nudges(
 
 def _refresh_nudges(db: Session) -> tuple[list[GuidanceReminder], dict[str, dict[str, object]]]:
     today = date.today()
-    now = datetime.utcnow()
+    now = utc_now()
     reminders: list[GuidanceReminder] = []
     dirty = False
     pattern_defs: dict[str, dict[str, object]] = {}
@@ -708,7 +709,7 @@ def _refresh_nudges(db: Session) -> tuple[list[GuidanceReminder], dict[str, dict
 def list_nudges(db: Session = Depends(get_db)):
     # Read-only endpoint: navigation fetches should not mutate reminder state.
     today = date.today()
-    now = datetime.utcnow()
+    now = utc_now()
     reminders = (
         db.query(GuidanceReminder)
         .filter(
@@ -736,7 +737,7 @@ def complete_nudge(reminder_id: int, db: Session = Depends(get_db)):
     reminder = db.get(GuidanceReminder, reminder_id)
     if not reminder:
         raise HTTPException(status_code=404, detail="Reminder not found")
-    now = datetime.utcnow()
+    now = utc_now()
     reminder.completed_at = reminder.completed_at or now
     reminder.acknowledged_at = reminder.acknowledged_at or now
     reminder.snoozed_until = None
@@ -763,8 +764,8 @@ async def snooze_nudge(reminder_id: int, request: Request, db: Session = Depends
     if minutes <= 0 or minutes > 60 * 24 * 14:
         raise HTTPException(status_code=400, detail="Invalid snooze duration")
 
-    reminder.snoozed_until = datetime.utcnow() + timedelta(minutes=minutes)
-    reminder.last_shown_at = datetime.utcnow()
+    reminder.snoozed_until = utc_now() + timedelta(minutes=minutes)
+    reminder.last_shown_at = utc_now()
     db.add(reminder)
     db.commit()
     return JSONResponse({"ok": True, "snoozed_until": reminder.snoozed_until.isoformat()})

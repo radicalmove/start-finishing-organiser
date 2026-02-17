@@ -100,6 +100,13 @@ class HealthMetricCategory(str, Enum):
 ENUM_KWARGS = {"values_callable": lambda obj: [e.value for e in obj], "native_enum": False}
 
 
+INBOX_INTENT_UNPROCESSED = "unprocessed"
+INBOX_INTENT_SUPPORT_PROJECT = "support_project"
+INBOX_INTENT_LEARN_EXPLORE = "learn_explore"
+INBOX_INTENT_ENJOY_RECOVER = "enjoy_recover"
+INBOX_INTENT_PARK_LET_GO = "park_let_go"
+
+
 class Project(Base):
     __tablename__ = "projects"
 
@@ -139,6 +146,9 @@ class Task(Base):
     description = Column(Text, nullable=True)
     in_inbox = Column(Boolean, nullable=False, default=False)
     archived_from_inbox = Column(Boolean, nullable=False, default=False)
+    intake_intent = Column(String(32), nullable=False, default=INBOX_INTENT_UNPROCESSED)
+    intake_container = Column(String(32), nullable=False, default=INBOX_INTENT_UNPROCESSED)
+    intake_processed_at = Column(DateTime(timezone=True), nullable=True)
     when_bucket = Column(SAEnum(WhenBucket, **ENUM_KWARGS), nullable=False, default=WhenBucket.LATER)
     block_type = Column(SAEnum(BlockType, **ENUM_KWARGS), nullable=True)
     duration_minutes = Column(Integer, nullable=True)
@@ -299,6 +309,65 @@ class HealthGoal(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
     metric = relationship("HealthMetric", back_populates="goals")
+
+
+class HealthSupplement(Base):
+    __tablename__ = "health_supplements"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(120), nullable=False)
+    dose = Column(String(80), nullable=True)
+    timing = Column(String(32), nullable=False, default="morning")
+    timing_detail = Column(Text, nullable=True)
+    notes = Column(Text, nullable=True)
+    is_active = Column(Boolean, nullable=False, default=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+
+class HealthExerciseSession(Base):
+    __tablename__ = "health_exercise_sessions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    day_of_week = Column(String(12), nullable=False)
+    focus_area = Column(String(16), nullable=False)
+    title = Column(String(160), nullable=False)
+    start_time = Column(Time, nullable=True)
+    duration_minutes = Column(Integer, nullable=True)
+    notes = Column(Text, nullable=True)
+    is_active = Column(Boolean, nullable=False, default=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+
+class HealthTrainingPlan(Base):
+    __tablename__ = "health_training_plans"
+
+    id = Column(Integer, primary_key=True, index=True)
+    title = Column(String(160), nullable=False)
+    start_date = Column(Date, nullable=True)
+    end_date = Column(Date, nullable=True)
+    focus_goal = Column(Text, nullable=True)
+    notes = Column(Text, nullable=True)
+    is_active = Column(Boolean, nullable=False, default=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+
+class HealthTrainingSetLog(Base):
+    __tablename__ = "health_training_set_logs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    session_id = Column(Integer, ForeignKey("health_exercise_sessions.id"), nullable=True)
+    log_date = Column(Date, nullable=False, default=date.today)
+    exercise_name = Column(String(160), nullable=True)
+    reps = Column(Integer, nullable=True)
+    load_text = Column(String(64), nullable=True)
+    duration_seconds = Column(Integer, nullable=True)
+    notes = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    session = relationship("HealthExerciseSession")
 
 
 class CoachConversation(Base):

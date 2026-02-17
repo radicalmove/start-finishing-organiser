@@ -128,12 +128,37 @@ document.addEventListener("DOMContentLoaded", () => {
   const showToast = (message, options = {}) => {
     const text = `${message || ""}`.trim();
     if (!text) return;
-    const { variant = "success", timeout = 4200 } = options;
+    const {
+      variant = "success",
+      timeout = 4200,
+      actionLabel = "",
+      onAction = null,
+    } = options;
     const stack = ensureToastStack();
     const toast = document.createElement("div");
     toast.className = `toast ${variant}`.trim();
-    toast.textContent = text;
     toast.setAttribute("role", "status");
+    const messageEl = document.createElement("span");
+    messageEl.className = "toast-text";
+    messageEl.textContent = text;
+    toast.appendChild(messageEl);
+    if (actionLabel && typeof onAction === "function") {
+      const actionBtn = document.createElement("button");
+      actionBtn.type = "button";
+      actionBtn.className = "toast-action";
+      actionBtn.textContent = actionLabel;
+      actionBtn.addEventListener("click", async (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        actionBtn.disabled = true;
+        try {
+          await onAction();
+        } finally {
+          dismiss();
+        }
+      });
+      toast.appendChild(actionBtn);
+    }
     stack.appendChild(toast);
     requestAnimationFrame(() => toast.classList.add("is-visible"));
 
@@ -249,6 +274,30 @@ document.addEventListener("DOMContentLoaded", () => {
     updateInboxEmptyState();
   };
 
+  const csrfToken =
+    document.querySelector('meta[name="csrf-token"]')?.getAttribute("content") || "";
+
+  const postInboxUndo = async (taskId) => {
+    const formData = new FormData();
+    formData.append("task_id", String(taskId));
+    if (csrfToken) {
+      formData.append("csrf_token", csrfToken);
+    }
+    const response = await fetch("/inbox/undo", {
+      method: "POST",
+      body: formData,
+      headers: {
+        "X-Requested-With": "fetch",
+        Accept: "application/json",
+      },
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok || payload.ok === false || payload.status === "error") {
+      throw new Error(payload.message || payload.error || "Could not undo.");
+    }
+    return payload;
+  };
+
   const handleAsyncFormSubmit = async (form, event) => {
     if (form.dataset.asyncPending === "1") return;
     event.preventDefault();
@@ -285,10 +334,6 @@ document.addEventListener("DOMContentLoaded", () => {
         return;
       }
 
-      if (payload.message) {
-        showToast(payload.message, { variant: "success" });
-      }
-
       if (typeof payload.inbox_count === "number") {
         updateInboxCount(payload.inbox_count);
       }
@@ -301,16 +346,66 @@ document.addEventListener("DOMContentLoaded", () => {
       }
 
       if (payload.removed && payload.task_id) {
+        let removedItem = null;
+        let removedParent = null;
         const removeClosest = form.dataset.removeClosest;
         if (removeClosest) {
-          form.closest(removeClosest)?.remove();
+          removedItem = form.closest(removeClosest);
+          removedParent = removedItem?.parentElement || null;
+          removedItem?.remove();
           updateInboxEmptyState();
         } else {
+          removedItem = document.querySelector(
+            `[data-inbox-item][data-task-id="${payload.task_id}"]`
+          );
+          removedParent = removedItem?.parentElement || null;
           removeInboxItem(payload.task_id);
         }
         document.dispatchEvent(
           new CustomEvent("inbox:archived", { detail: { taskId: payload.task_id } })
         );
+        const removedMarkup = removedItem?.outerHTML || "";
+        if (payload.message) {
+          if (payload.undo_available && removedMarkup && removedParent) {
+            showToast(payload.message, {
+              variant: "success",
+              timeout: 9000,
+              actionLabel: "Undo",
+              onAction: async () => {
+                try {
+                  const undoPayload = await postInboxUndo(payload.task_id);
+                  if (typeof undoPayload.inbox_count === "number") {
+                    updateInboxCount(undoPayload.inbox_count);
+                  }
+                  const temp = document.createElement("div");
+                  temp.innerHTML = removedMarkup;
+                  const restored = temp.firstElementChild;
+                  if (undoPayload.restored && restored) {
+                    removedParent.prepend(restored);
+                    updateInboxEmptyState();
+                    document.dispatchEvent(
+                      new CustomEvent("inbox:restored", {
+                        detail: { taskId: payload.task_id },
+                      })
+                    );
+                  }
+                  if (undoPayload.message) {
+                    showToast(undoPayload.message, { variant: "success", timeout: 2400 });
+                  }
+                } catch (error) {
+                  showToast(error.message || "Could not undo.", { variant: "error" });
+                }
+              },
+            });
+          } else {
+            showToast(payload.message, { variant: "success" });
+          }
+        }
+        return;
+      }
+
+      if (payload.message) {
+        showToast(payload.message, { variant: "success" });
       }
     } catch (error) {
       showToast("Something went wrong. Please try again.", { variant: "error" });
@@ -423,6 +518,12 @@ document.addEventListener("DOMContentLoaded", () => {
     const horizonNoteProject = form.querySelector("[data-horizon-note-project]");
     const blockStep = form.querySelector('.wizard-step[data-step="5"]');
     const whyStep = form.querySelector('.wizard-step[data-step="4"]');
+    const projectLinkNote = form.querySelector("[data-project-link-note]");
+    const projectSelectField = form.querySelector('select[name="project_id"]');
+    const blockTypeSelect = form.querySelector('select[name="block_type"]');
+    const blockGuidance = form.querySelector("[data-block-guidance]");
+    const captureTitleInput = form.querySelector('input[name="capture_text"]');
+    const captureDescriptionInput = form.querySelector('textarea[name="capture_description"]');
     const notSureSteps = Array.from(form.querySelectorAll("[data-not-sure-step]"));
     const notSureDecisionInputs = Array.from(
       form.querySelectorAll('input[name="not_sure_decision"]')
@@ -435,15 +536,47 @@ document.addEventListener("DOMContentLoaded", () => {
     const notSureSuggestionText = form.querySelector("[data-not-sure-suggestion-text]");
     const notSureUseBtn = form.querySelector("[data-not-sure-use]");
     const horizonStep = form.querySelector('.wizard-step[data-step="3"]');
+    const sourceTaskInput = form.querySelector('input[name="source_task_id"]');
+    const sourceIntentSection = form.querySelector("[data-source-intent]");
+    const sourceIntentInputs = Array.from(
+      form.querySelectorAll("[data-source-intent-input]")
+    );
+    const defaultIntentInput = form.querySelector("[data-inbox-intent-default]");
+    const supportOnlySections = Array.from(
+      form.querySelectorAll("[data-support-project-only]")
+    );
     const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute("content");
 
     let current = 0;
     let currentKind = "task";
+    let blockTypeManuallySet = false;
 
     const waitingField = form.querySelector("[data-waiting-person]");
 
     const getActiveSteps = () =>
       steps.filter((step) => step.dataset.stepDisabled !== "true");
+
+    const isSourceTaskMode = () => {
+      const value = sourceTaskInput?.value || "";
+      return value.trim().length > 0;
+    };
+
+    const selectedInboxIntent = () =>
+      sourceIntentInputs.find((input) => input.checked)?.value || "";
+
+    const syncSourceIntentMode = () => {
+      const sourceMode = isSourceTaskMode();
+      sourceIntentSection?.classList.toggle("hidden", !sourceMode);
+      if (defaultIntentInput) {
+        defaultIntentInput.disabled = sourceMode;
+      }
+      sourceIntentInputs.forEach((input) => {
+        input.disabled = !sourceMode;
+        if (!sourceMode) {
+          input.checked = false;
+        }
+      });
+    };
 
     const showStep = (index) => {
       const activeSteps = getActiveSteps();
@@ -579,28 +712,69 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     };
 
+    const inferBlockTypeSuggestion = () => {
+      const sourceText = `${captureTitleInput?.value || ""} ${captureDescriptionInput?.value || ""}`
+        .toLowerCase()
+        .trim();
+      if (!sourceText) {
+        return { type: "focus", reason: "default for meaningful work." };
+      }
+      if (/(call|meeting|chat|talk|interview|1:1|one-on-one)/.test(sourceText)) {
+        return { type: "social", reason: "it sounds conversation-based." };
+      }
+      if (/(email|invoice|admin|follow[ -]?up|schedule|book|organi[sz]e|paperwork|forms?)/.test(sourceText)) {
+        return { type: "admin", reason: "it sounds operational/logistics-heavy." };
+      }
+      if (/(recover|rest|sleep|walk|stretch|wellbeing|recharge|reset)/.test(sourceText)) {
+        return { type: "recovery", reason: "it sounds energy/rest oriented." };
+      }
+      return { type: "focus", reason: "it likely needs focused attention." };
+    };
+
+    const syncBlockGuidance = () => {
+      if (!blockGuidance) return;
+      const suggestion = inferBlockTypeSuggestion();
+      const title = suggestion.type.charAt(0).toUpperCase() + suggestion.type.slice(1);
+      blockGuidance.textContent = `Suggested: ${title} - ${suggestion.reason}`;
+      if (blockTypeSelect && !blockTypeManuallySet) {
+        blockTypeSelect.value = suggestion.type;
+      }
+    };
+
     const syncKind = (options = {}) => {
+      syncSourceIntentMode();
       const prevKind = currentKind;
       const kind = form.querySelector('input[name="item_kind"]:checked')?.value;
       const owner = form.querySelector('input[name="owner_type"]:checked')?.value;
-      currentKind = kind || "task";
-      const isTask = currentKind === "task";
-      const isProject = currentKind === "project";
-      const isDecideLater = currentKind === "decide_later";
-      const isNotSure = currentKind === "not_sure";
+      const sourceMode = isSourceTaskMode();
+      const intent = selectedInboxIntent();
+      const nextKind = kind || "task";
+      const supportsProjectFlow = !sourceMode || !intent || intent === "support_project";
+      const supportsProjectTask =
+        sourceMode && intent === "support_project" && nextKind === "task";
+      currentKind = nextKind;
+      const isTask = supportsProjectFlow && currentKind === "task";
+      const isProject = supportsProjectFlow && currentKind === "project";
+      const isDecideLater = supportsProjectFlow && currentKind === "decide_later";
+      const isNotSure = supportsProjectFlow && currentKind === "not_sure";
+      supportOnlySections.forEach((section) => setSectionActive(section, supportsProjectFlow));
       setSectionActive(attachProject, isTask);
       setSectionActive(projectCategory, isProject);
       setSectionActive(projectColor, isProject);
+      if (projectSelectField) {
+        projectSelectField.required = Boolean(supportsProjectTask);
+      }
+      projectLinkNote?.classList.toggle("hidden", !supportsProjectTask);
       includeWeekFields.forEach((field) => setSectionActive(field, isProject));
       if (horizonLabel) {
         horizonLabel.textContent = isProject ? "Time horizon" : "When does it belong?";
       }
       horizonNoteTask?.classList.toggle("hidden", isProject);
       horizonNoteProject?.classList.toggle("hidden", !isProject);
-      setStepEnabled(horizonStep, !isDecideLater);
-      setStepEnabled(whyStep, !isDecideLater);
+      setStepEnabled(horizonStep, supportsProjectFlow && !isDecideLater);
+      setStepEnabled(whyStep, false);
       setStepEnabled(blockStep, isTask);
-      setNotSureSteps(isNotSure);
+      setNotSureSteps(supportsProjectFlow && isNotSure);
       if (isNotSure && prevKind !== "not_sure") {
         notSureDecisionInputs.forEach((input) => {
           input.checked = false;
@@ -624,6 +798,7 @@ document.addEventListener("DOMContentLoaded", () => {
           current = index;
         }
       }
+      syncBlockGuidance();
       showStep(current);
     };
 
@@ -665,23 +840,30 @@ document.addEventListener("DOMContentLoaded", () => {
     form.querySelectorAll('input[name="item_kind"]').forEach((r) =>
       r.addEventListener("change", syncKind)
     );
+    sourceIntentInputs.forEach((input) => input.addEventListener("change", syncKind));
     form.querySelectorAll('input[name="owner_type"]').forEach((r) =>
       r.addEventListener("change", syncKind)
     );
     horizonSelect?.addEventListener("change", syncHorizon);
+    captureTitleInput?.addEventListener("input", syncBlockGuidance);
+    captureDescriptionInput?.addEventListener("input", syncBlockGuidance);
+    blockTypeSelect?.addEventListener("change", () => {
+      blockTypeManuallySet = true;
+    });
 
     const resetWizard = () => {
       form.reset();
-      const sourceInput = form.querySelector('input[name="source_task_id"]');
-      if (sourceInput) {
-        sourceInput.disabled = !sourceInput.value;
+      if (sourceTaskInput) {
+        sourceTaskInput.disabled = !sourceTaskInput.value;
       }
+      blockTypeManuallySet = false;
       resetNotSureSuggestion();
       syncKind();
       showStep(0);
     };
 
     form.addEventListener("wizard-reset", resetWizard);
+    form.addEventListener("wizard-sync", syncKind);
     form.addEventListener("input", (event) => {
       const step = event.target.closest(".wizard-step");
       clearStepError(step);
@@ -805,6 +987,7 @@ document.addEventListener("DOMContentLoaded", () => {
       if (projectSelect) {
         projectSelect.value = projectId || "";
       }
+      form?.dispatchEvent(new Event("wizard-sync"));
       guidedCaptureModal.classList.remove("hidden");
       input?.focus();
       input?.select();
@@ -898,12 +1081,54 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
+  const recycleEmptyModal = document.getElementById("recycle-empty-modal");
+  if (recycleEmptyModal) {
+    const openButtons = document.querySelectorAll("[data-recycle-empty-open]");
+    const closeButtons = recycleEmptyModal.querySelectorAll("[data-recycle-empty-close]");
+
+    const openModal = () => {
+      recycleEmptyModal.classList.remove("hidden");
+      closeButtons[0]?.focus();
+    };
+
+    const closeModal = () => {
+      recycleEmptyModal.classList.add("hidden");
+    };
+
+    openButtons.forEach((button) => {
+      button.addEventListener("click", (event) => {
+        event.preventDefault();
+        openModal();
+      });
+    });
+
+    closeButtons.forEach((button) => {
+      button.addEventListener("click", (event) => {
+        event.preventDefault();
+        closeModal();
+      });
+    });
+
+    recycleEmptyModal.addEventListener("click", (event) => {
+      if (event.target === recycleEmptyModal) {
+        closeModal();
+      }
+    });
+
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape" && !recycleEmptyModal.classList.contains("hidden")) {
+        closeModal();
+      }
+    });
+  }
+
   const inboxDetailModal = document.getElementById("inbox-detail-modal");
   if (inboxDetailModal) {
     const modalCard = inboxDetailModal.querySelector(".inbox-detail-card");
     const closeButtons = inboxDetailModal.querySelectorAll("[data-inbox-detail-close]");
     const form = inboxDetailModal.querySelector("[data-inbox-detail-form]");
     const archiveForm = inboxDetailModal.querySelector("[data-inbox-detail-archive-form]");
+    const routeForms = inboxDetailModal.querySelectorAll("[data-inbox-detail-route-form]");
     const titleEl = inboxDetailModal.querySelector("[data-inbox-detail-name]");
     const descField = form?.querySelector('textarea[name="description"]');
     const previewEl = inboxDetailModal.querySelector("[data-inbox-detail-preview]");
@@ -981,6 +1206,12 @@ document.addEventListener("DOMContentLoaded", () => {
       setEditing(false);
       if (idField) idField.value = taskId;
       if (archiveIdField) archiveIdField.value = taskId;
+      routeForms.forEach((routeForm) => {
+        const routeTaskField = routeForm.querySelector('input[name="task_id"]');
+        if (routeTaskField) {
+          routeTaskField.value = taskId;
+        }
+      });
       if (processLink) {
         processLink.dataset.guidedPrefill = title;
         processLink.dataset.guidedSource = taskId;
@@ -1063,6 +1294,56 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     });
   }
+
+  const setInboxSelection = (item) => {
+    document
+      .querySelectorAll("[data-inbox-item].is-selected")
+      .forEach((node) => node.classList.remove("is-selected"));
+    if (!item) return;
+    item.classList.add("is-selected");
+  };
+
+  document.addEventListener("click", (event) => {
+    const item = event.target.closest("[data-inbox-item]");
+    if (!item) return;
+    setInboxSelection(item);
+  });
+
+  const inboxShortcutItem = () => {
+    const selected = document.querySelector("[data-inbox-item].is-selected");
+    if (selected) return selected;
+    return document.querySelector("[data-inbox-item]");
+  };
+
+  const isTypingTarget = (target) => {
+    if (!(target instanceof Element)) return false;
+    if (target.closest(".coach-panel")) return true;
+    return Boolean(target.closest("input, textarea, select, [contenteditable='true']"));
+  };
+
+  document.addEventListener("keydown", (event) => {
+    if (event.defaultPrevented) return;
+    if (isTypingTarget(event.target)) return;
+    if (document.querySelector(".app-modal:not(.hidden)")) return;
+    const key = (event.key || "").toLowerCase();
+    if (!["p", "l", "e", "k", "d"].includes(key)) return;
+    const item = inboxShortcutItem();
+    if (!item) return;
+    const target = item.querySelector(`[data-inbox-shortcut="${key}"]`);
+    if (!target) return;
+    event.preventDefault();
+    setInboxSelection(item);
+    if (target.closest("form")) {
+      const form = target.closest("form");
+      if (typeof form?.requestSubmit === "function") {
+        form.requestSubmit();
+        return;
+      }
+      target.click();
+      return;
+    }
+    target.click();
+  });
 
   const onboardingForm = document.querySelector("[data-onboarding-wizard]");
   if (onboardingForm) {

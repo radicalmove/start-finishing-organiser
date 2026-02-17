@@ -1,0 +1,249 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <section class="health-shell" data-training-live>
+    {% set hero_title = "Training live" %}
+    {% set hero_subtitle = "Log reps, sets, and timed work for today while keeping your weekly and overall plan visible." %}
+    {% include "partials/health_nav.html" %}
+
+    {% if form_error %}
+      <div class="panel health-alert">{{ form_error }}</div>
+    {% endif %}
+
+    <div class="health-dashboard-grid">
+      <div class="panel">
+        <div class="panel-title-row">
+          <h3>Today {{ today_label }}</h3>
+          <div class="panel-actions">
+            <a class="btn ghost btn-sm" href="/health/exercise">Edit weekly plan</a>
+          </div>
+        </div>
+        <div class="health-training-summary">
+          <span class="pill">Sets: {{ today_totals.sets }}</span>
+          <span class="pill">Reps: {{ today_totals.reps }}</span>
+          <span class="pill">Timed work: {{ today_totals.minutes }} min</span>
+        </div>
+
+        {% if today_sessions %}
+          <div class="health-exercise-session-list">
+            {% for session in today_sessions %}
+              {% set link = exercise_focus_links.get(session.focus_area, exercise_focus_links["fitness"]) %}
+              <div class="health-exercise-session-row">
+                <div>
+                  <div class="health-supplement-title">{{ session.title }}</div>
+                  <div class="health-supplement-meta">
+                    <span class="pill">{{ session.focus_area|title }}</span>
+                    {% if session.start_time %}
+                      <span class="pill">{{ session.start_time.strftime("%I:%M %p").lstrip("0") }}</span>
+                    {% endif %}
+                    {% if session.duration_minutes %}
+                      <span class="pill">{{ session.duration_minutes }} min</span>
+                    {% endif %}
+                  </div>
+                  {% if session.notes %}
+                    <div class="muted">{{ session.notes }}</div>
+                  {% endif %}
+                </div>
+                <a class="btn ghost btn-sm" href="{{ link.path }}">{{ link.label }}</a>
+              </div>
+            {% endfor %}
+          </div>
+        {% else %}
+          <div class="muted">No sessions scheduled for today yet.</div>
+        {% endif %}
+
+        <form class="form" method="post" action="/health/training/sets">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+          <input type="hidden" name="return_to" value="/health/training">
+          <label class="field">
+            Link to session (optional)
+            <select name="session_id">
+              <option value="">No linked session</option>
+              {% for session in today_sessions %}
+                <option value="{{ session.id }}">{{ session.title }}</option>
+              {% endfor %}
+            </select>
+          </label>
+
+          <div class="field two">
+            <label>
+              Reps
+              <input type="number" name="reps" min="1" placeholder="8">
+            </label>
+            <label>
+              Duration (sec)
+              <input type="number" name="duration_seconds" min="1" placeholder="60">
+            </label>
+          </div>
+
+          <details class="health-progressive-details" {% if show_log_context %}open{% endif %}>
+            <summary>Add context (optional)</summary>
+            <div class="field two">
+              <label>
+                Exercise
+                <input type="text" name="exercise_name" placeholder="Example: Goblet squat">
+              </label>
+              <label>
+                Load
+                <input type="text" name="load_text" placeholder="Example: 24 kg">
+              </label>
+            </div>
+            <label class="field">
+              Notes
+              <input type="text" name="notes" placeholder="Optional: RPE, tempo, rest">
+            </label>
+          </details>
+
+          <div class="muted">Enter reps or duration. Add context only if useful.</div>
+          <div class="cta-row cta-row--end">
+            <button class="btn pink btn-sm" type="submit">Log set</button>
+          </div>
+        </form>
+      </div>
+
+      <div class="panel">
+        <div class="panel-title-row">
+          <h3>Live tools</h3>
+        </div>
+        <div class="health-training-tools">
+          <div class="health-training-tool">
+            <div class="health-exercise-day-title">Quick counter</div>
+            <div class="health-training-live-value" data-live-counter>0 sets / 0 reps</div>
+            <div class="health-training-controls">
+              <button class="btn ghost btn-sm" type="button" data-counter-add-set>+1 Set</button>
+              <button class="btn ghost btn-sm" type="button" data-counter-add-rep>+1 Rep</button>
+              <button class="btn ghost btn-sm" type="button" data-counter-reset>Reset</button>
+            </div>
+          </div>
+          <div class="health-training-tool">
+            <div class="health-exercise-day-title">Rest timer</div>
+            <div class="health-training-live-value" data-live-timer>01:30</div>
+            <div class="health-training-controls">
+              <input type="number" min="10" step="5" value="90" data-rest-seconds class="health-training-rest-input">
+              <button class="btn ghost btn-sm" type="button" data-rest-start>Start</button>
+              <button class="btn ghost btn-sm" type="button" data-rest-reset>Reset</button>
+            </div>
+          </div>
+        </div>
+        <div class="muted">Quick tools stay in the page only. Use "Log set" to save to your history.</div>
+
+        <div class="panel-title-row">
+          <h3>Today log history</h3>
+        </div>
+        <div class="health-entry-list">
+          {% for row in today_logs %}
+            <div class="health-entry-row">
+              <div>
+                <div class="health-entry-title">
+                  {{ row.exercise_name or row.session_title or "Set" }}
+                </div>
+                <div class="health-entry-meta">
+                  {{ row.time_label }}
+                  {% if row.session_title %} · {{ row.session_title }}{% endif %}
+                  {% if row.focus_area %} · {{ row.focus_area|title }}{% endif %}
+                  {% if row.notes %} · {{ row.notes }}{% endif %}
+                </div>
+              </div>
+              <div class="health-entry-value">
+                {% if row.reps %}{{ row.reps }} reps{% endif %}
+                {% if row.reps and row.duration_seconds %} · {% endif %}
+                {% if row.duration_seconds %}{{ row.duration_seconds }}s{% endif %}
+                {% if row.load_text %} · {{ row.load_text }}{% endif %}
+              </div>
+            </div>
+          {% else %}
+            <div class="muted">No sets logged yet for today.</div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+
+    <div class="health-dashboard-grid">
+      <div class="panel">
+        <div class="panel-title-row">
+          <h3>Overall plan</h3>
+        </div>
+        {% if active_plan %}
+          <div class="health-goal-card">
+            <div class="health-goal-title">{{ active_plan.title }}</div>
+            <div class="health-goal-meta">
+              {% if active_plan.start_date %}
+                <span class="pill">Start {{ active_plan.start_date }}</span>
+              {% endif %}
+              {% if active_plan.end_date %}
+                <span class="pill">End {{ active_plan.end_date }}</span>
+              {% endif %}
+            </div>
+            {% if active_plan.focus_goal %}
+              <div class="muted">{{ active_plan.focus_goal }}</div>
+            {% endif %}
+            {% if active_plan.notes %}
+              <div class="muted">{{ active_plan.notes }}</div>
+            {% endif %}
+          </div>
+        {% else %}
+          <div class="muted">No active overall training plan yet.</div>
+        {% endif %}
+        <details class="health-progressive-details" {% if show_plan_editor %}open{% endif %}>
+          <summary>{% if active_plan %}Edit overall plan{% else %}Create overall plan{% endif %}</summary>
+          <form class="form" method="post" action="/health/training/plans">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+            <input type="hidden" name="return_to" value="/health/training">
+            <label class="field">
+              Plan title
+              <input type="text" name="title" placeholder="Example: 12-week strength base" required>
+            </label>
+            <div class="field two">
+              <label>
+                Start date
+                <input type="date" name="start_date">
+              </label>
+              <label>
+                End date
+                <input type="date" name="end_date">
+              </label>
+            </div>
+            <label class="field">
+              Focus goal
+              <input type="text" name="focus_goal" placeholder="Example: Build squat volume and improve VO2 base">
+            </label>
+            <label class="field">
+              Notes
+              <input type="text" name="notes" placeholder="Constraints, progression rules, recovery priorities">
+            </label>
+            <div class="cta-row cta-row--end">
+              <button class="btn pink btn-sm" type="submit">Save overall plan</button>
+            </div>
+          </form>
+        </details>
+      </div>
+
+      <div class="panel">
+        <div class="panel-title-row">
+          <h3>Weekly schedule snapshot</h3>
+          <div class="panel-actions">
+            <a class="btn ghost btn-sm" href="/health/exercise">Open Exercise Plan</a>
+          </div>
+        </div>
+        <div class="health-exercise-days">
+          {% for day in weekly_grouped_sessions %}
+            <div class="health-exercise-day">
+              <div class="health-exercise-day-title">{{ day.day_label }}</div>
+              {% if day.sessions %}
+                <div class="health-supplement-meta">
+                  {% for session in day.sessions %}
+                    <span class="pill">{{ session.focus_area|title }} · {{ session.title }}</span>
+                  {% endfor %}
+                </div>
+              {% else %}
+                <div class="muted">No session set.</div>
+              {% endif %}
+            </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <script defer src="{{ url_for('static', path='/js/health-training-live.js') }}?v={{ static_version }}"></script>
+{% endblock %}

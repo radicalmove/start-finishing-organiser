@@ -17,6 +17,7 @@ from .routes import homepage, api, capture, blocks, resurface, weekly, waiting, 
 from .security import ensure_csrf_token, current_user, is_authenticated, ui_auth_enabled
 from .utils.health import ensure_health_metrics
 from .utils.gmail import start_gmail_sync_loop
+from .version import APP_VERSION, short_version
 
 logger = logging.getLogger(__name__)
 
@@ -65,7 +66,7 @@ def create_app() -> FastAPI:
     apply_schema_migrations()
     ensure_health_metrics()
 
-    app = FastAPI(title="Start Finishing Organiser", version="0.73.0")
+    app = FastAPI(title="Start Finishing Organiser", version=APP_VERSION)
     app.state.startup_error = None
     app.state.startup_warnings = []
 
@@ -111,6 +112,8 @@ def create_app() -> FastAPI:
     templates.env.globals["auth_enabled"] = ui_auth_enabled
     templates.env.globals["is_authenticated"] = is_authenticated
     templates.env.globals["current_user"] = current_user
+    templates.env.globals["app_version"] = APP_VERSION
+    templates.env.globals["app_version_short"] = short_version()
     templates.env.globals["static_version"] = os.getenv("SFO_STATIC_VERSION") or str(
         int(time.time())
     )

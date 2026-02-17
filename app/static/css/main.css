@@ -375,6 +375,61 @@ h4 {
   gap: 8px;
 }
 
+.inbox-header-menu {
+  position: relative;
+}
+
+.inbox-header-menu summary {
+  list-style: none;
+}
+
+.inbox-header-menu summary::-webkit-details-marker {
+  display: none;
+}
+
+.inbox-header-menu-toggle::after {
+  content: " ▾";
+  font-size: 11px;
+  opacity: 0.85;
+}
+
+.inbox-header-menu[open] .inbox-header-menu-toggle::after {
+  content: " ▴";
+}
+
+.inbox-header-menu-panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 40;
+  min-width: 172px;
+  padding: 6px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(8, 12, 34, 0.96);
+  box-shadow: 0 0 16px rgba(53, 195, 255, 0.24), 0 0 12px rgba(255, 43, 209, 0.18);
+}
+
+.inbox-header-menu-item {
+  display: block;
+  padding: 7px 10px;
+  border-radius: 8px;
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.inbox-header-menu-item:hover {
+  background: linear-gradient(120deg, rgba(25, 135, 255, 0.24), rgba(255, 43, 209, 0.24));
+  color: #fff;
+}
+
+.inbox-header-menu-item--footer {
+  margin-top: 4px;
+  padding-top: 9px;
+  border-top: 1px solid rgba(255, 255, 255, 0.14);
+}
+
 .btn-icon {
   padding: 4px;
   width: 28px;
@@ -834,6 +889,13 @@ h4 {
   margin-top: 12px;
 }
 
+.health-subnav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: -6px;
+}
+
 .health-nav .btn.is-active,
 .health-nav .btn[aria-current="page"],
 .health-nav .btn.is-active:hover,
@@ -842,6 +904,15 @@ h4 {
   color: #ffffff;
   border-color: rgba(255, 255, 255, 0.45);
   box-shadow: 0 0 16px rgba(255, 255, 255, 0.35), 0 0 10px rgba(255, 255, 255, 0.2);
+}
+
+.health-subnav .btn.is-active,
+.health-subnav .btn[aria-current="page"],
+.health-subnav .btn.is-active:hover,
+.health-subnav .btn[aria-current="page"]:hover {
+  background: rgba(73, 246, 163, 0.2);
+  color: #ffffff;
+  border-color: rgba(73, 246, 163, 0.55);
 }
 
 .health-dashboard-grid {
@@ -963,6 +1034,205 @@ h4 {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
+}
+
+.health-supplement-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.health-supplement-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(6, 9, 22, 0.6);
+}
+
+.health-supplement-title {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.health-supplement-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.health-supplement-inactive {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.health-exercise-link-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.health-exercise-days {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.health-exercise-day {
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(6, 9, 22, 0.6);
+}
+
+.health-exercise-day-title {
+  font-size: 12px;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+
+.health-exercise-session-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.health-exercise-session-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.health-exercise-session-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.health-training-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 8px 0 12px;
+}
+
+.health-progressive-details {
+  margin-top: 10px;
+  padding: 10px;
+  border-radius: 10px;
+  border: 1px dashed rgba(255, 255, 255, 0.2);
+  background: rgba(0, 0, 0, 0.15);
+}
+
+.health-progressive-details > summary {
+  cursor: pointer;
+  list-style: none;
+  font-size: 12px;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.health-progressive-details > summary::-webkit-details-marker {
+  display: none;
+}
+
+.health-progressive-details > summary::after {
+  content: "Show";
+  margin-left: 8px;
+}
+
+.health-progressive-details[open] > summary::after {
+  content: "Hide";
+}
+
+.health-progressive-details[open] > form,
+.health-progressive-details[open] > .field,
+.health-progressive-details[open] > .field.two,
+.health-progressive-details[open] > .muted {
+  margin-top: 10px;
+}
+
+.health-training-tools {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.health-training-tool {
+  padding: 10px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(0, 0, 0, 0.2);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.health-training-live-value {
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+}
+
+.health-training-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.health-training-rest-input {
+  width: 92px;
+}
+
+.health-tracker-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 12px;
+  margin-top: 10px;
+}
+
+.health-tracker-card {
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(6, 9, 22, 0.6);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+@media (max-width: 700px) {
+  .health-exercise-session-row {
+    flex-direction: column;
+  }
+
+  .health-exercise-session-actions {
+    width: 100%;
+  }
 }
 
 .health-chart-grid {
@@ -1327,6 +1597,21 @@ body.dragging * {
   z-index: 2;
 }
 
+.task-card-actions--hover.inbox-item-actions {
+  z-index: 6;
+}
+
+.task-card-actions--hover.inbox-item-trash-actions {
+  z-index: 7;
+}
+
+.task-card-actions--hover.inbox-item-bottom-actions {
+  top: auto;
+  bottom: 8px;
+  right: 8px;
+  transform: translateY(2px);
+}
+
 .task-card-actions--hover .task-card-action {
   margin: 0;
 }
@@ -1658,11 +1943,11 @@ body.dragging * {
 .inbox-trash-btn {
   border-radius: 5px !important;
   line-height: 1;
-  width: 18px !important;
+  width: 22px !important;
   height: 20px !important;
-  min-width: 18px !important;
+  min-width: 22px !important;
   padding: 0 !important;
-  font-size: 9px;
+  font-size: 10px;
 }
 
 .inbox-process-btn {
@@ -1696,6 +1981,19 @@ body.dragging * {
 
 .inbox-panel .panel-title-row {
   padding-left: 24px;
+}
+
+.inbox-shortcuts-hint {
+  margin-top: 6px;
+  font-size: 11px;
+}
+
+.inbox-container-nav .btn.is-active,
+.inbox-container-nav .btn.is-active:hover {
+  background: linear-gradient(120deg, var(--accent-blue), var(--accent-pink));
+  color: #0b0a18;
+  border-color: rgba(255, 255, 255, 0.45);
+  box-shadow: 0 0 16px rgba(53, 195, 255, 0.35), 0 0 12px rgba(255, 43, 209, 0.3);
 }
 
 .inbox-count {
@@ -1926,6 +2224,25 @@ body.dragging * {
   box-shadow: 0 0 12px rgba(73, 246, 163, 0.2);
 }
 
+.toast-text {
+  display: inline-block;
+}
+
+.toast-action {
+  margin-left: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  background: rgba(0, 0, 0, 0.2);
+  color: var(--text);
+  padding: 3px 8px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.toast-action:disabled {
+  opacity: 0.6;
+}
+
 .toast-stack .toast {
   margin: 0;
   pointer-events: auto;
@@ -1975,7 +2292,7 @@ body.dragging * {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  padding: 10px 12px;
+  padding: 10px 12px 20px;
   cursor: pointer;
   position: relative;
   transition: border-color 0.16s ease, box-shadow 0.16s ease;
@@ -1984,6 +2301,11 @@ body.dragging * {
 .inbox-item:hover {
   border-color: rgba(255, 255, 255, 0.45);
   box-shadow: 0 0 16px rgba(53, 195, 255, 0.3), 0 0 12px rgba(255, 43, 209, 0.25);
+}
+
+.inbox-item.is-selected {
+  border-color: rgba(255, 255, 255, 0.55);
+  box-shadow: 0 0 18px rgba(53, 195, 255, 0.38), 0 0 14px rgba(255, 43, 209, 0.32);
 }
 
 .inbox-item .task-card-header {
@@ -2002,16 +2324,49 @@ body.dragging * {
 }
 
 .inbox-item-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0;
   margin: 0;
 }
 
 .inbox-process-icon {
   border-radius: 5px !important;
   line-height: 1;
-  width: 18px !important;
+  width: 22px !important;
   height: 20px !important;
-  min-width: 18px !important;
+  min-width: 22px !important;
   padding: 0 !important;
+  font-size: 10px;
+}
+
+.inbox-item .task-card-actions--hover .btn.ghost {
+  color: rgba(236, 241, 255, 0.98);
+  border-color: rgba(255, 255, 255, 0.3);
+  background: rgba(15, 23, 58, 0.62);
+  box-shadow: none;
+}
+
+.inbox-item .task-card-actions--hover .btn.ghost:hover,
+.inbox-item .task-card-actions--hover .btn.ghost:focus-visible {
+  background: linear-gradient(120deg, rgba(25, 135, 255, 0.95), rgba(255, 43, 209, 0.95));
+  color: #ffffff;
+  border-color: rgba(255, 255, 255, 0.44);
+  box-shadow: 0 0 12px rgba(53, 195, 255, 0.3), 0 0 10px rgba(255, 43, 209, 0.24);
+}
+
+.inbox-intent-btn {
+  border-radius: 5px !important;
+  line-height: 1;
+  width: 22px !important;
+  height: 20px !important;
+  min-width: 22px !important;
+  padding: 0 !important;
+  font-size: 10px;
+}
+
+.inbox-item .task-card-actions--hover .inbox-trash-btn {
   font-size: 11px;
 }
 
@@ -2403,10 +2758,15 @@ button:hover,
 
 .guided-capture-card {
   width: min(720px, 94vw);
-  height: min(50vh, 420px);
+  height: min(64vh, 560px);
+  min-height: 460px;
   display: flex;
   flex-direction: column;
   overflow: hidden;
+}
+
+.recycle-empty-modal-card {
+  width: min(420px, 92vw);
 }
 
 .guided-capture-card .capture-shell {
@@ -2447,6 +2807,13 @@ button:hover,
 
 .guided-capture-card [data-include-week] {
   margin: 6px 0;
+}
+
+@media (max-height: 760px) {
+  .guided-capture-card {
+    height: min(72vh, 520px);
+    min-height: 0;
+  }
 }
 
 .why-tags {

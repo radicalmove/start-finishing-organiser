@@ -24,6 +24,14 @@ from ..utils.rules import (
     parse_optional_int,
 )
 from ..utils.coach import build_coach_context_json, project_summary, suggest_capture_kind
+from ..utils.inbox_intents import (
+    INBOX_INTENT_LABELS,
+    INBOX_INTENT_SUPPORT_PROJECT,
+    apply_inbox_container,
+    mark_support_project_processed,
+    normalize_inbox_intent,
+    reset_to_unprocessed_inbox,
+)
 from ..utils.projects import normalize_project_color
 from ..security import csrf_protect, require_html_auth, is_safe_redirect
 
@@ -67,6 +75,7 @@ def capture(request: Request, db: Session = Depends(get_db)):
     )
 
     return templates.TemplateResponse(
+        request,
         "capture.html",
         {
             "request": request,
@@ -111,6 +120,7 @@ def capture_wizard(request: Request, db: Session = Depends(get_db)):
         db=db,
     )
     return templates.TemplateResponse(
+        request,
         "capture_wizard.html",
         {
             "request": request,
@@ -131,6 +141,7 @@ def submit_wizard(
     capture_description: str | None = Form(None),
     owner_type: OwnerType = Form(OwnerType.MINE),
     item_kind: str = Form("task"),
+    inbox_intent: str | None = Form(None),
     displacement_ack: str | None = Form(None),
     source_task_id: int | None = Form(None),
     next_url: str | None = Form(None),
@@ -155,15 +166,6 @@ def submit_wizard(
             url=f"/capture/wizard?error={msg}{source}",
             status_code=303,
         )
-
-    if item_kind in {"task", "project"} and (displacement_ack or "").lower() not in {"1", "true", "yes"}:
-        msg = quote_plus("Confirm the displacement check before saving.")
-        prefill = quote_plus(cleaned_title)
-        source = f"&source_task_id={source_task_id}" if source_task_id else ""
-        return RedirectResponse(
-            url=f"/capture/wizard?error={msg}&prefill={prefill}{source}",
-            status_code=303,
-        )
     active_this_week = include_this_week.lower() == "yes" or horizon == WhenBucket.WEEK
     pid = int(project_id) if project_id not in (None, "", "null") else None
     btype = parse_block_type(block_type) if block_type not in (None, "", "null") else None
@@ -177,17 +179,60 @@ def submit_wizard(
     if details is None and source_task:
         details = source_task.description
 
+    normalized_intent = normalize_inbox_intent(inbox_intent)
+    if source_task and normalized_intent is None:
+        msg = quote_plus("Choose how to handle this inbox item before saving.")
+        prefill = quote_plus(cleaned_title)
+        source = f"&source_task_id={source_task_id}" if source_task_id else ""
+        return RedirectResponse(
+            url=f"/capture/wizard?error={msg}&prefill={prefill}{source}",
+            status_code=303,
+        )
+    if normalized_intent is None:
+        normalized_intent = INBOX_INTENT_SUPPORT_PROJECT
+
+    if (
+        normalized_intent == INBOX_INTENT_SUPPORT_PROJECT
+        and item_kind in {"task", "project"}
+        and (displacement_ack or "").lower() not in {"1", "true", "yes"}
+    ):
+        msg = quote_plus("Confirm the displacement check before saving.")
+        prefill = quote_plus(cleaned_title)
+        source = f"&source_task_id={source_task_id}" if source_task_id else ""
+        return RedirectResponse(
+            url=f"/capture/wizard?error={msg}&prefill={prefill}{source}",
+            status_code=303,
+        )
+    if (
+        source_task
+        and normalized_intent == INBOX_INTENT_SUPPORT_PROJECT
+        and item_kind == "task"
+        and pid is None
+    ):
+        msg = quote_plus("Select an existing project or choose Project flow.")
+        prefill = quote_plus(cleaned_title)
+        source = f"&source_task_id={source_task_id}" if source_task_id else ""
+        return RedirectResponse(
+            url=f"/capture/wizard?error={msg}&prefill={prefill}{source}",
+            status_code=303,
+        )
+
     try:
+        if source_task and normalized_intent != INBOX_INTENT_SUPPORT_PROJECT:
+            source_task.verb_noun = cleaned_title
+            source_task.description = details
+            apply_inbox_container(source_task, normalized_intent)
+            db.add(source_task)
+            db.commit()
+            message = f"Saved to {INBOX_INTENT_LABELS.get(normalized_intent, 'container')}"
+            return _safe_redirect(next_url, "/", message)
+
         if item_kind == "decide_later":
             details = capture_description.strip() if capture_description else None
             if source_task:
                 source_task.verb_noun = cleaned_title
                 source_task.description = details
-                source_task.in_inbox = True
-                source_task.when_bucket = WhenBucket.LATER
-                source_task.archived_from_inbox = False
-                source_task.status = TaskStatus.PENDING
-                source_task.completed_at = None
+                reset_to_unprocessed_inbox(source_task)
             else:
                 task = Task(
                     verb_noun=cleaned_title,
@@ -219,6 +264,7 @@ def submit_wizard(
             )
             db.add(project)
             if source_task:
+                mark_support_project_processed(source_task)
                 source_task.in_inbox = False
                 source_task.archived_from_inbox = True
                 source_task.status = TaskStatus.ARCHIVED
@@ -241,6 +287,7 @@ def submit_wizard(
                 )
                 task.status = TaskStatus.PENDING
                 task.completed_at = None
+                mark_support_project_processed(task)
             else:
                 task = Task(
                     verb_noun=cleaned_title,

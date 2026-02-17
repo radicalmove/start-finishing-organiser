@@ -24,6 +24,13 @@ _DEFAULT_CONTEXT_WAITING_LIMIT = 20
 _DEFAULT_CONTEXT_RITUAL_LIMIT = 12
 _DEFAULT_TEXT_PREVIEW_LIMIT = 160
 _DEFAULT_CONTEXT_MAX_BYTES = 120_000
+_DEFAULT_CONTEXT_CACHE_TTL_SECONDS = 12
+
+_GLOBAL_CONTEXT_CACHE: dict[str, Any] = {
+    "db_key": None,
+    "expires_at": 0.0,
+    "context": None,
+}
 
 
 def _env_int(name: str, default: int, minimum: int = 1, maximum: int = 500_000) -> int:
@@ -115,6 +122,8 @@ def task_summary(task: Task) -> dict[str, Any]:
         "project_id": task.project_id,
         "project_title": _text_preview(task.project.title if task.project else None, 80),
         "in_inbox": task.in_inbox,
+        "intake_intent": task.intake_intent,
+        "intake_container": task.intake_container,
         "when_bucket": task.when_bucket.value if task.when_bucket else None,
         "block_type": task.block_type.value if task.block_type else None,
         "duration_minutes": task.duration_minutes,
@@ -323,6 +332,36 @@ def collect_global_context(db: Session) -> dict[str, Any]:
     }
 
 
+def _collect_global_context_cached(db: Session) -> dict[str, Any]:
+    ttl_seconds = _env_int(
+        "SFO_COACH_CONTEXT_CACHE_TTL_SECONDS",
+        _DEFAULT_CONTEXT_CACHE_TTL_SECONDS,
+        minimum=0,
+        maximum=120,
+    )
+    if ttl_seconds <= 0:
+        return collect_global_context(db)
+
+    bind = db.bind
+    db_key = str(bind.url) if bind is not None else "unknown"
+    now_ts = datetime.now().timestamp()
+    cached_context = _GLOBAL_CONTEXT_CACHE.get("context")
+    cached_expires = float(_GLOBAL_CONTEXT_CACHE.get("expires_at") or 0.0)
+    cached_db_key = _GLOBAL_CONTEXT_CACHE.get("db_key")
+    if (
+        cached_context is not None
+        and cached_db_key == db_key
+        and now_ts < cached_expires
+    ):
+        return cached_context
+
+    fresh_context = collect_global_context(db)
+    _GLOBAL_CONTEXT_CACHE["db_key"] = db_key
+    _GLOBAL_CONTEXT_CACHE["expires_at"] = now_ts + ttl_seconds
+    _GLOBAL_CONTEXT_CACHE["context"] = fresh_context
+    return fresh_context
+
+
 def build_coach_context(
     *,
     request_path: str,
@@ -362,7 +401,7 @@ def build_coach_context_json(
         screen_id=screen_id,
         screen_title=screen_title,
         screen_data=screen_data,
-        global_context=collect_global_context(db),
+        global_context=_collect_global_context_cached(db),
     )
     payload = json.dumps(context, ensure_ascii=True, default=_json_default)
     max_bytes = _env_int(

@@ -28,6 +28,7 @@ def list_waiting(request: Request, db: Session = Depends(get_db)):
         db=db,
     )
     return templates.TemplateResponse(
+        request,
         "waiting.html",
         {
             "request": request,

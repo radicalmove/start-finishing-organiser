@@ -18,8 +18,8 @@
         </div>
         <div class="panel-actions tasks-page-nav">
           <a class="btn ghost btn-sm{% if is_active_page %} is-active{% endif %}" href="/tasks/time">Active {{ active_tasks|length }}</a>
-          <a class="btn ghost btn-sm{% if page_mode == 'completed' %} is-active{% endif %}" href="/tasks/completed">Completed {{ completed_tasks|length }}</a>
-          <a class="btn ghost btn-sm{% if page_mode == 'archived' %} is-active{% endif %}" href="/tasks/archived">Archived {{ archived_tasks|length }}</a>
+          <a class="btn ghost btn-sm{% if page_mode == 'completed' %} is-active{% endif %}" href="/tasks/completed">Completed {{ completed_total_count }}</a>
+          <a class="btn ghost btn-sm{% if page_mode == 'archived' %} is-active{% endif %}" href="/tasks/archived">Archived {{ archived_total_count }}</a>
         </div>
       </div>
       {% if is_active_page %}
@@ -202,7 +202,7 @@
       <div class="panel-title-row">
         <h3>Completed tasks</h3>
         <div class="panel-actions">
-          <span class="pill">Keep them tidy</span>
+          <span class="pill">Page {{ completed_pagination.page }} of {{ completed_pagination.total_pages }}</span>
         </div>
       </div>
       <div class="tasks-list">
@@ -236,6 +236,16 @@
           <div class="muted">No completed tasks yet.</div>
         {% endfor %}
       </div>
+      {% if completed_pagination.total_pages > 1 %}
+        <div class="cta-row cta-row--end">
+          {% if completed_pagination.has_prev %}
+            <a class="btn ghost btn-sm" href="/tasks/completed?completed_page={{ completed_pagination.prev_page }}">Previous</a>
+          {% endif %}
+          {% if completed_pagination.has_next %}
+            <a class="btn ghost btn-sm" href="/tasks/completed?completed_page={{ completed_pagination.next_page }}">Next</a>
+          {% endif %}
+        </div>
+      {% endif %}
     </div>
     {% endif %}
 
@@ -244,7 +254,7 @@
       <div class="panel-title-row">
         <h3>Archived</h3>
         <div class="panel-actions">
-          <span class="pill">{{ archived_tasks|length }}</span>
+          <span class="pill">Page {{ archived_pagination.page }} of {{ archived_pagination.total_pages }}</span>
         </div>
       </div>
       <div class="tasks-list">
@@ -277,6 +287,16 @@
           <div class="muted">No archived tasks yet.</div>
         {% endfor %}
       </div>
+      {% if archived_pagination.total_pages > 1 %}
+        <div class="cta-row cta-row--end">
+          {% if archived_pagination.has_prev %}
+            <a class="btn ghost btn-sm" href="/tasks/archived?archived_page={{ archived_pagination.prev_page }}">Previous</a>
+          {% endif %}
+          {% if archived_pagination.has_next %}
+            <a class="btn ghost btn-sm" href="/tasks/archived?archived_page={{ archived_pagination.next_page }}">Next</a>
+          {% endif %}
+        </div>
+      {% endif %}
     </div>
     {% endif %}
   </section>

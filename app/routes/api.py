@@ -1,8 +1,9 @@
-from datetime import date
+import math
+from datetime import date, datetime
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel, Field
+from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.orm import Session
 
 from ..db import get_db
@@ -78,6 +79,56 @@ class TaskUpdate(BaseModel):
     status: Optional[TaskStatus] = None
 
 
+class ProjectOut(BaseModel):
+    id: int
+    title: str
+    description: Optional[str] = None
+    category: ProjectCategory
+    status: ProjectStatus
+    size: Optional[ProjectSize] = None
+    time_horizon: Optional[str] = None
+    target_date: Optional[date] = None
+    level_of_success: Optional[SuccessLevel] = None
+    why_link_text: Optional[str] = None
+    active_this_week: bool
+    created_at: Optional[datetime] = None
+    model_config = ConfigDict(from_attributes=True)
+
+
+class TaskOut(BaseModel):
+    id: int
+    project_id: Optional[int] = None
+    verb_noun: str
+    description: Optional[str] = None
+    in_inbox: bool
+    when_bucket: WhenBucket
+    block_type: Optional[BlockType] = None
+    priority: Optional[int] = None
+    frog: bool
+    alignment: Optional[Alignment] = None
+    first_action: Optional[str] = None
+    scheduled_for: Optional[date] = None
+    status: TaskStatus
+    created_at: Optional[datetime] = None
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ProjectListResponse(BaseModel):
+    items: list[ProjectOut]
+    page: int
+    page_size: int
+    total: int
+    total_pages: int
+
+
+class TaskListResponse(BaseModel):
+    items: list[TaskOut]
+    page: int
+    page_size: int
+    total: int
+    total_pages: int
+
+
 # ---------- Helpers ----------
 def _enforce_weekly_cap(db: Session, category: ProjectCategory, make_active: bool) -> None:
     if not make_active:
@@ -96,14 +147,38 @@ def _enforce_weekly_cap(db: Session, category: ProjectCategory, make_active: boo
         )
 
 
+def _pagination_meta(total: int, requested_page: int, page_size: int) -> tuple[int, int]:
+    total_pages = max(1, math.ceil(total / page_size)) if total > 0 else 1
+    page = max(1, min(requested_page, total_pages))
+    return page, total_pages
+
+
 # ---------- Project endpoints ----------
-@router.get("/projects")
-def list_projects(db: Session = Depends(get_db)):
-    rows = db.query(Project).order_by(Project.created_at.desc()).all()
-    return rows
+@router.get("/projects", response_model=ProjectListResponse)
+def list_projects(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(50, ge=1, le=200),
+    db: Session = Depends(get_db),
+):
+    total = db.query(Project).count()
+    resolved_page, total_pages = _pagination_meta(total, page, page_size)
+    rows = (
+        db.query(Project)
+        .order_by(Project.created_at.desc())
+        .offset((resolved_page - 1) * page_size)
+        .limit(page_size)
+        .all()
+    )
+    return {
+        "items": rows,
+        "page": resolved_page,
+        "page_size": page_size,
+        "total": total,
+        "total_pages": total_pages,
+    }
 
 
-@router.post("/projects", status_code=201)
+@router.post("/projects", status_code=201, response_model=ProjectOut)
 def create_project(payload: ProjectCreate, db: Session = Depends(get_db)):
     _enforce_weekly_cap(db, payload.category, payload.active_this_week)
     project = Project(**payload.model_dump())
@@ -113,7 +188,7 @@ def create_project(payload: ProjectCreate, db: Session = Depends(get_db)):
     return project
 
 
-@router.patch("/projects/{project_id}")
+@router.patch("/projects/{project_id}", response_model=ProjectOut)
 def update_project(project_id: int, payload: ProjectUpdate, db: Session = Depends(get_db)):
     project = db.get(Project, project_id)
     if not project:
@@ -142,17 +217,31 @@ def delete_project(project_id: int, db: Session = Depends(get_db)):
 
 
 # ---------- Task endpoints ----------
-@router.get("/tasks")
-def list_tasks(db: Session = Depends(get_db)):
+@router.get("/tasks", response_model=TaskListResponse)
+def list_tasks(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(50, ge=1, le=200),
+    db: Session = Depends(get_db),
+):
+    total = db.query(Task).count()
+    resolved_page, total_pages = _pagination_meta(total, page, page_size)
     rows = (
         db.query(Task)
         .order_by(Task.when_bucket.asc(), Task.priority.asc().nulls_last(), Task.created_at.desc())
+        .offset((resolved_page - 1) * page_size)
+        .limit(page_size)
         .all()
     )
-    return rows
+    return {
+        "items": rows,
+        "page": resolved_page,
+        "page_size": page_size,
+        "total": total,
+        "total_pages": total_pages,
+    }
 
 
-@router.post("/tasks", status_code=201)
+@router.post("/tasks", status_code=201, response_model=TaskOut)
 def create_task(payload: TaskCreate, db: Session = Depends(get_db)):
     task = Task(**payload.model_dump())
     db.add(task)
@@ -161,7 +250,7 @@ def create_task(payload: TaskCreate, db: Session = Depends(get_db)):
     return task
 
 
-@router.patch("/tasks/{task_id}")
+@router.patch("/tasks/{task_id}", response_model=TaskOut)
 def update_task(task_id: int, payload: TaskUpdate, db: Session = Depends(get_db)):
     task = db.get(Task, task_id)
     if not task:

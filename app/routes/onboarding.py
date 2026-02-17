@@ -70,6 +70,7 @@ def onboarding(request: Request, db: Session = Depends(get_db)):
         db=db,
     )
     return templates.TemplateResponse(
+        request,
         "onboarding.html",
         {
             "request": request,

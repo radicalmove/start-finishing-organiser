@@ -1,4 +1,4 @@
-# Start Finishing Organiser (SFO) — Functional Overview (v0.73)
+# Start Finishing Organiser (SFO) — Functional Overview (v0.732)
 
 This document explains how SFO works from a user and product perspective: screens, cards,
 information types, and the flow of work through the system.
@@ -16,6 +16,23 @@ SFO is a single-user organiser built around *Start Finishing* principles. It hel
 
 The UI uses “pills” and “cards” to keep work readable: each pill is a status or tag; each card is a
 work unit (task, project, block, metric, etc).
+
+---
+
+## Current strategy update (inbox and later handling)
+
+The active, approved design direction for inbox processing and "later" containment is documented in:
+
+- `docs/inbox_intent_container_strategy.md`
+
+Key behavior direction:
+
+- Process-time intent classification (support project, learn/explore, enjoy/recover, park/let go).
+- Inbox actions prioritize explicit routing over default task creation.
+- Learning is bounded through curated picks, not unlimited visible backlog.
+- Enjoy/recover remains separate from work execution views.
+
+This strategy is being rolled out in phases, with scorecard metrics used to tune guardrail strictness.
 
 ---
 
@@ -119,10 +136,13 @@ A conversational helper that can:
 This is the daily execution dashboard.
 
 **Panels**
-- **Inbox**: List of inbox tasks. Actions: Quick capture, Guided capture, Waiting list, Recycle bin link.
-  Each item shows title + when bucket + project pill, with actions:
-  - Process (opens guided capture prefilled).
-  - Move to recycle bin (archive).
+- **Inbox**: List of inbox tasks. Header actions: `Quick`, `Process`, and `Lists` (Containers, Waiting, Recycle bin).
+  Each item shows title + when bucket + project pill, with hover actions:
+  - `P` Process (opens guided capture prefilled).
+  - `L` route to Learning.
+  - `E` route to Enjoy.
+  - `K` route to Park.
+  - `🗑` move to recycle bin.
 - **Today calendar**: Day schedule with:
   - Internal blocks (Focus/Admin/Social/Recovery).
   - External calendar events (Cozi).
@@ -162,14 +182,17 @@ Step-by-step capture for clarity and decision-making.
 - Today/Week/Month/Quarter/Later.
 - For projects: horizon + weekly focus toggle.
 
-**Step 4: Why alignment**
-- Why tags + short Why text.
-
-**Step 5: Block type + duration**
+**Step 4: Block type + duration**
 - Optional block type, duration, frog.
+- Block type now includes inline guidance and auto-suggestion from capture text.
 
 **Special flow: “Process inbox item”**
-Guided capture can be launched from an inbox item; the captured data updates or archives the inbox item.
+Guided capture can be launched from an inbox item. In source-item mode, intent choice is explicit:
+- Support a Project (task/project conversion flow)
+- Learn / Explore
+- Enjoy / Recover
+- Park / Let Go
+Non-support intents route the item to its container without creating a schedulable task.
 
 ---
 

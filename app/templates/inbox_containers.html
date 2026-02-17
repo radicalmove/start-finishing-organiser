@@ -1,0 +1,151 @@
+{% extends "base.html" %}
+{% block content %}
+  <section class="panel" style="margin-top: 12px;">
+    <div class="panel-title-row">
+      <div class="panel-title-group">
+        <h3>Inbox containers</h3>
+      </div>
+      <div class="panel-actions">
+        <a class="btn ghost btn-sm" href="/">Back to Home</a>
+      </div>
+    </div>
+    <div class="muted">Learning, Enjoy, and Parked are containers. They are not scheduled blocks until you deliberately promote them.</div>
+    <div class="cta-row inbox-container-nav" style="margin-top: 10px;">
+      <a class="btn ghost btn-sm{% if active_tab == 'learning' %} is-active{% endif %}" href="/inbox/containers?tab=learning">Learning ({{ container_counts.learn_explore or 0 }})</a>
+      <a class="btn ghost btn-sm{% if active_tab == 'enjoy' %} is-active{% endif %}" href="/inbox/containers?tab=enjoy">Enjoy ({{ container_counts.enjoy_recover or 0 }})</a>
+      <a class="btn ghost btn-sm{% if active_tab == 'parked' %} is-active{% endif %}" href="/inbox/containers?tab=parked">Parked ({{ container_counts.park_let_go or 0 }})</a>
+      <a class="btn ghost btn-sm{% if active_tab == 'recycle' %} is-active{% endif %}" href="/inbox/containers?tab=recycle">Recycle Bin ({{ container_counts.recycle_bin or 0 }})</a>
+    </div>
+  </section>
+
+  <section class="panel" style="margin-top: 10px;">
+    {% if active_tab == "learning" %}
+      <h3>Learning backlog</h3>
+      <div class="muted">Review during Weekly Review, then pull selected items back into Inbox when you want to turn them into action.</div>
+      <div class="list" style="margin-top: 12px;">
+        {% for item in learning_items %}
+          <div class="list-item">
+            <div class="task-card-title">{{ item.verb_noun }}</div>
+            <div class="muted">{{ item.description or "No details." }}</div>
+            <div class="task-meta">
+              <form method="post" action="/inbox/undo">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+                <input type="hidden" name="task_id" value="{{ item.id }}">
+                <input type="hidden" name="next_url" value="/inbox/containers?tab=learning">
+                <button class="btn ghost btn-sm" type="submit">Return to Inbox</button>
+              </form>
+            </div>
+          </div>
+        {% else %}
+          <div class="muted">No learning items yet.</div>
+        {% endfor %}
+      </div>
+    {% elif active_tab == "enjoy" %}
+      <h3>Enjoy list</h3>
+      <div class="muted">Leisure items stay out of work views. Bring one back to Inbox only if you want to deliberately schedule it.</div>
+      <div class="list" style="margin-top: 12px;">
+        {% for item in enjoy_items %}
+          <div class="list-item">
+            <div class="task-card-title">{{ item.verb_noun }}</div>
+            <div class="muted">{{ item.description or "No details." }}</div>
+            <div class="task-meta">
+              <form method="post" action="/inbox/undo">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+                <input type="hidden" name="task_id" value="{{ item.id }}">
+                <input type="hidden" name="next_url" value="/inbox/containers?tab=enjoy">
+                <button class="btn ghost btn-sm" type="submit">Return to Inbox</button>
+              </form>
+            </div>
+          </div>
+        {% else %}
+          <div class="muted">No enjoy items yet.</div>
+        {% endfor %}
+      </div>
+    {% elif active_tab == "parked" %}
+      <h3>Parked on purpose</h3>
+      <div class="muted">Parked items are intentionally out of circulation. They are different from deleted/recycle-bin items.</div>
+      <div class="list" style="margin-top: 12px;">
+        {% for item in parked_items %}
+          <div class="list-item">
+            <div class="task-card-title">{{ item.verb_noun }}</div>
+            <div class="muted">{{ item.description or "No details." }}</div>
+            <div class="task-meta">
+              <form method="post" action="/inbox/undo">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+                <input type="hidden" name="task_id" value="{{ item.id }}">
+                <input type="hidden" name="next_url" value="/inbox/containers?tab=parked">
+                <button class="btn ghost btn-sm" type="submit">Return to Inbox</button>
+              </form>
+            </div>
+          </div>
+        {% else %}
+          <div class="muted">No parked items.</div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="panel-title-row">
+        <h3>Recycle bin</h3>
+        <div class="panel-actions">
+          {% if recycle_retention_days > 0 %}
+            <form method="post" action="/inbox/recycle/purge-expired">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+              <input type="hidden" name="next_url" value="/inbox/containers?tab=recycle">
+              <button class="btn ghost btn-sm" type="submit">Clean Expired</button>
+            </form>
+          {% endif %}
+          <button class="btn ghost btn-sm" type="button" data-recycle-empty-open>Empty Recycle Bin</button>
+        </div>
+      </div>
+      <div class="muted">Deleted inbox items live here until restored.</div>
+      {% if recycle_retention_days > 0 %}
+        <div class="muted">Auto-cleanup removes items after {{ recycle_retention_days }} days.</div>
+      {% else %}
+        <div class="muted">Auto-cleanup is off.</div>
+      {% endif %}
+      {% if recycle_oldest_days is not none %}
+        <div class="muted">Oldest item age: {{ recycle_oldest_days }} day{% if recycle_oldest_days != 1 %}s{% endif %}.</div>
+      {% endif %}
+      {% if recycle_expired_count %}
+        <div class="muted">{{ recycle_expired_count }} item{% if recycle_expired_count != 1 %}s{% endif %} currently exceed the retention window.</div>
+      {% endif %}
+      <div class="list" style="margin-top: 12px;">
+        {% for item in recycle_items %}
+          <div class="list-item">
+            <div class="task-card-title">{{ item.verb_noun }}</div>
+            <div class="muted">{{ item.description or "No details." }}</div>
+            <div class="task-meta">
+              <form method="post" action="/tasks/restore">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+                <input type="hidden" name="task_id" value="{{ item.id }}">
+                <input type="hidden" name="next_url" value="/inbox/containers?tab=recycle">
+                <button class="btn ghost btn-sm" type="submit">Restore</button>
+              </form>
+            </div>
+          </div>
+        {% else %}
+          <div class="muted">Recycle bin is empty.</div>
+        {% endfor %}
+      </div>
+    {% endif %}
+  </section>
+
+  {% if active_tab == "recycle" %}
+    <div class="app-modal hidden" id="recycle-empty-modal" role="dialog" aria-modal="true" aria-labelledby="recycle-empty-title">
+      <div class="app-modal-card recycle-empty-modal-card">
+        <div class="quick-capture-header">
+          <h3 class="app-modal-title" id="recycle-empty-title">Empty Recycle Bin?</h3>
+          <button class="quick-capture-close" type="button" data-recycle-empty-close aria-label="Close">&times;</button>
+        </div>
+        <div class="app-modal-body">
+          This will permanently delete all items in Recycle Bin. This can't be reversed.
+        </div>
+        <form method="post" action="/inbox/recycle/empty" class="quick-capture-actions">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+          <input type="hidden" name="next_url" value="/inbox/containers?tab=recycle">
+          <button class="btn ghost btn-sm" type="button" data-recycle-empty-close>Cancel</button>
+          <button class="btn pink btn-sm" type="submit">Empty Recycle Bin</button>
+        </form>
+      </div>
+    </div>
+  {% endif %}
+{% endblock %}

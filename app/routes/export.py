@@ -22,8 +22,12 @@ from ..models import (
     GuidanceEvent,
     GuidanceReminder,
     HealthEntry,
+    HealthExerciseSession,
     HealthGoal,
     HealthMetric,
+    HealthSupplement,
+    HealthTrainingPlan,
+    HealthTrainingSetLog,
     Profile,
     Project,
     ProjectStatus,
@@ -34,6 +38,8 @@ from ..models import (
 )
 from ..security import csrf_protect, require_html_auth
 from ..utils.coach import build_coach_context_json
+from ..utils.time import utc_now
+from ..version import APP_VERSION
 
 router = APIRouter(dependencies=[Depends(require_html_auth), Depends(csrf_protect)])
 
@@ -143,7 +149,7 @@ def _checksummed_manifest(files: dict[str, bytes], metadata: dict[str, object]) 
         )
     payload = {
         "metadata": metadata,
-        "generated_at": datetime.utcnow().isoformat(),
+        "generated_at": utc_now().isoformat(),
         "file_count": len(manifest_rows),
         "files": manifest_rows,
     }
@@ -207,6 +213,10 @@ def _task_payload(tasks: list[Task]) -> list[dict]:
                 "description": task.description,
                 "status": task.status.value if task.status else None,
                 "in_inbox": task.in_inbox,
+                "archived_from_inbox": task.archived_from_inbox,
+                "intake_intent": task.intake_intent,
+                "intake_container": task.intake_container,
+                "intake_processed_at": task.intake_processed_at,
                 "when_bucket": task.when_bucket.value if task.when_bucket else None,
                 "block_type": task.block_type.value if task.block_type else None,
                 "duration_minutes": task.duration_minutes,
@@ -353,6 +363,76 @@ def _health_goal_payload(goals: list[HealthGoal]) -> list[dict]:
     ]
 
 
+def _health_supplement_payload(supplements: list[HealthSupplement]) -> list[dict]:
+    return [
+        {
+            "id": supplement.id,
+            "name": supplement.name,
+            "dose": supplement.dose,
+            "timing": supplement.timing,
+            "timing_detail": supplement.timing_detail,
+            "notes": supplement.notes,
+            "is_active": supplement.is_active,
+            "created_at": supplement.created_at,
+            "updated_at": supplement.updated_at,
+        }
+        for supplement in supplements
+    ]
+
+
+def _health_exercise_session_payload(sessions: list[HealthExerciseSession]) -> list[dict]:
+    return [
+        {
+            "id": session.id,
+            "day_of_week": session.day_of_week,
+            "focus_area": session.focus_area,
+            "title": session.title,
+            "start_time": session.start_time,
+            "duration_minutes": session.duration_minutes,
+            "notes": session.notes,
+            "is_active": session.is_active,
+            "created_at": session.created_at,
+            "updated_at": session.updated_at,
+        }
+        for session in sessions
+    ]
+
+
+def _health_training_plan_payload(plans: list[HealthTrainingPlan]) -> list[dict]:
+    return [
+        {
+            "id": plan.id,
+            "title": plan.title,
+            "start_date": plan.start_date,
+            "end_date": plan.end_date,
+            "focus_goal": plan.focus_goal,
+            "notes": plan.notes,
+            "is_active": plan.is_active,
+            "created_at": plan.created_at,
+            "updated_at": plan.updated_at,
+        }
+        for plan in plans
+    ]
+
+
+def _health_training_set_log_payload(logs: list[HealthTrainingSetLog]) -> list[dict]:
+    return [
+        {
+            "id": log.id,
+            "session_id": log.session_id,
+            "session_title": log.session.title if log.session else None,
+            "log_date": log.log_date,
+            "exercise_name": log.exercise_name,
+            "reps": log.reps,
+            "load_text": log.load_text,
+            "duration_seconds": log.duration_seconds,
+            "notes": log.notes,
+            "created_at": log.created_at,
+        }
+        for log in logs
+    ]
+
+
 def _coach_payload(messages: list[CoachMessage]) -> list[dict]:
     return [
         {
@@ -410,6 +490,7 @@ def export_page(request: Request, db: Session = Depends(get_db)):
         db=db,
     )
     return templates.TemplateResponse(
+        request,
         "export.html",
         {"request": request, "coach_context_json": coach_context_json},
     )
@@ -465,7 +546,7 @@ def export_data(
 ):
     start_date, end_date = _date_range(range_choice)
     start_dt, end_dt = _dt_bounds(start_date, end_date)
-    created_at = datetime.utcnow().isoformat()
+    created_at = utc_now().isoformat()
 
     include_profile = _is_truthy(include_profile)
     include_projects = _is_truthy(include_projects)
@@ -572,6 +653,42 @@ def export_data(
             )
         goals = goals_query.order_by(HealthGoal.created_at.desc()).all()
         goal_rows = _health_goal_payload(goals)
+        supplements_query = db.query(HealthSupplement)
+        if start_dt:
+            supplements_query = supplements_query.filter(HealthSupplement.created_at >= start_dt)
+        supplements = supplements_query.order_by(HealthSupplement.created_at.desc()).all()
+        supplement_rows = _health_supplement_payload(supplements)
+        exercise_sessions_query = db.query(HealthExerciseSession)
+        if start_dt:
+            exercise_sessions_query = exercise_sessions_query.filter(
+                HealthExerciseSession.created_at >= start_dt
+            )
+        exercise_sessions = exercise_sessions_query.order_by(
+            HealthExerciseSession.created_at.desc()
+        ).all()
+        exercise_session_rows = _health_exercise_session_payload(exercise_sessions)
+        training_plans_query = db.query(HealthTrainingPlan)
+        if start_dt:
+            training_plans_query = training_plans_query.filter(
+                HealthTrainingPlan.created_at >= start_dt
+            )
+        training_plans = training_plans_query.order_by(
+            HealthTrainingPlan.created_at.desc()
+        ).all()
+        training_plan_rows = _health_training_plan_payload(training_plans)
+        training_logs_query = db.query(HealthTrainingSetLog).options(
+            selectinload(HealthTrainingSetLog.session)
+        )
+        if start_date:
+            training_logs_query = training_logs_query.filter(
+                HealthTrainingSetLog.log_date >= start_date,
+                HealthTrainingSetLog.log_date <= end_date,
+            )
+        training_logs = training_logs_query.order_by(
+            HealthTrainingSetLog.log_date.desc(),
+            HealthTrainingSetLog.created_at.desc(),
+        ).all()
+        training_log_rows = _health_training_set_log_payload(training_logs)
         metric_ids = {row["metric_id"] for row in entry_rows if row.get("metric_id")}
         metric_ids.update({row["metric_id"] for row in goal_rows if row.get("metric_id")})
         metrics_query = db.query(HealthMetric)
@@ -582,15 +699,40 @@ def export_data(
         payload["health_entries"] = entry_rows
         payload["health_goals"] = goal_rows
         payload["health_metrics"] = metric_rows
+        payload["health_supplements"] = supplement_rows
+        payload["health_exercise_sessions"] = exercise_session_rows
+        payload["health_training_plans"] = training_plan_rows
+        payload["health_training_set_logs"] = training_log_rows
         files["health_entries.json"] = _json_bytes(entry_rows)
         files["health_goals.json"] = _json_bytes(goal_rows)
         files["health_metrics.json"] = _json_bytes(metric_rows)
+        files["health_supplements.json"] = _json_bytes(supplement_rows)
+        files["health_exercise_sessions.json"] = _json_bytes(exercise_session_rows)
+        files["health_training_plans.json"] = _json_bytes(training_plan_rows)
+        files["health_training_set_logs.json"] = _json_bytes(training_log_rows)
         if entry_rows:
             files["health_entries.csv"] = _csv_bytes(entry_rows, list(entry_rows[0].keys()))
         if goal_rows:
             files["health_goals.csv"] = _csv_bytes(goal_rows, list(goal_rows[0].keys()))
         if metric_rows:
             files["health_metrics.csv"] = _csv_bytes(metric_rows, list(metric_rows[0].keys()))
+        if supplement_rows:
+            files["health_supplements.csv"] = _csv_bytes(supplement_rows, list(supplement_rows[0].keys()))
+        if exercise_session_rows:
+            files["health_exercise_sessions.csv"] = _csv_bytes(
+                exercise_session_rows,
+                list(exercise_session_rows[0].keys()),
+            )
+        if training_plan_rows:
+            files["health_training_plans.csv"] = _csv_bytes(
+                training_plan_rows,
+                list(training_plan_rows[0].keys()),
+            )
+        if training_log_rows:
+            files["health_training_set_logs.csv"] = _csv_bytes(
+                training_log_rows,
+                list(training_log_rows[0].keys()),
+            )
 
     if include_coach:
         messages_query = db.query(CoachMessage)
@@ -650,7 +792,7 @@ def export_data(
         if backup_bytes:
             files["database.sqlite3"] = backup_bytes
     backup_metadata = {
-        "app_version": "0.7.0",
+        "app_version": APP_VERSION,
         "range": range_choice,
         "table_counts": _table_counts(db),
         "includes_full_database_snapshot": "database.sqlite3" in files,

@@ -37,30 +37,44 @@
         </div>
 
         <div class="wizard-step hidden" data-step="2">
-          <div class="field">
-            <span>Is this a task or a project?</span>
+          <input type="hidden" name="inbox_intent" value="support_project" data-inbox-intent-default {% if source_task_id %}disabled{% endif %}>
+          <div class="field{% if not source_task_id %} hidden{% endif %}" data-source-intent>
+            <span>How should this inbox item be handled?</span>
             <div class="why-tags why-tags--stack">
-              <label><input type="radio" name="item_kind" value="task" checked> Task (15–120 min)</label>
-              <label><input type="radio" name="item_kind" value="project"> Project (bigger than a task)</label>
-              <label><input type="radio" name="item_kind" value="decide_later"> Decide later (send to Inbox)</label>
-              <label><input type="radio" name="item_kind" value="not_sure"> Not sure yet</label>
+              <label><input type="radio" name="inbox_intent" value="support_project" data-source-intent-input {% if not source_task_id %}disabled{% endif %} required> Support a Project</label>
+              <label><input type="radio" name="inbox_intent" value="learn_explore" data-source-intent-input {% if not source_task_id %}disabled{% endif %}> Learn / Explore</label>
+              <label><input type="radio" name="inbox_intent" value="enjoy_recover" data-source-intent-input {% if not source_task_id %}disabled{% endif %}> Enjoy / Recover</label>
+              <label><input type="radio" name="inbox_intent" value="park_let_go" data-source-intent-input {% if not source_task_id %}disabled{% endif %}> Park / Let Go</label>
             </div>
+            <div class="note">Choose one container before saving.</div>
           </div>
-          <div class="field hidden" data-attach-project>
-            <span>Attach to an existing project (optional)</span>
-            <select name="project_id">
-              <option value="">— None —</option>
-              {% for p in projects|default([]) %}
-                <option value="{{ p.id }}">{{ p.title }}</option>
-              {% endfor %}
-            </select>
-          </div>
-          <div class="field" data-project-category>
-            <span>Category (for new project)</span>
-            <select name="category">
-              <option value="work">Work</option>
-              <option value="personal">Personal</option>
-            </select>
+          <div data-support-project-only>
+            <div class="field">
+              <span>Is this a task or a project?</span>
+              <div class="why-tags why-tags--stack">
+                <label><input type="radio" name="item_kind" value="task" checked> Task (15–120 min)</label>
+                <label><input type="radio" name="item_kind" value="project"> Project (bigger than a task)</label>
+                <label><input type="radio" name="item_kind" value="decide_later"> Decide later (send to Inbox)</label>
+                <label><input type="radio" name="item_kind" value="not_sure"> Not sure yet</label>
+              </div>
+            </div>
+            <div class="field hidden" data-attach-project>
+              <span>Attach to an existing project</span>
+              <select name="project_id">
+                <option value="">— None —</option>
+                {% for p in projects|default([]) %}
+                  <option value="{{ p.id }}">{{ p.title }}</option>
+                {% endfor %}
+              </select>
+              <div class="note hidden" data-project-link-note>Required for task flow when Support a Project is selected.</div>
+            </div>
+            <div class="field" data-project-category>
+              <span>Category (for new project)</span>
+              <select name="category">
+                <option value="work">Work</option>
+                <option value="personal">Personal</option>
+              </select>
+            </div>
           </div>
         </div>
 
@@ -173,6 +187,7 @@
               <option value="social">Social</option>
               <option value="recovery">Recovery</option>
             </select>
+            <div class="note" data-block-guidance>Tip: Focus for deep work, Admin for logistics, Social for calls/meetings, Recovery for wellbeing.</div>
           </div>
           <label class="field">
             <span>Duration (minutes, optional)</span>

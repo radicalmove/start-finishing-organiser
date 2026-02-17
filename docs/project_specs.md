@@ -1,6 +1,6 @@
 ---
 app_name: "Meaningful Work Organiser"
-version: "0.7"
+version: "0.732"
 author: "Richard Davies"
 created_for: "Personal use, extensible to others later"
 primary_reference: "Start Finishing – Charlie Gilkey"
@@ -95,7 +95,11 @@ constraints_and_rules:
 
 ---
 
-# Meaningful Work Organiser — Massive Blueprint (v0.721)
+# Meaningful Work Organiser — Massive Blueprint (v0.732)
+
+Current strategy update (approved):
+
+- Inbox intent and container strategy: `docs/inbox_intent_container_strategy.md`
 
 ## Table of Contents
 
@@ -819,4 +823,4 @@ This is where the app’s intelligence lives.
 - **Why**: Core purpose, identity, and values that the app keeps front and centre.
 
 ---
-# End of Massive Blueprint (v0.721)
+# End of Massive Blueprint (v0.732)

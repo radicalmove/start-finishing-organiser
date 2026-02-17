@@ -1,4 +1,4 @@
-# SFO Test Plan (v0.721)
+# SFO Test Plan (v0.732)
 
 ## Goal
 Validate core flows with junk data before real use and manual Trello migration. Add automated
@@ -32,10 +32,14 @@ regression coverage for API + capture logic without touching the real database.
 - Guided capture wizard:
   - Displacement check required.
   - Creates task and project flows.
+  - Source-item intent routing (support project vs containers).
 - Quick capture:
   - Missing title error.
   - Not sure redirects to wizard.
   - Inbox capture creates task.
+- Inbox workflow:
+  - Quick route to Learning/Enjoy/Park with undo behavior.
+  - Recycle-bin action stays distinct from Park.
 
 ## Seeded data coverage
 - Profile with Why, values, energy, workday.

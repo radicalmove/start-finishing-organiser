@@ -25,6 +25,7 @@ from ..services.coach_actions import (
 )
 from ..security import csrf_protect, require_html_auth
 from ..utils.coach import generate_coach_reply, suggest_quick_actions
+from ..utils.time import utc_now
 
 router = APIRouter(dependencies=[Depends(require_html_auth), Depends(csrf_protect)])
 
@@ -261,7 +262,7 @@ async def coach_message(request: Request, db: Session = Depends(get_db)):
         content=reply,
         actions_json=actions_json,
     )
-    convo.updated_at = datetime.utcnow()
+    convo.updated_at = utc_now()
     db.add_all([user_msg, assistant_msg, convo])
     db.commit()
 

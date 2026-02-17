@@ -1,4 +1,4 @@
-# SFO Manual Test Program (v0.721)
+# SFO Manual Test Program (v0.732)
 
 ## How to use
 - Status values: TODO, PASS, FAIL, SKIP.
@@ -40,11 +40,14 @@
 | --- | --- | --- | --- | --- |
 | HOME-001 | Home loads core panels | Open `/` | Inbox, Today tasks, Now, calendar render without errors | PASS |
 | HOME-002 | Quick capture saves to inbox | Open Quick modal; enter title; save | Task appears in Inbox list | PASS |
-| HOME-003 | Guided capture modal opens | Click Guided from Home | Guided modal opens and closes cleanly | PASS |
+| HOME-003 | Process modal opens | Click Process from Home Inbox header | Guided process modal opens and closes cleanly | PASS |
+| HOME-003A | Waiting list access from Home | Click Lists -> Waiting | `/waiting` loads without errors | TODO |
 | HOME-004 | Process inbox item | Click Process on an inbox item; complete guided flow | Item removed from Inbox; task/project created | PASS |
 | HOME-005 | Edit block title from calendar | Click Edit on a block; change title; save | Title updates on calendar and blocks list | TODO |
 | HOME-006 | Week calendar view | Click Week from Home | `/calendar/week` loads and shows week grid | TODO |
 | HOME-007 | Cozi events (conditional) | Set `COZI_ICS_URL`; load Home | External events appear and Cozi status OK | TODO |
+| HOME-008 | Recycle cleanup is explicit | Open `/inbox/containers?tab=recycle` with expired recycle items | Expired items are shown until `Clean Expired` is clicked | TODO |
+| HOME-009 | Recycle cleanup action works | Click `Clean Expired` on recycle tab | Only expired recycle items are removed and success message appears | TODO |
 
 ## Capture - quick (CAP-Q)
 | ID | Scenario | Steps | Expected | Status |
@@ -85,6 +88,8 @@
 | TASK-009 | Bulk archive completed | Select multiple completed; archive | Selected tasks move to Archived page | TODO |
 | TASK-010 | Completed this week | Complete a task today | Appears under Completed this week | TODO |
 | TASK-011 | Send task to Inbox | Edit a non-inbox task; click Send to Inbox; save | Task appears in Home inbox; button no longer shows on edit | TODO |
+| TASK-012 | Completed pagination | Open `/tasks/completed` with >40 completed tasks | Page controls show; next/previous navigate without errors | TODO |
+| TASK-013 | Archived pagination | Open `/tasks/archived` with >40 archived tasks | Page controls show; next/previous navigate without errors | TODO |
 
 ## Blocks (BLOCK)
 | ID | Scenario | Steps | Expected | Status |
@@ -174,3 +179,5 @@
 | API-001 | Unauthorized API blocked | Call `/api/tasks` without token | 401 response | TODO |
 | API-002 | Tasks CRUD | Create, update, delete task | API returns expected data and status | TODO |
 | API-003 | Projects CRUD + cap | Create 5th active work project | 400 weekly cap error | TODO |
+| API-004 | List APIs return paginated envelope | Call `/api/tasks` and `/api/projects` | Response includes `items`, `page`, `page_size`, `total`, `total_pages` | TODO |
+| API-005 | List API paging controls | Call `/api/tasks?page=2&page_size=2` (similarly for projects) | Returns correct page metadata and bounded items list | TODO |

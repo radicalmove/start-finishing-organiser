@@ -250,6 +250,7 @@ def long_range_horizons(request: Request, db: Session = Depends(get_db)):
         active_tab="horizons",
     )
     return templates.TemplateResponse(
+        request,
         "long_range.html",
         context,
     )
@@ -266,6 +267,7 @@ def long_range_pyramid(request: Request, db: Session = Depends(get_db)):
         active_tab="pyramid",
     )
     return templates.TemplateResponse(
+        request,
         "long_range_pyramid.html",
         context,
     )
@@ -282,6 +284,7 @@ def long_range_roadmaps(request: Request, db: Session = Depends(get_db)):
         active_tab="roadmaps",
     )
     return templates.TemplateResponse(
+        request,
         "long_range_roadmaps.html",
         context,
     )

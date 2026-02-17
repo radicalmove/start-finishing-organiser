@@ -2,7 +2,22 @@
 
 Neon-themed, single-user organiser inspired by *Start Finishing*. Built on FastAPI, Jinja, and SQLite for quick iteration.
 
-Current version: 0.73
+Current version: 0.732
+
+## Strategy and decision records
+
+- Inbox intent and container strategy (approved): `docs/inbox_intent_container_strategy.md`
+
+## Inbox processing quick guide
+
+- `Quick` captures to Inbox fast (minimal friction).
+- `Process` opens guided capture for deeper classification.
+- To set something to `Waiting`:
+  - Open `Process` on the item.
+  - In step 1, set owner to `Other People’s Priority (OPP)`.
+  - Optionally set who you are waiting on, then save.
+  - This creates a row in `Waiting On`.
+- Open the waiting list from Home: `Lists` -> `Waiting`.
 
 ## Run locally
 
