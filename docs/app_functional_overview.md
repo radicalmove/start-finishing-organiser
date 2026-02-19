@@ -152,7 +152,17 @@ This is the daily execution dashboard.
 - **Today tasks**: Tasks in Today bucket with block type / frog / alignment pills.
 
 **Modal**
-- **Inbox detail**: Edit description for an inbox item, then Save or Process.
+- **Inbox detail**: Edit description for an inbox item, then Save, Process, route to Learning/Enjoy/Park, or move to recycle bin.
+
+---
+
+### Inbox containers
+Dedicated lists page for non-work intake containers:
+- **Learning**, **Enjoy**, **Parked**, and **Recycle bin** tabs.
+- Restore actions for items that should return to active planning.
+- Recycle bin supports:
+  - **Empty Recycle Bin** (destructive, confirmed).
+  - **Clean Expired** (explicit cleanup using retention policy).
 
 ---
 
@@ -222,10 +232,12 @@ If the task is not already in the Inbox, a **“Send to Inbox”** button appear
 **Completed**
 - “Completed this week” checklist with bulk archive.
 - Full completed list with Reopen or Archive actions.
+- Server-side pagination for longer histories.
 
 **Archived**
 - Archived list with Restore.
 - If task was archived from Inbox, restore returns it to Inbox.
+- Server-side pagination for longer histories.
 
 ---
 
@@ -326,17 +338,25 @@ Home uses ritual status to show what’s next.
 ### Health
 Health is a full module with:
 
-**Dashboard**
-- Current state cards (key metrics).
-- Quick log for metrics.
-- Goals list + add goal.
-- Blood pressure quick log.
-- Add custom metrics.
-- Trend board charts.
+**Dashboard + trackers hub**
+- Dashboard: key metrics, quick log, goals, blood pressure quick log, custom metrics, trend board.
+- Trackers hub: category entry point for all health tracking surfaces.
 
 **Category pages**
 - Diet, Weight, Fitness, Strength, Flexibility.
 - Each category has: log form, trend charts, recent entries.
+
+**Supplements**
+- Dedicated supplements page to log what you are taking, dosage/context notes, and timing.
+
+**Exercise plan**
+- Weekly training schedule across fitness/strength/flexibility focuses.
+- Session planning and links into related health categories.
+
+**Training live**
+- Day-of execution page for logging sets/reps/duration.
+- Includes quick counter and rest timer tools.
+- Shows today schedule, recent logs, weekly snapshot, and overall training plan editor.
 
 ---
 
@@ -345,6 +365,9 @@ Export produces a ZIP containing JSON + CSV.
 Options:
 - Time window (all, year, quarter, month, week).
 - Data sets to include (profile, projects, tasks, health, blocks, rituals, waiting, coach, guidance).
+- Includes backup manifest + checksums and restore notes.
+- Default export includes a full SQLite snapshot (`database.sqlite3`) for backup-grade recovery when enabled.
+- `/export/health` reports backup readiness and schema migration state.
 
 ---
 
@@ -367,6 +390,14 @@ Step-by-step setup that:
 
 ### Login (optional)
 If auth is enabled, users log in with password (and optionally username).
+
+---
+
+### API (optional, token/session protected)
+- `/api/projects` and `/api/tasks` list endpoints are paginated.
+- List responses return envelope metadata:
+  - `items`, `page`, `page_size`, `total`, `total_pages`.
+- Create/update/delete endpoints remain available for projects and tasks.
 
 ---
 

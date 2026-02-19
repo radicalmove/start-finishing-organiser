@@ -66,6 +66,42 @@ def test_guided_capture_creates_project(client, api_headers, db_session):
     assert project.active_this_week is True
 
 
+def test_guided_capture_project_keeps_year_horizon(client, api_headers, db_session):
+    res = client.post(
+        "/capture/wizard",
+        data={
+            "capture_text": "Year project",
+            "item_kind": "project",
+            "horizon": "year",
+            "include_this_week": "no",
+            "displacement_ack": "true",
+        },
+        headers=api_headers,
+        follow_redirects=False,
+    )
+    assert res.status_code == 303
+    project = db_session.query(Project).filter(Project.title == "Year project").one()
+    assert project.time_horizon == "year"
+    assert project.active_this_week is False
+
+
+def test_guided_capture_task_year_horizon_maps_to_later_bucket(client, api_headers, db_session):
+    res = client.post(
+        "/capture/wizard",
+        data={
+            "capture_text": "Year task",
+            "item_kind": "task",
+            "horizon": "year",
+            "displacement_ack": "yes",
+        },
+        headers=api_headers,
+        follow_redirects=False,
+    )
+    assert res.status_code == 303
+    task = db_session.query(Task).filter(Task.verb_noun == "Year task").one()
+    assert task.when_bucket == WhenBucket.LATER
+
+
 def test_guided_capture_requires_intent_when_processing_source_task(client, api_headers, db_session):
     source = Task(
         verb_noun="Inbox source",

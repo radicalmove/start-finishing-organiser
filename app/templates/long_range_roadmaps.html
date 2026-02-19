@@ -40,7 +40,9 @@
                 <div>
                   <div class="roadmap-title">{{ project.title }}</div>
                   <div class="roadmap-meta">
-                    <span class="pill">{{ project.category.value }}</span>
+                    <span class="pill{% if project.category and project.category.value == 'personal' %} pill--category-personal{% endif %}">
+                      {{ project.category.value|title if project.category else "Uncategorised" }}
+                    </span>
                     {% if project.time_horizon %}
                       <span class="pill">{{ project.time_horizon|title }}</span>
                     {% endif %}

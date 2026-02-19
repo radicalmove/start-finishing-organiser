@@ -510,6 +510,12 @@ document.addEventListener("DOMContentLoaded", () => {
     const projectCategory = form.querySelector("[data-project-category]");
     const projectColor = form.querySelector("[data-project-color]");
     const horizonSelect = form.querySelector('select[name="horizon"]');
+    const horizonOptionConfigs = horizonSelect
+      ? Array.from(horizonSelect.options).map((option) => ({
+          option,
+          horizonFor: option.dataset.horizonFor || "both",
+        }))
+      : [];
     const includeRadios = form.querySelectorAll('input[name="include_this_week"]');
     const includeWeekFields = form.querySelectorAll("[data-include-week]");
     const helperNote = form.querySelector(".note.helper");
@@ -741,6 +747,27 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     };
 
+    const syncHorizonOptions = () => {
+      if (!horizonSelect || !horizonOptionConfigs.length) return;
+      const mode = currentKind === "project" ? "project" : "task";
+      let hasCurrent = false;
+      let firstVisibleValue = "";
+      horizonOptionConfigs.forEach(({ option, horizonFor }) => {
+        const visible = horizonFor === "both" || horizonFor === mode;
+        option.hidden = !visible;
+        option.disabled = !visible;
+        if (visible && !firstVisibleValue) {
+          firstVisibleValue = option.value;
+        }
+        if (visible && option.value === horizonSelect.value) {
+          hasCurrent = true;
+        }
+      });
+      if (!hasCurrent && firstVisibleValue) {
+        horizonSelect.value = firstVisibleValue;
+      }
+    };
+
     const syncKind = (options = {}) => {
       syncSourceIntentMode();
       const prevKind = currentKind;
@@ -771,6 +798,7 @@ document.addEventListener("DOMContentLoaded", () => {
       }
       horizonNoteTask?.classList.toggle("hidden", isProject);
       horizonNoteProject?.classList.toggle("hidden", !isProject);
+      syncHorizonOptions();
       setStepEnabled(horizonStep, supportsProjectFlow && !isDecideLater);
       setStepEnabled(whyStep, false);
       setStepEnabled(blockStep, isTask);
@@ -2252,6 +2280,24 @@ document.addEventListener("DOMContentLoaded", () => {
         .forEach((el) => el.classList.remove("is-drop-target"));
     };
 
+    const refreshHorizonCount = (column) => {
+      if (!column) return;
+      const list = column.querySelector("[data-horizon-list]");
+      const countPill = column.querySelector(".horizon-header .pill");
+      if (!list || !countPill) return;
+      const count = list.querySelectorAll("[data-project-id]").length;
+      countPill.textContent = String(count);
+    };
+
+    const refreshHorizonCounts = (...columns) => {
+      const seen = new Set();
+      columns.forEach((column) => {
+        if (!column || seen.has(column)) return;
+        seen.add(column);
+        refreshHorizonCount(column);
+      });
+    };
+
     horizonBoard.querySelectorAll("[data-project-id]").forEach((item) => {
       if (usePointerDrag) {
         item.removeAttribute("draggable");
@@ -2420,6 +2466,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
         const targetKey = dropColumn.dataset.horizonKey;
+        const sourceColumn = dragOrigin?.column || null;
         if (!targetKey || targetKey === dragOrigin?.sourceKey) {
           restoreDraggedItem();
           revertToOrigin();
@@ -2444,12 +2491,14 @@ document.addEventListener("DOMContentLoaded", () => {
         placeholder.remove();
         restoreDraggedItem();
         dragItem.classList.remove("is-dragging");
+        refreshHorizonCounts(sourceColumn, dropColumn);
 
         try {
           const result = await postProjectHorizon(dragOrigin?.projectId, targetKey);
           if (!result.ok) {
             longRangeError(result.detail);
             revertToOrigin();
+            refreshHorizonCounts(sourceColumn, dropColumn);
             return;
           }
           showToast("Project horizon updated.", { variant: "success", timeout: 2400 });
@@ -2475,6 +2524,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if (!column || !list) return;
         dragItem = item;
         dragOrigin = {
+          column,
           list,
           nextSibling: item.nextElementSibling,
           sourceKey: column.dataset.horizonKey,
@@ -2552,6 +2602,9 @@ document.addEventListener("DOMContentLoaded", () => {
         if (!column || !dragInfo) return;
         event.preventDefault();
         clearDropTargets();
+        const targetList = column.querySelector("[data-horizon-list]");
+        const item = dragInfo.item;
+        const sourceColumn = item?.closest("[data-horizon-column]") || null;
         const targetKey = column.dataset.horizonKey;
         if (!targetKey || targetKey === dragInfo.sourceKey) {
           dragInfo.item.classList.remove("is-dragging");
@@ -2563,6 +2616,10 @@ document.addEventListener("DOMContentLoaded", () => {
           longRangeError(result.detail);
           return;
         }
+        if (targetList && item && item.parentElement !== targetList) {
+          targetList.appendChild(item);
+        }
+        refreshHorizonCounts(sourceColumn, column);
         showToast("Project horizon updated.", { variant: "success", timeout: 2400 });
       });
     }

@@ -255,14 +255,16 @@
     <div class="app-modal-card inbox-detail-card">
       <div class="quick-capture-header inbox-detail-header">
         <div class="inbox-detail-title-group">
+          <h3 class="app-modal-title" id="inbox-detail-title">Inbox details</h3>
+        </div>
+        <div class="inbox-detail-header-actions">
+          <button class="quick-capture-close" type="button" data-inbox-detail-close aria-label="Close">&times;</button>
           <form method="post" action="/inbox/archive" data-inbox-detail-archive-form class="inbox-detail-trash" data-preserve-scroll data-async>
             <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
             <input type="hidden" name="task_id" value="">
             <button class="btn ghost btn-sm btn-icon btn-icon--tiny inbox-trash-btn" type="submit" aria-label="Move to recycle bin" title="Move to recycle bin">🗑</button>
           </form>
-          <h3 class="app-modal-title" id="inbox-detail-title">Inbox details</h3>
         </div>
-        <button class="quick-capture-close" type="button" data-inbox-detail-close aria-label="Close">&times;</button>
       </div>
       <div class="inbox-detail-name" data-inbox-detail-name></div>
       <form method="post" action="/inbox/update" data-inbox-detail-form id="inbox-detail-form" data-preserve-scroll data-async>

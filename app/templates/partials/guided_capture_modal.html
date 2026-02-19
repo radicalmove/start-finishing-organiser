@@ -124,10 +124,11 @@
           <div class="field">
             <span data-horizon-label>Time horizon</span>
             <select name="horizon">
-              <option value="today">Today</option>
+              <option value="today" data-horizon-for="task">Today</option>
               <option value="week" selected>This week</option>
               <option value="month">This month</option>
               <option value="quarter">This quarter</option>
+              <option value="year" data-horizon-for="project">Year +</option>
               <option value="later">Later/Someday</option>
             </select>
             <div class="note" data-horizon-note-task>
@@ -158,7 +159,7 @@
             <span>Park it outside this week</span>
           </div>
           <div class="note helper hidden" data-week-helper>
-            Month/Quarter/Later selected. Want to spotlight it this week? Toggle above.
+            Month/Quarter/Year/Later selected. Want to spotlight it this week? Toggle above.
           </div>
         </div>
 

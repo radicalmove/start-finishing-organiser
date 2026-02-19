@@ -1,4 +1,4 @@
-from app.models import Task
+from app.models import Project, Task
 
 
 def test_quick_capture_requires_title(client, api_headers):
@@ -50,3 +50,21 @@ def test_quick_capture_task_sets_resurface_for_future_bucket(client, api_headers
     assert res.status_code == 303
     task = db_session.query(Task).filter(Task.verb_noun == "Future task").one()
     assert task.resurface_on is not None
+
+
+def test_quick_capture_project_keeps_year_horizon(client, api_headers, db_session):
+    res = client.post(
+        "/capture",
+        data={
+            "title": "Annual project",
+            "capture_kind": "project",
+            "displacement_ack": "yes",
+            "project_time_horizon": "year",
+            "project_include_this_week": "no",
+        },
+        headers=api_headers,
+        follow_redirects=False,
+    )
+    assert res.status_code == 303
+    project = db_session.query(Project).filter(Project.title == "Annual project").one()
+    assert project.time_horizon == "year"

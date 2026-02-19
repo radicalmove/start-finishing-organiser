@@ -55,11 +55,25 @@ def _clean_title(title: str | None) -> str | None:
 
 def _project_horizon(value: str) -> str:
     normalized = (value or "").strip().lower()
-    if normalized in {"week", "month", "quarter", "later"}:
+    if normalized in {"week", "month", "quarter", "year", "later"}:
         return normalized
     if normalized == "today":
         return "week"
     return "later"
+
+
+def _task_when_bucket(value: str | None) -> WhenBucket:
+    normalized = (value or "").strip().lower()
+    mapping = {
+        "today": WhenBucket.TODAY,
+        "week": WhenBucket.WEEK,
+        "month": WhenBucket.MONTH,
+        "quarter": WhenBucket.QUARTER,
+        "later": WhenBucket.LATER,
+        # Tasks do not have a year bucket; year maps to later for task flow.
+        "year": WhenBucket.LATER,
+    }
+    return mapping.get(normalized, WhenBucket.WEEK)
 
 
 @router.get("/capture", response_class=HTMLResponse)
@@ -148,7 +162,7 @@ def submit_wizard(
     category: ProjectCategory = Form(ProjectCategory.WORK),
     project_id: str | None = Form(""),
     project_color_scheme: str | None = Form(None),
-    horizon: WhenBucket = Form(WhenBucket.WEEK),
+    horizon: str = Form("week"),
     include_this_week: str = Form("yes"),
     why_link_text: str | None = Form(None),
     why_tags: list[str] | None = Form(None),
@@ -166,7 +180,9 @@ def submit_wizard(
             url=f"/capture/wizard?error={msg}{source}",
             status_code=303,
         )
-    active_this_week = include_this_week.lower() == "yes" or horizon == WhenBucket.WEEK
+    task_horizon = _task_when_bucket(horizon)
+    project_horizon = _project_horizon(horizon)
+    active_this_week = include_this_week.lower() == "yes" or project_horizon == "week"
     pid = int(project_id) if project_id not in (None, "", "null") else None
     btype = parse_block_type(block_type) if block_type not in (None, "", "null") else None
     duration_value = parse_optional_int(duration_minutes)
@@ -255,9 +271,7 @@ def submit_wizard(
                 title=cleaned_title,
                 category=category,
                 active_this_week=active_this_week,
-                time_horizon=_project_horizon(
-                    horizon.value if isinstance(horizon, WhenBucket) else str(horizon)
-                ),
+                time_horizon=project_horizon,
                 why_link_text=compose_why_text(why_link_text, why_tags),
                 color_scheme=normalize_project_color(project_color_scheme),
                 description=details,
@@ -276,15 +290,13 @@ def submit_wizard(
                 task.description = details
                 task.in_inbox = False
                 task.archived_from_inbox = False
-                task.when_bucket = horizon
+                task.when_bucket = task_horizon
                 task.block_type = btype
                 task.duration_minutes = duration_value
                 task.frog = frog
                 task.owner_type = owner_type
                 task.alignment = None
-                task.resurface_on = compute_resurface_on(
-                    horizon.value if hasattr(horizon, "value") else str(horizon)
-                )
+                task.resurface_on = compute_resurface_on(task_horizon.value)
                 task.status = TaskStatus.PENDING
                 task.completed_at = None
                 mark_support_project_processed(task)
@@ -294,15 +306,13 @@ def submit_wizard(
                     project_id=pid,
                     description=details,
                     in_inbox=False,
-                    when_bucket=horizon,
+                    when_bucket=task_horizon,
                     block_type=btype,
                     duration_minutes=duration_value,
                     frog=frog,
                     owner_type=owner_type,
                     alignment=None,
-                    resurface_on=compute_resurface_on(
-                        horizon.value if hasattr(horizon, "value") else str(horizon)
-                    ),
+                    resurface_on=compute_resurface_on(task_horizon.value),
                 )
                 db.add(task)
             if owner_type == OwnerType.OPP:

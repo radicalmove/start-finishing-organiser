@@ -49,7 +49,9 @@
                   </div>
                   <div class="muted">{{ project.description or "No description yet." }}</div>
                   <div class="horizon-item-meta">
-                    <span class="pill">{{ project.category.value }}</span>
+                    <span class="pill{% if project.category and project.category.value == 'personal' %} pill--category-personal{% endif %}">
+                      {{ project.category.value|title if project.category else "Uncategorised" }}
+                    </span>
                     {% if project.level_of_success %}
                       <span class="pill">{{ project.level_of_success.value|title }} success</span>
                     {% endif %}

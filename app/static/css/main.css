@@ -2039,6 +2039,12 @@ body.dragging * {
   border-color: rgba(255, 85, 118, 0.35);
 }
 
+.pill--category-personal {
+  background: rgba(255, 43, 209, 0.26);
+  border-color: rgba(255, 43, 209, 0.62);
+  color: #ffe6f7;
+}
+
 .pill--block,
 .pill--alignment,
 .pill--frog {
@@ -2642,6 +2648,7 @@ button:hover,
   height: min(70vh, 720px);
   display: flex;
   flex-direction: column;
+  position: relative;
 }
 
 .inbox-detail-name {
@@ -2654,6 +2661,41 @@ button:hover,
   display: inline-flex;
   align-items: center;
   gap: 8px;
+}
+
+.inbox-detail-header-actions {
+  position: absolute;
+  top: 0;
+  right: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+}
+
+.inbox-detail-header {
+  position: relative;
+  padding-right: 44px;
+}
+
+.inbox-detail-header .quick-capture-close,
+.inbox-detail-header .inbox-trash-btn {
+  width: 33px !important;
+  height: 30px !important;
+  min-width: 33px !important;
+  border-radius: 8px;
+  padding: 0 !important;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.inbox-detail-header .quick-capture-close {
+  font-size: 22px;
+}
+
+.inbox-detail-header .inbox-trash-btn {
+  font-size: 15px;
 }
 
 .inbox-detail-trash {
