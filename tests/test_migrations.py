@@ -1,6 +1,8 @@
 from sqlalchemy import text
 
 from app import db as db_module
+from app.models import Base, HealthMetric
+from app.utils import health as health_utils
 
 
 def _table_exists(name: str) -> bool:
@@ -28,3 +30,21 @@ def test_apply_schema_migrations_tracks_revisions_and_is_idempotent():
 
     second_applied = db_module.apply_schema_migrations()
     assert second_applied == []
+
+
+def test_ensure_health_metrics_uses_current_engine(tmp_path):
+    original_url = str(db_module.engine.url)
+    new_db = tmp_path / "health_metrics.db"
+    try:
+        db_module.init_engine(f"sqlite:///{new_db}")
+        Base.metadata.create_all(bind=db_module.engine)
+
+        health_utils.ensure_health_metrics()
+
+        session = db_module.SessionLocal()
+        try:
+            assert session.query(HealthMetric).count() == len(health_utils.DEFAULT_METRICS)
+        finally:
+            session.close()
+    finally:
+        db_module.init_engine(original_url)

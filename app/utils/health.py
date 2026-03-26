@@ -4,7 +4,7 @@ from typing import Iterable
 
 from sqlalchemy.orm import Session
 
-from ..db import SessionLocal
+from .. import db as db_module
 from ..models import HealthMetric, HealthMetricCategory
 
 
@@ -240,7 +240,7 @@ DEFAULT_METRICS: list[dict[str, object]] = [
 def ensure_health_metrics(db: Session | None = None) -> None:
     close_after = False
     if db is None:
-        db = SessionLocal()
+        db = db_module.SessionLocal()
         close_after = True
     try:
         existing = {metric.slug for metric in db.query(HealthMetric).all()}
