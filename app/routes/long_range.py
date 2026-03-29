@@ -1,4 +1,5 @@
 from datetime import datetime, date
+from urllib.parse import quote_plus
 
 from fastapi import APIRouter, Depends, Request, Form, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
@@ -9,6 +10,7 @@ from ..models import Project, ProjectStatus, ProjectCategory, ProjectSize, Succe
 from ..security import csrf_protect, require_html_auth
 from ..utils.coach import build_coach_context_json, project_summary
 from ..utils.projects import normalize_project_color
+from ..utils.projects import project_title_looks_action
 from ..utils.rules import enforce_weekly_cap
 
 router = APIRouter(dependencies=[Depends(require_html_auth), Depends(csrf_protect)])
@@ -56,6 +58,12 @@ def _normalize_horizon_input(value: str | None) -> str | None:
     if cleaned in {"unspecified", "unsorted", "none", "null"}:
         return None
     return cleaned or None
+
+
+def _format_horizon_target_date(value: date | None) -> str:
+    if not value:
+        return ""
+    return value.strftime("%a %d %b %Y")
 
 
 def _build_long_range_context(
@@ -120,6 +128,7 @@ def _build_long_range_context(
         "horizons": horizons,
         "horizon_columns": horizon_columns,
         "roadmap_projects": roadmap_projects,
+        "format_horizon_target_date": _format_horizon_target_date,
         "coach_context_json": coach_context_json,
         "active_long_term_tab": active_tab,
     }
@@ -129,6 +138,7 @@ def _build_long_range_context(
 def update_long_range_project(
     project_id: int,
     title: str | None = Form(None),
+    verb_check_ack: str | None = Form(None),
     description: str | None = Form(None),
     category: str | None = Form(None),
     time_horizon: str | None = Form(None),
@@ -148,10 +158,26 @@ def update_long_range_project(
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
 
+    cleaned_title = project.title
     if title is not None:
-        cleaned = title.strip()
-        if cleaned:
-            project.title = cleaned
+        candidate = title.strip()
+        if candidate:
+            cleaned_title = candidate
+    if not project_title_looks_action(cleaned_title):
+        if (verb_check_ack or "").strip().lower() not in {"1", "true", "yes", "on"}:
+            msg = quote_plus(
+                "Project title should start with an action verb (e.g. Move Sam to Atlanta)."
+            )
+            return RedirectResponse(url=f"/long-term?error={msg}", status_code=303)
+
+    parsed_target_date = _parse_optional_date(target_date)
+    if parsed_target_date is None:
+        msg = quote_plus("Set a target date for this project. No date = no finish.")
+        return RedirectResponse(url=f"/long-term?error={msg}", status_code=303)
+
+    if title is not None:
+        if cleaned_title:
+            project.title = cleaned_title
 
     if description is not None:
         project.description = description.strip() or None
@@ -171,8 +197,7 @@ def update_long_range_project(
     if parsed_level or level_of_success == "":
         project.level_of_success = parsed_level
 
-    if target_date is not None:
-        project.target_date = _parse_optional_date(target_date)
+    project.target_date = parsed_target_date
 
     if color_scheme is not None:
         project.color_scheme = normalize_project_color(color_scheme)

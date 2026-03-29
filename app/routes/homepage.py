@@ -27,16 +27,21 @@ from ..models import (
     INBOX_INTENT_UNPROCESSED,
     INBOX_INTENT_PARK_LET_GO,
 )
-from ..utils.rules import enforce_weekly_cap, compose_why_text, parse_block_type, parse_optional_int
+from ..services import (
+    apply_task_update,
+    archive_inbox_task as mutate_archive_inbox_task,
+    restore_inbox_item as mutate_restore_inbox_item,
+)
+from ..utils.rules import enforce_weekly_cap, compose_why_text
 from ..utils.coach import build_coach_context_json, block_summary, task_summary
 from ..utils.inbox_intents import (
     INBOX_INTENT_LABELS,
     QUICK_ROUTE_INTENTS,
     apply_inbox_container,
     normalize_inbox_intent,
-    reset_to_unprocessed_inbox,
 )
 from ..utils.profile import get_profile
+from ..utils.projects import project_title_looks_action
 from ..utils.time import utc_now, utc_now_naive
 from ..security import csrf_protect, require_html_auth, is_safe_redirect
 
@@ -868,11 +873,30 @@ def create_project(
     category: ProjectCategory = Form(ProjectCategory.WORK),
     time_horizon: str = Form("week"),
     include_this_week: str = Form("yes"),
+    target_date: str = Form(...),
+    verb_check_ack: str | None = Form(None),
     description: str | None = Form(None),
     why_link_text: str | None = Form(None),
     why_tags: list[str] | None = Form(None),
     db: Session = Depends(get_db),
 ):
+    cleaned_title = title.strip()
+    if not cleaned_title:
+        return RedirectResponse(url="/?error=Title+is+required", status_code=303)
+
+    if not project_title_looks_action(cleaned_title):
+        if (verb_check_ack or "").strip().lower() not in {"1", "true", "yes", "on"}:
+            msg = quote_plus(
+                "Project title should start with an action verb (e.g. Move Sam to Atlanta)."
+            )
+            return RedirectResponse(url=f"/?error={msg}", status_code=303)
+
+    try:
+        parsed_target_date = datetime.strptime(target_date.strip(), "%Y-%m-%d").date()
+    except (ValueError, AttributeError):
+        msg = quote_plus("Set a target date for this project. No date = no finish.")
+        return RedirectResponse(url=f"/?error={msg}", status_code=303)
+
     active_this_week = include_this_week.lower() == "yes" or time_horizon == "week"
     if active_this_week:
         try:
@@ -882,12 +906,13 @@ def create_project(
             return RedirectResponse(url=f"/?error={msg}", status_code=303)
 
     project = Project(
-        title=title.strip(),
+        title=cleaned_title,
         category=category,
         description=description or None,
         active_this_week=active_this_week,
         why_link_text=compose_why_text(why_link_text, why_tags),
         time_horizon=time_horizon,
+        target_date=parsed_target_date,
     )
     db.add(project)
     db.commit()
@@ -905,20 +930,19 @@ def create_task(
     frog: bool = Form(False),
     db: Session = Depends(get_db),
 ):
-    pid = int(project_id) if project_id not in (None, "", "null") else None
-    btype = block_type if block_type not in (None, "", "null") else None
-    duration_value = parse_optional_int(duration_minutes)
-    if duration_value is not None and duration_value <= 0:
-        duration_value = None
-
     task = Task(
         verb_noun=verb_noun.strip(),
-        project_id=pid,
-        description=description or None,
         in_inbox=False,
         when_bucket=when_bucket,
-        block_type=parse_block_type(btype),
-        duration_minutes=duration_value,
+    )
+    apply_task_update(
+        task,
+        verb_noun=verb_noun,
+        description=description,
+        project_id=project_id,
+        when_bucket=when_bucket,
+        block_type=block_type,
+        duration_minutes=duration_minutes,
         frog=frog,
     )
     db.add(task)
@@ -941,8 +965,7 @@ def update_inbox_item(
                 status_code=404,
             )
         return RedirectResponse(url="/?error=Inbox+item+not+found", status_code=303)
-    if description is not None:
-        task.description = description.strip() or None
+    apply_task_update(task, description=description)
     db.add(task)
     db.commit()
     if _wants_json(request):
@@ -971,11 +994,7 @@ def archive_inbox_item(
                 status_code=404,
             )
         return RedirectResponse(url="/?error=Inbox+item+not+found", status_code=303)
-    task.status = TaskStatus.ARCHIVED
-    task.in_inbox = False
-    task.archived_from_inbox = True
-    task.intake_processed_at = None
-    task.completed_at = utc_now()
+    mutate_archive_inbox_task(task)
     db.add(task)
     db.commit()
     if _wants_json(request):
@@ -1077,7 +1096,7 @@ def undo_inbox_route(
         sep = "&" if "?" in target else "?"
         return RedirectResponse(url=f"{target}{sep}error=Nothing+to+undo+for+this+item", status_code=303)
 
-    reset_to_unprocessed_inbox(task)
+    mutate_restore_inbox_item(task)
     db.add(task)
     db.commit()
     if _wants_json(request):

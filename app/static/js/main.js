@@ -229,6 +229,422 @@ document.addEventListener("DOMContentLoaded", () => {
   showFlashToasts();
   window.showToast = showToast;
 
+  const initMiniDatePicker = () => {
+    const dateInputs = Array.from(document.querySelectorAll('input[type="date"]'));
+    if (!dateInputs.length) return;
+
+    const supportsShowPicker =
+      typeof HTMLInputElement !== "undefined" &&
+      typeof HTMLInputElement.prototype?.showPicker === "function";
+
+    if (supportsShowPicker) {
+      const openNativePicker = (event) => {
+        const input = event.currentTarget;
+        if (!(input instanceof HTMLInputElement)) return;
+        if (input.disabled || input.readOnly) return;
+        try {
+          input.showPicker();
+        } catch (err) {
+          // Ignore picker invocation failures (e.g. browser security timing).
+        }
+      };
+
+      dateInputs.forEach((input) => {
+        if (input.dataset.datePickerBound === "true") return;
+        input.dataset.datePickerBound = "true";
+        input.addEventListener("focus", openNativePicker);
+        input.addEventListener("click", openNativePicker);
+      });
+      return;
+    }
+
+    const monthNames = [
+      "January",
+      "February",
+      "March",
+      "April",
+      "May",
+      "June",
+      "July",
+      "August",
+      "September",
+      "October",
+      "November",
+      "December",
+    ];
+    const weekdayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+    const today = new Date();
+
+    const parseIsoDate = (value) => {
+      if (typeof value !== "string") return null;
+      const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value.trim());
+      if (!match) return null;
+      const year = Number.parseInt(match[1], 10);
+      const month = Number.parseInt(match[2], 10) - 1;
+      const day = Number.parseInt(match[3], 10);
+      const parsed = new Date(year, month, day);
+      if (
+        Number.isNaN(parsed.getTime()) ||
+        parsed.getFullYear() !== year ||
+        parsed.getMonth() !== month ||
+        parsed.getDate() !== day
+      ) {
+        return null;
+      }
+      return parsed;
+    };
+
+    const formatIsoDate = (dateValue) => {
+      const year = dateValue.getFullYear();
+      const month = `${dateValue.getMonth() + 1}`.padStart(2, "0");
+      const day = `${dateValue.getDate()}`.padStart(2, "0");
+      return `${year}-${month}-${day}`;
+    };
+
+    const popover = document.createElement("div");
+    popover.className = "mini-date-popover hidden";
+    popover.setAttribute("aria-hidden", "true");
+    popover.innerHTML = `
+      <div class="mini-date-header">
+        <button type="button" class="mini-date-nav" data-mini-prev aria-label="Previous month">&lt;</button>
+        <div class="mini-date-selects">
+          <select data-mini-month aria-label="Month"></select>
+          <select data-mini-year aria-label="Year"></select>
+        </div>
+        <button type="button" class="mini-date-nav" data-mini-next aria-label="Next month">&gt;</button>
+      </div>
+      <div class="mini-date-weekdays" data-mini-weekdays></div>
+      <div class="mini-date-grid" data-mini-grid></div>
+    `;
+    document.body.appendChild(popover);
+
+    const monthSelect = popover.querySelector("[data-mini-month]");
+    const yearSelect = popover.querySelector("[data-mini-year]");
+    const weekdaysRow = popover.querySelector("[data-mini-weekdays]");
+    const grid = popover.querySelector("[data-mini-grid]");
+    const prevBtn = popover.querySelector("[data-mini-prev]");
+    const nextBtn = popover.querySelector("[data-mini-next]");
+
+    if (
+      !(monthSelect instanceof HTMLSelectElement) ||
+      !(yearSelect instanceof HTMLSelectElement) ||
+      !(weekdaysRow instanceof HTMLElement) ||
+      !(grid instanceof HTMLElement) ||
+      !(prevBtn instanceof HTMLButtonElement) ||
+      !(nextBtn instanceof HTMLButtonElement)
+    ) {
+      return;
+    }
+
+    monthNames.forEach((name, index) => {
+      const option = document.createElement("option");
+      option.value = String(index);
+      option.textContent = name;
+      monthSelect.appendChild(option);
+    });
+
+    weekdayNames.forEach((weekday) => {
+      const dayLabel = document.createElement("div");
+      dayLabel.className = "mini-date-weekday";
+      dayLabel.textContent = weekday;
+      weekdaysRow.appendChild(dayLabel);
+    });
+
+    let activeInput = null;
+    let viewYear = today.getFullYear();
+    let viewMonth = today.getMonth();
+
+    const populateYearOptions = (centerYear) => {
+      yearSelect.innerHTML = "";
+      const start = centerYear - 20;
+      const end = centerYear + 20;
+      for (let year = start; year <= end; year += 1) {
+        const option = document.createElement("option");
+        option.value = String(year);
+        option.textContent = String(year);
+        yearSelect.appendChild(option);
+      }
+      yearSelect.value = String(viewYear);
+    };
+
+    const setInputDate = (dateValue) => {
+      if (!(activeInput instanceof HTMLInputElement)) return;
+      const value = formatIsoDate(dateValue);
+      activeInput.value = value;
+      activeInput.dispatchEvent(new Event("input", { bubbles: true }));
+      activeInput.dispatchEvent(new Event("change", { bubbles: true }));
+    };
+
+    const renderGrid = () => {
+      grid.innerHTML = "";
+      const firstDay = new Date(viewYear, viewMonth, 1);
+      const startWeekday = firstDay.getDay();
+      const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
+      const prevMonthDays = new Date(viewYear, viewMonth, 0).getDate();
+      const selected = activeInput ? parseIsoDate(activeInput.value) : null;
+
+      for (let i = 0; i < 42; i += 1) {
+        const cell = document.createElement("button");
+        cell.type = "button";
+        cell.className = "mini-date-cell";
+
+        let cellYear = viewYear;
+        let cellMonth = viewMonth;
+        let cellDay = i - startWeekday + 1;
+        let outside = false;
+
+        if (cellDay <= 0) {
+          outside = true;
+          cellMonth -= 1;
+          if (cellMonth < 0) {
+            cellMonth = 11;
+            cellYear -= 1;
+          }
+          cellDay = prevMonthDays + cellDay;
+        } else if (cellDay > daysInMonth) {
+          outside = true;
+          cellMonth += 1;
+          if (cellMonth > 11) {
+            cellMonth = 0;
+            cellYear += 1;
+          }
+          cellDay -= daysInMonth;
+        }
+
+        const cellDate = new Date(cellYear, cellMonth, cellDay);
+        const isToday =
+          cellDate.getFullYear() === today.getFullYear() &&
+          cellDate.getMonth() === today.getMonth() &&
+          cellDate.getDate() === today.getDate();
+        const isSelected =
+          selected &&
+          cellDate.getFullYear() === selected.getFullYear() &&
+          cellDate.getMonth() === selected.getMonth() &&
+          cellDate.getDate() === selected.getDate();
+
+        if (outside) {
+          cell.classList.add("is-outside");
+        }
+        if (isToday) {
+          cell.classList.add("is-today");
+        }
+        if (isSelected) {
+          cell.classList.add("is-selected");
+        }
+
+        cell.textContent = String(cellDay);
+        cell.addEventListener("click", () => {
+          setInputDate(cellDate);
+          closePopover();
+        });
+        grid.appendChild(cell);
+      }
+    };
+
+    const positionPopover = () => {
+      if (!(activeInput instanceof HTMLInputElement)) return;
+      const rect = activeInput.getBoundingClientRect();
+      const popRect = popover.getBoundingClientRect();
+      const viewportPad = 8;
+      let left = rect.left + window.scrollX;
+      const minLeft = window.scrollX + viewportPad;
+      const maxLeft = window.scrollX + window.innerWidth - popRect.width - viewportPad;
+      left = Math.max(minLeft, Math.min(left, maxLeft));
+
+      let top = rect.bottom + window.scrollY + 6;
+      const maxBottom = window.scrollY + window.innerHeight - viewportPad;
+      if (top + popRect.height > maxBottom) {
+        top = rect.top + window.scrollY - popRect.height - 6;
+      }
+      if (top < window.scrollY + viewportPad) {
+        top = rect.bottom + window.scrollY + 6;
+      }
+
+      popover.style.left = `${left}px`;
+      popover.style.top = `${top}px`;
+    };
+
+    const openPopover = (input) => {
+      if (!(input instanceof HTMLInputElement)) return;
+      activeInput = input;
+      const parsed = parseIsoDate(input.value) || today;
+      viewYear = parsed.getFullYear();
+      viewMonth = parsed.getMonth();
+      populateYearOptions(viewYear);
+      monthSelect.value = String(viewMonth);
+      yearSelect.value = String(viewYear);
+      renderGrid();
+      popover.classList.remove("hidden");
+      popover.setAttribute("aria-hidden", "false");
+      positionPopover();
+    };
+
+    const closePopover = () => {
+      popover.classList.add("hidden");
+      popover.setAttribute("aria-hidden", "true");
+      activeInput = null;
+    };
+
+    const shiftMonth = (delta) => {
+      const next = new Date(viewYear, viewMonth + delta, 1);
+      viewYear = next.getFullYear();
+      viewMonth = next.getMonth();
+      populateYearOptions(viewYear);
+      monthSelect.value = String(viewMonth);
+      yearSelect.value = String(viewYear);
+      renderGrid();
+      positionPopover();
+    };
+
+    prevBtn.addEventListener("click", () => shiftMonth(-1));
+    nextBtn.addEventListener("click", () => shiftMonth(1));
+    monthSelect.addEventListener("change", () => {
+      viewMonth = Number.parseInt(monthSelect.value, 10);
+      renderGrid();
+      positionPopover();
+    });
+    yearSelect.addEventListener("change", () => {
+      viewYear = Number.parseInt(yearSelect.value, 10);
+      renderGrid();
+      positionPopover();
+    });
+
+    const bindInput = (input) => {
+      if (!(input instanceof HTMLInputElement)) return;
+      if (input.dataset.datePickerBound === "true") return;
+      input.dataset.datePickerBound = "true";
+      input.dataset.miniDateInput = "true";
+      input.type = "text";
+      if (!input.placeholder) {
+        input.placeholder = "YYYY-MM-DD";
+      }
+      input.autocomplete = "off";
+      input.pattern = "\\d{4}-\\d{2}-\\d{2}";
+
+      input.addEventListener("focus", () => openPopover(input));
+      input.addEventListener("click", (event) => {
+        event.preventDefault();
+        openPopover(input);
+      });
+      input.addEventListener("keydown", (event) => {
+        if (event.key === "ArrowDown" || event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          openPopover(input);
+        } else if (event.key === "Escape") {
+          closePopover();
+        }
+      });
+      input.addEventListener("change", () => {
+        const parsed = parseIsoDate(input.value);
+        if (parsed) {
+          input.value = formatIsoDate(parsed);
+        }
+      });
+    };
+
+    dateInputs.forEach(bindInput);
+
+    document.addEventListener("mousedown", (event) => {
+      const target = event.target;
+      if (!(target instanceof Node)) return;
+      if (popover.contains(target)) return;
+      if (activeInput && target === activeInput) return;
+      closePopover();
+    });
+
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") {
+        closePopover();
+      }
+    });
+
+    window.addEventListener("resize", () => {
+      if (activeInput && !popover.classList.contains("hidden")) {
+        positionPopover();
+      }
+    });
+
+    document.addEventListener(
+      "scroll",
+      () => {
+        if (activeInput && !popover.classList.contains("hidden")) {
+          positionPopover();
+        }
+      },
+      true
+    );
+  };
+
+  initMiniDatePicker();
+
+  const ACTION_STARTERS = new Set([
+    "add",
+    "align",
+    "audit",
+    "book",
+    "build",
+    "call",
+    "clean",
+    "clear",
+    "close",
+    "coach",
+    "complete",
+    "create",
+    "cut",
+    "define",
+    "deliver",
+    "design",
+    "draft",
+    "edit",
+    "finish",
+    "fix",
+    "improve",
+    "launch",
+    "learn",
+    "make",
+    "map",
+    "move",
+    "organize",
+    "organise",
+    "plan",
+    "prepare",
+    "publish",
+    "record",
+    "reduce",
+    "refine",
+    "release",
+    "remove",
+    "repair",
+    "replace",
+    "research",
+    "reset",
+    "review",
+    "schedule",
+    "ship",
+    "simplify",
+    "sort",
+    "start",
+    "train",
+    "update",
+    "write",
+  ]);
+
+  const projectTitleLooksAction = (value) => {
+    const words = String(value || "")
+      .trim()
+      .toLowerCase()
+      .match(/[a-z][a-z'/-]*/g);
+    if (!words || words.length < 2) return false;
+    const first = words[0];
+    if (ACTION_STARTERS.has(first)) return true;
+    return /(ize|ise|ify|ate|en)$/.test(first) && first.length >= 5;
+  };
+
+  const confirmProjectVerbCheck = () =>
+    window.confirm(
+      "Coaching check: Project titles should start with an action verb (e.g. Move Sam to Atlanta). Save anyway?"
+    );
+
   const updateInboxCount = (count) => {
     if (typeof count !== "number") return;
     const pill = document.querySelector(".inbox-count");
@@ -471,6 +887,10 @@ document.addEventListener("DOMContentLoaded", () => {
     const kindSelect = captureForm.querySelector("[data-capture-kind]");
     const sections = Array.from(captureForm.querySelectorAll("[data-capture-section]"));
     const titleInput = captureForm.querySelector('input[name="title"]');
+    const projectTargetDateInput = captureForm.querySelector('input[name="project_target_date"]');
+    const projectVerbAckInput = captureForm.querySelector(
+      'input[name="project_verb_check_ack"]'
+    );
     const redirectToWizard = () => {
       const raw = titleInput?.value?.trim() || "";
       if (typeof openGuidedCaptureModal === "function") {
@@ -496,6 +916,36 @@ document.addEventListener("DOMContentLoaded", () => {
         redirectToWizard();
       }
     });
+    titleInput?.addEventListener("input", () => {
+      if (projectVerbAckInput) {
+        projectVerbAckInput.value = "0";
+      }
+    });
+    captureForm.addEventListener("submit", (event) => {
+      if ((kindSelect?.value || "decide_later") !== "project") {
+        return;
+      }
+      if (!projectTargetDateInput?.value) {
+        showToast("Set a target date for this project. No date = no finish.", {
+          variant: "error",
+        });
+        projectTargetDateInput?.focus();
+        event.preventDefault();
+        return;
+      }
+      const title = titleInput?.value || "";
+      if (!projectTitleLooksAction(title)) {
+        const proceed = confirmProjectVerbCheck();
+        if (!proceed) {
+          event.preventDefault();
+          titleInput?.focus();
+          return;
+        }
+        if (projectVerbAckInput) {
+          projectVerbAckInput.value = "1";
+        }
+      }
+    });
     updateCaptureSections();
   }
 
@@ -509,6 +959,9 @@ document.addEventListener("DOMContentLoaded", () => {
     const attachProject = form.querySelector("[data-attach-project]");
     const projectCategory = form.querySelector("[data-project-category]");
     const projectColor = form.querySelector("[data-project-color]");
+    const projectTargetDateFields = form.querySelectorAll("[data-project-target-date]");
+    const projectTargetDateInput = form.querySelector('input[name="target_date"]');
+    const verbCheckAckInput = form.querySelector('input[name="verb_check_ack"]');
     const horizonSelect = form.querySelector('select[name="horizon"]');
     const horizonOptionConfigs = horizonSelect
       ? Array.from(horizonSelect.options).map((option) => ({
@@ -788,6 +1241,10 @@ document.addEventListener("DOMContentLoaded", () => {
       setSectionActive(attachProject, isTask);
       setSectionActive(projectCategory, isProject);
       setSectionActive(projectColor, isProject);
+      projectTargetDateFields.forEach((field) => setSectionActive(field, isProject));
+      if (projectTargetDateInput) {
+        projectTargetDateInput.required = isProject;
+      }
       if (projectSelectField) {
         projectSelectField.required = Boolean(supportsProjectTask);
       }
@@ -873,7 +1330,12 @@ document.addEventListener("DOMContentLoaded", () => {
       r.addEventListener("change", syncKind)
     );
     horizonSelect?.addEventListener("change", syncHorizon);
-    captureTitleInput?.addEventListener("input", syncBlockGuidance);
+    captureTitleInput?.addEventListener("input", () => {
+      syncBlockGuidance();
+      if (verbCheckAckInput) {
+        verbCheckAckInput.value = "0";
+      }
+    });
     captureDescriptionInput?.addEventListener("input", syncBlockGuidance);
     blockTypeSelect?.addEventListener("change", () => {
       blockTypeManuallySet = true;
@@ -883,6 +1345,9 @@ document.addEventListener("DOMContentLoaded", () => {
       form.reset();
       if (sourceTaskInput) {
         sourceTaskInput.disabled = !sourceTaskInput.value;
+      }
+      if (verbCheckAckInput) {
+        verbCheckAckInput.value = "0";
       }
       blockTypeManuallySet = false;
       resetNotSureSuggestion();
@@ -901,6 +1366,36 @@ document.addEventListener("DOMContentLoaded", () => {
       if (!validateStep(firstStep)) {
         showStep(0);
         event.preventDefault();
+        return;
+      }
+      if (currentKind !== "project") {
+        return;
+      }
+      if (!projectTargetDateInput?.value) {
+        showStepError(horizonStep, "Set a target date for this project. No date = no finish.");
+        if (horizonStep) {
+          const activeSteps = getActiveSteps();
+          const index = activeSteps.indexOf(horizonStep);
+          if (index >= 0) {
+            showStep(index);
+          }
+        }
+        projectTargetDateInput?.focus();
+        event.preventDefault();
+        return;
+      }
+      const title = captureTitleInput?.value || "";
+      if (!projectTitleLooksAction(title) && !(verbCheckAckInput?.value === "1")) {
+        const proceed = confirmProjectVerbCheck();
+        if (!proceed) {
+          showStep(0);
+          captureTitleInput?.focus();
+          event.preventDefault();
+          return;
+        }
+        if (verbCheckAckInput) {
+          verbCheckAckInput.value = "1";
+        }
       }
     });
 
@@ -1579,6 +2074,47 @@ document.addEventListener("DOMContentLoaded", () => {
       const input = form.querySelector('input[name="title"]');
       input?.focus();
       input?.select();
+    }
+  });
+
+  document.addEventListener("input", (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLInputElement)) return;
+    if (target.name !== "title") return;
+    const form = target.closest(".project-edit-form");
+    if (!form) return;
+    const ackInput = form.querySelector('input[name="verb_check_ack"]');
+    if (ackInput instanceof HTMLInputElement) {
+      ackInput.value = "0";
+    }
+  });
+
+  document.addEventListener("submit", (event) => {
+    const form = event.target instanceof HTMLFormElement ? event.target : null;
+    if (!form || !form.matches(".project-edit-form")) return;
+    const dateInput = form.querySelector('input[name="target_date"]');
+    if (dateInput instanceof HTMLInputElement && !dateInput.value) {
+      showToast("Set a target date for this project. No date = no finish.", {
+        variant: "error",
+      });
+      dateInput.focus();
+      event.preventDefault();
+      return;
+    }
+    const titleInput = form.querySelector('input[name="title"]');
+    const ackInput = form.querySelector('input[name="verb_check_ack"]');
+    const title = titleInput instanceof HTMLInputElement ? titleInput.value : "";
+    const acked = ackInput instanceof HTMLInputElement && ackInput.value === "1";
+    if (!projectTitleLooksAction(title) && !acked) {
+      const proceed = confirmProjectVerbCheck();
+      if (!proceed) {
+        titleInput?.focus();
+        event.preventDefault();
+        return;
+      }
+      if (ackInput instanceof HTMLInputElement) {
+        ackInput.value = "1";
+      }
     }
   });
 

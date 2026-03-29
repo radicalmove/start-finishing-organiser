@@ -10,13 +10,16 @@ from app.models import (
 )
 
 
-def test_inbox_update_and_archive_flow(client, api_headers, db_session):
+def test_inbox_update_trims_description(client, api_headers, db_session):
     task = Task(
         verb_noun="Review inbox item",
         description="Old description",
         in_inbox=True,
         when_bucket=WhenBucket.LATER,
         status=TaskStatus.PENDING,
+        intake_intent=INBOX_INTENT_LEARN_EXPLORE,
+        intake_container=INBOX_INTENT_LEARN_EXPLORE,
+        intake_processed_at=datetime.now(timezone.utc),
     )
     db_session.add(task)
     db_session.commit()
@@ -37,6 +40,22 @@ def test_inbox_update_and_archive_flow(client, api_headers, db_session):
     assert task.in_inbox is True
     assert task.status == TaskStatus.PENDING
 
+
+def test_inbox_archive_resets_processed_state(client, api_headers, db_session):
+    task = Task(
+        verb_noun="Review inbox item",
+        description="Old description",
+        in_inbox=True,
+        when_bucket=WhenBucket.LATER,
+        status=TaskStatus.PENDING,
+        intake_intent=INBOX_INTENT_LEARN_EXPLORE,
+        intake_container=INBOX_INTENT_LEARN_EXPLORE,
+        intake_processed_at=datetime.now(timezone.utc),
+    )
+    db_session.add(task)
+    db_session.commit()
+    db_session.refresh(task)
+
     archive = client.post(
         "/inbox/archive",
         headers={**api_headers, "accept": "application/json"},
@@ -52,7 +71,9 @@ def test_inbox_update_and_archive_flow(client, api_headers, db_session):
     assert task.in_inbox is False
     assert task.archived_from_inbox is True
     assert task.status == TaskStatus.ARCHIVED
+    assert task.intake_intent == INBOX_INTENT_UNPROCESSED
     assert task.intake_container == INBOX_INTENT_UNPROCESSED
+    assert task.intake_processed_at is None
     assert task.completed_at is not None
 
 
@@ -96,7 +117,10 @@ def test_inbox_route_and_undo_flow(client, api_headers, db_session):
     db_session.refresh(task)
     assert task.in_inbox is True
     assert task.status == TaskStatus.PENDING
+    assert task.archived_from_inbox is False
+    assert task.intake_intent == INBOX_INTENT_UNPROCESSED
     assert task.intake_container == INBOX_INTENT_UNPROCESSED
+    assert task.intake_processed_at is None
 
 
 def test_inbox_metrics_reports_age_and_processed_counts(client, api_headers, db_session):

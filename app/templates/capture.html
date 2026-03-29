@@ -12,6 +12,7 @@
     <form method="post" action="/capture" class="form" data-capture-form>
       <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
       <input type="hidden" name="displacement_ack" value="0" data-displacement-ack>
+      <input type="hidden" name="project_verb_check_ack" value="0" data-project-verb-check-ack>
       <label class="field">
         <span>Name / Title</span>
         <input type="text" name="title" required placeholder="e.g. Plan quarterly reset">
@@ -105,6 +106,11 @@
             <option value="amber">Amber</option>
             <option value="violet">Violet</option>
           </select>
+        </label>
+        <label class="field">
+          <span>Target date</span>
+          <input type="date" name="project_target_date" required>
+          <div class="note">No date = no finish.</div>
         </label>
         <div class="field checkbox">
           <input type="radio" name="project_include_this_week" value="yes" checked>

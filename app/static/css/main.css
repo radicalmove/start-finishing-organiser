@@ -80,9 +80,6 @@ a {
 
 a:focus-visible,
 button:focus-visible,
-input:focus-visible,
-select:focus-visible,
-textarea:focus-visible,
 [role="button"]:focus-visible {
   outline: 2px solid rgba(73, 246, 163, 0.85);
   outline-offset: 2px;
@@ -656,6 +653,16 @@ h4 {
   display: flex;
   flex-wrap: wrap;
   gap: var(--horizon-item-meta-gap);
+}
+
+.pill.horizon-target-pill {
+  border-radius: 0;
+  background: rgba(255, 255, 255, 0.52);
+  border-color: rgba(255, 255, 255, 0.68);
+}
+
+.horizon-target-pill-label {
+  font-weight: 800;
 }
 
 .roadmap-grid {
@@ -3535,6 +3542,117 @@ button:hover,
   .today-tasks-panel {
     margin-top: 10px;
   }
+}
+
+.mini-date-popover {
+  position: absolute;
+  z-index: 400;
+  width: min(300px, calc(100vw - 16px));
+  padding: 10px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(8, 10, 24, 0.98);
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.45), var(--glow);
+}
+
+.mini-date-header {
+  display: grid;
+  grid-template-columns: 28px 1fr 28px;
+  gap: 8px;
+  align-items: center;
+}
+
+.mini-date-nav {
+  height: 28px;
+  min-width: 28px;
+  padding: 0;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text);
+  box-shadow: none;
+  font-weight: 700;
+}
+
+.mini-date-nav:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text);
+  border-color: rgba(255, 255, 255, 0.28);
+  box-shadow: none;
+}
+
+.mini-date-selects {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(84px, auto);
+  gap: 8px;
+}
+
+.mini-date-selects select {
+  height: 28px;
+  padding: 0 8px;
+  border-radius: 8px;
+  font-size: 12px;
+}
+
+.mini-date-weekdays {
+  margin-top: 10px;
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+}
+
+.mini-date-weekday {
+  text-align: center;
+  font-size: 11px;
+  letter-spacing: 0.3px;
+  color: var(--muted);
+  text-transform: uppercase;
+}
+
+.mini-date-grid {
+  margin-top: 6px;
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+}
+
+.mini-date-cell {
+  height: 32px;
+  min-width: 0;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text);
+  box-shadow: none;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 0;
+}
+
+.mini-date-cell:hover {
+  border-color: rgba(255, 43, 209, 0.44);
+  background: rgba(255, 43, 209, 0.12);
+  color: var(--text);
+  box-shadow: none;
+}
+
+.mini-date-cell.is-outside {
+  color: rgba(156, 167, 210, 0.6);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.mini-date-cell.is-today {
+  border-color: rgba(25, 135, 255, 0.55);
+}
+
+.mini-date-cell.is-selected {
+  border-color: rgba(255, 43, 209, 0.7);
+  background: rgba(255, 43, 209, 0.28);
+  color: #ffe6f7;
+}
+
+input[data-mini-date-input="true"] {
+  cursor: pointer;
 }
 
 input,

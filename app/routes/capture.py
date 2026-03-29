@@ -33,9 +33,15 @@ from ..utils.inbox_intents import (
     reset_to_unprocessed_inbox,
 )
 from ..utils.projects import normalize_project_color
+from ..utils.projects import project_title_looks_action
 from ..security import csrf_protect, require_html_auth, is_safe_redirect
 
 router = APIRouter(dependencies=[Depends(require_html_auth), Depends(csrf_protect)])
+_ACK_VALUES = {"1", "true", "yes", "on"}
+_PROJECT_DATE_REQUIRED = "Set a target date for this project. No date = no finish."
+_PROJECT_VERB_REQUIRED = (
+    "Project title should start with an action verb (e.g. Move Sam to Atlanta)."
+)
 
 
 def _safe_redirect(next_url: str | None, fallback: str, message: str | None = None) -> RedirectResponse:
@@ -74,6 +80,22 @@ def _task_when_bucket(value: str | None) -> WhenBucket:
         "year": WhenBucket.LATER,
     }
     return mapping.get(normalized, WhenBucket.WEEK)
+
+
+def _is_acknowledged(value: str | None) -> bool:
+    return (value or "").strip().lower() in _ACK_VALUES
+
+
+def _parse_iso_date(value: str | None):
+    if value is None:
+        return None
+    cleaned = value.strip()
+    if not cleaned:
+        return None
+    try:
+        return datetime.strptime(cleaned, "%Y-%m-%d").date()
+    except ValueError:
+        return None
 
 
 @router.get("/capture", response_class=HTMLResponse)
@@ -164,6 +186,8 @@ def submit_wizard(
     project_color_scheme: str | None = Form(None),
     horizon: str = Form("week"),
     include_this_week: str = Form("yes"),
+    target_date: str | None = Form(None),
+    verb_check_ack: str | None = Form(None),
     why_link_text: str | None = Form(None),
     why_tags: list[str] | None = Form(None),
     block_type: str | None = Form(""),
@@ -233,6 +257,26 @@ def submit_wizard(
             status_code=303,
         )
 
+    parsed_project_target_date = None
+    if item_kind == "project":
+        parsed_project_target_date = _parse_iso_date(target_date)
+        if parsed_project_target_date is None:
+            msg = quote_plus(_PROJECT_DATE_REQUIRED)
+            prefill = quote_plus(cleaned_title)
+            source = f"&source_task_id={source_task_id}" if source_task_id else ""
+            return RedirectResponse(
+                url=f"/capture/wizard?error={msg}&prefill={prefill}{source}",
+                status_code=303,
+            )
+        if not project_title_looks_action(cleaned_title) and not _is_acknowledged(verb_check_ack):
+            msg = quote_plus(_PROJECT_VERB_REQUIRED)
+            prefill = quote_plus(cleaned_title)
+            source = f"&source_task_id={source_task_id}" if source_task_id else ""
+            return RedirectResponse(
+                url=f"/capture/wizard?error={msg}&prefill={prefill}{source}",
+                status_code=303,
+            )
+
     try:
         if source_task and normalized_intent != INBOX_INTENT_SUPPORT_PROJECT:
             source_task.verb_noun = cleaned_title
@@ -272,6 +316,7 @@ def submit_wizard(
                 category=category,
                 active_this_week=active_this_week,
                 time_horizon=project_horizon,
+                target_date=parsed_project_target_date,
                 why_link_text=compose_why_text(why_link_text, why_tags),
                 color_scheme=normalize_project_color(project_color_scheme),
                 description=details,
@@ -386,6 +431,8 @@ def submit_capture(
     project_category: ProjectCategory = Form(ProjectCategory.WORK),
     project_time_horizon: str = Form("week"),
     project_include_this_week: str = Form("yes"),
+    project_target_date: str | None = Form(None),
+    project_verb_check_ack: str | None = Form(None),
     project_description: str | None = Form(None),
     project_why_link_text: str | None = Form(None),
     project_why_tags: list[str] | None = Form(None),
@@ -458,6 +505,13 @@ def submit_capture(
             return _safe_redirect(next_url, "/", "Captured")
 
         if capture_kind == "project":
+            parsed_target_date = _parse_iso_date(project_target_date)
+            if parsed_target_date is None:
+                raise HTTPException(status_code=400, detail=_PROJECT_DATE_REQUIRED)
+            if not project_title_looks_action(cleaned_title) and not _is_acknowledged(
+                project_verb_check_ack
+            ):
+                raise HTTPException(status_code=400, detail=_PROJECT_VERB_REQUIRED)
             active_this_week = (
                 project_include_this_week.lower() == "yes" or project_time_horizon == "week"
             )
@@ -469,6 +523,7 @@ def submit_capture(
                 category=project_category,
                 active_this_week=active_this_week,
                 time_horizon=_project_horizon(project_time_horizon),
+                target_date=parsed_target_date,
                 why_link_text=compose_why_text(project_why_link_text, project_why_tags),
                 color_scheme=normalize_project_color(project_color_scheme),
                 description=project_description or None,

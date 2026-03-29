@@ -54,15 +54,16 @@ def test_guided_capture_creates_project(client, api_headers, db_session):
     res = client.post(
         "/capture/wizard",
         data={
-            "capture_text": "Guided project",
+            "capture_text": "Launch guided project",
             "item_kind": "project",
             "displacement_ack": "true",
+            "target_date": "2030-01-10",
         },
         headers=api_headers,
         follow_redirects=False,
     )
     assert res.status_code == 303
-    project = db_session.query(Project).filter(Project.title == "Guided project").one()
+    project = db_session.query(Project).filter(Project.title == "Launch guided project").one()
     assert project.active_this_week is True
 
 
@@ -70,19 +71,51 @@ def test_guided_capture_project_keeps_year_horizon(client, api_headers, db_sessi
     res = client.post(
         "/capture/wizard",
         data={
-            "capture_text": "Year project",
+            "capture_text": "Plan annual roadmap",
             "item_kind": "project",
             "horizon": "year",
             "include_this_week": "no",
+            "displacement_ack": "true",
+            "target_date": "2031-03-01",
+        },
+        headers=api_headers,
+        follow_redirects=False,
+    )
+    assert res.status_code == 303
+    project = db_session.query(Project).filter(Project.title == "Plan annual roadmap").one()
+    assert project.time_horizon == "year"
+    assert project.active_this_week is False
+
+
+def test_guided_capture_project_requires_target_date(client, api_headers):
+    res = client.post(
+        "/capture/wizard",
+        data={
+            "capture_text": "Publish launch plan",
+            "item_kind": "project",
             "displacement_ack": "true",
         },
         headers=api_headers,
         follow_redirects=False,
     )
     assert res.status_code == 303
-    project = db_session.query(Project).filter(Project.title == "Year project").one()
-    assert project.time_horizon == "year"
-    assert project.active_this_week is False
+    assert "Set+a+target+date+for+this+project" in res.headers["location"]
+
+
+def test_guided_capture_project_requires_action_title_without_ack(client, api_headers):
+    res = client.post(
+        "/capture/wizard",
+        data={
+            "capture_text": "Website redesign",
+            "item_kind": "project",
+            "displacement_ack": "true",
+            "target_date": "2030-02-10",
+        },
+        headers=api_headers,
+        follow_redirects=False,
+    )
+    assert res.status_code == 303
+    assert "Project+title+should+start+with+an+action+verb" in res.headers["location"]
 
 
 def test_guided_capture_task_year_horizon_maps_to_later_bucket(client, api_headers, db_session):

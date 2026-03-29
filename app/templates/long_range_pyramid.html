@@ -16,6 +16,7 @@
         <a class="btn ghost btn-sm {% if active_long_term_tab == 'horizons' %}is-active{% endif %}" href="/long-term" {% if active_long_term_tab == 'horizons' %}aria-current="page"{% endif %}>Horizon map</a>
         <a class="btn ghost btn-sm {% if active_long_term_tab == 'pyramid' %}is-active{% endif %}" href="/long-term/pyramid" {% if active_long_term_tab == 'pyramid' %}aria-current="page"{% endif %}>Project pyramid</a>
         <a class="btn ghost btn-sm {% if active_long_term_tab == 'roadmaps' %}is-active{% endif %}" href="/long-term/roadmaps" {% if active_long_term_tab == 'roadmaps' %}aria-current="page"{% endif %}>Project roadmaps</a>
+        <a class="btn ghost btn-sm blue" href="/capture/wizard" data-guided-capture-open data-guided-next-url="{{ request.url.path }}">New Project</a>
       </div>
     </div>
 
@@ -93,4 +94,5 @@
       </div>
     </div>
   </section>
+  {% include "partials/guided_capture_modal.html" %}
 {% endblock %}

@@ -18,6 +18,7 @@
         <a class="btn ghost btn-sm {% if active_long_term_tab == 'horizons' %}is-active{% endif %}" href="/long-term" {% if active_long_term_tab == 'horizons' %}aria-current="page"{% endif %}>Horizon map</a>
         <a class="btn ghost btn-sm {% if active_long_term_tab == 'pyramid' %}is-active{% endif %}" href="/long-term/pyramid" {% if active_long_term_tab == 'pyramid' %}aria-current="page"{% endif %}>Project pyramid</a>
         <a class="btn ghost btn-sm {% if active_long_term_tab == 'roadmaps' %}is-active{% endif %}" href="/long-term/roadmaps" {% if active_long_term_tab == 'roadmaps' %}aria-current="page"{% endif %}>Project roadmaps</a>
+        <a class="btn ghost btn-sm blue" href="/capture/wizard" data-guided-capture-open data-guided-next-url="{{ request.url.path }}">New Project</a>
       </div>
     </div>
 
@@ -56,7 +57,7 @@
                       <span class="pill">{{ project.level_of_success.value|title }} success</span>
                     {% endif %}
                     {% if project.target_date %}
-                      <span class="pill">Target: {{ project.target_date }}</span>
+                      <span class="pill horizon-target-pill"><span class="horizon-target-pill-label">Target:</span> {{ format_horizon_target_date(project.target_date) }}</span>
                     {% endif %}
                   </div>
                   {{ project_edit_form(project) }}
@@ -79,4 +80,5 @@
       <div class="project-edit-modal-body" data-project-edit-body></div>
     </div>
   </div>
+  {% include "partials/guided_capture_modal.html" %}
 {% endblock %}

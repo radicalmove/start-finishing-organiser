@@ -11,6 +11,7 @@
       <form method="post" action="/capture/wizard" id="wizardForm">
         <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
         <input type="hidden" name="displacement_ack" value="0" data-displacement-ack>
+        <input type="hidden" name="verb_check_ack" value="0" data-verb-check-ack>
         <input type="hidden" name="source_task_id" value="{{ source_task_id or '' }}"{% if not source_task_id %} disabled{% endif %}>
         <input type="hidden" name="next_url" value="">
         <div class="wizard-step" data-step="1">
@@ -150,6 +151,11 @@
               <option value="violet">Violet</option>
             </select>
           </div>
+          <label class="field hidden" data-project-target-date>
+            <span>Target date</span>
+            <input type="date" name="target_date">
+            <div class="note">No date = no finish.</div>
+          </label>
           <div class="field checkbox" data-include-week>
             <input type="radio" name="include_this_week" value="yes" checked>
             <span>Include in this week’s 4+3 focus</span>

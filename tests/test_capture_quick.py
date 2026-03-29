@@ -56,15 +56,47 @@ def test_quick_capture_project_keeps_year_horizon(client, api_headers, db_sessio
     res = client.post(
         "/capture",
         data={
-            "title": "Annual project",
+            "title": "Plan annual project",
             "capture_kind": "project",
             "displacement_ack": "yes",
             "project_time_horizon": "year",
             "project_include_this_week": "no",
+            "project_target_date": "2031-04-01",
         },
         headers=api_headers,
         follow_redirects=False,
     )
     assert res.status_code == 303
-    project = db_session.query(Project).filter(Project.title == "Annual project").one()
+    project = db_session.query(Project).filter(Project.title == "Plan annual project").one()
     assert project.time_horizon == "year"
+
+
+def test_quick_capture_project_requires_target_date(client, api_headers):
+    res = client.post(
+        "/capture",
+        data={
+            "title": "Publish weekly article",
+            "capture_kind": "project",
+            "displacement_ack": "yes",
+        },
+        headers=api_headers,
+        follow_redirects=False,
+    )
+    assert res.status_code == 303
+    assert "Set+a+target+date+for+this+project" in res.headers["location"]
+
+
+def test_quick_capture_project_requires_action_title_without_ack(client, api_headers):
+    res = client.post(
+        "/capture",
+        data={
+            "title": "Website redesign",
+            "capture_kind": "project",
+            "displacement_ack": "yes",
+            "project_target_date": "2030-02-01",
+        },
+        headers=api_headers,
+        follow_redirects=False,
+    )
+    assert res.status_code == 303
+    assert "Project+title+should+start+with+an+action+verb" in res.headers["location"]

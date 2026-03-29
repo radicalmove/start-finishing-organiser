@@ -1,6 +1,7 @@
 {% macro project_edit_form(project) %}
   <form method="post" action="/long-term/projects/{{ project.id }}/update" class="project-edit-form hidden">
     <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+    <input type="hidden" name="verb_check_ack" value="0" data-verb-check-ack>
     <div class="project-edit-grid">
       <div class="project-edit-field">
         <div class="caps">Title</div>
@@ -26,7 +27,7 @@
       </div>
       <div class="project-edit-field">
         <div class="caps">Target date</div>
-        <input type="date" name="target_date" value="{{ project.target_date or '' }}">
+        <input type="date" name="target_date" value="{{ project.target_date or '' }}" required>
       </div>
       <div class="project-edit-field">
         <div class="caps">Color</div>
@@ -44,18 +45,18 @@
         <div class="caps">Size</div>
         <select name="size">
           <option value="" {% if not project.size %}selected{% endif %}>Unspecified</option>
-          <option value="light" {% if project.size and project.size.value == "light" %}selected{% endif %}>Light</option>
-          <option value="moderate" {% if project.size and project.size.value == "moderate" %}selected{% endif %}>Moderate</option>
-          <option value="heavy" {% if project.size and project.size.value == "heavy" %}selected{% endif %}>Heavy</option>
+          <option value="light" {% if project.size and project.size.value == "light" %}selected{% endif %}>Light - 1-3 blocks, low coordination</option>
+          <option value="moderate" {% if project.size and project.size.value == "moderate" %}selected{% endif %}>Moderate - 4-10 blocks, some dependencies</option>
+          <option value="heavy" {% if project.size and project.size.value == "heavy" %}selected{% endif %}>Heavy - 10+ blocks, many moving parts</option>
         </select>
       </div>
       <div class="project-edit-field">
         <div class="caps">Success level</div>
         <select name="level_of_success">
           <option value="" {% if not project.level_of_success %}selected{% endif %}>Unspecified</option>
-          <option value="small" {% if project.level_of_success and project.level_of_success.value == "small" %}selected{% endif %}>Small</option>
-          <option value="moderate" {% if project.level_of_success and project.level_of_success.value == "moderate" %}selected{% endif %}>Moderate</option>
-          <option value="epic" {% if project.level_of_success and project.level_of_success.value == "epic" %}selected{% endif %}>Epic</option>
+          <option value="small" {% if project.level_of_success and project.level_of_success.value == "small" %}selected{% endif %}>Small - done and useful</option>
+          <option value="moderate" {% if project.level_of_success and project.level_of_success.value == "moderate" %}selected{% endif %}>Moderate - strong, noticeable improvement</option>
+          <option value="epic" {% if project.level_of_success and project.level_of_success.value == "epic" %}selected{% endif %}>Epic - standout result with major impact</option>
         </select>
       </div>
       <div class="project-edit-field full">

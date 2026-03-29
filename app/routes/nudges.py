@@ -1,5 +1,5 @@
 import json
-from datetime import date, datetime, time, timedelta
+from datetime import date, datetime, time, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import JSONResponse
@@ -27,6 +27,14 @@ from ..utils.coach import refine_nudge_text
 from ..utils.time import utc_now
 
 router = APIRouter(dependencies=[Depends(require_html_auth), Depends(csrf_protect)])
+
+
+def _as_utc_aware(value: datetime | None) -> datetime | None:
+    if value is None:
+        return None
+    if value.tzinfo is None or value.tzinfo.utcoffset(value) is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc)
 
 
 def _start_of_week(day: date) -> date:
@@ -631,7 +639,8 @@ def _refresh_nudges(db: Session) -> tuple[list[GuidanceReminder], dict[str, dict
             dirty = True
             continue
 
-        if reminder.snoozed_until and reminder.snoozed_until > now:
+        snoozed_until = _as_utc_aware(reminder.snoozed_until)
+        if snoozed_until and snoozed_until > now:
             continue
 
         reminder.last_shown_at = now
@@ -675,9 +684,11 @@ def _refresh_nudges(db: Session) -> tuple[list[GuidanceReminder], dict[str, dict
                     reminder.title = pattern_title
                     reminder.body = pattern_body
                     dirty = True
-            if reminder.snoozed_until and reminder.snoozed_until > now:
+            snoozed_until = _as_utc_aware(reminder.snoozed_until)
+            if snoozed_until and snoozed_until > now:
                 continue
-            if reminder.last_shown_at and now - reminder.last_shown_at < cooldown:
+            last_shown_at = _as_utc_aware(reminder.last_shown_at)
+            if last_shown_at and now - last_shown_at < cooldown:
                 continue
             reminder.last_shown_at = now
             reminders.append(reminder)

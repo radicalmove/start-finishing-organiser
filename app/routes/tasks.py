@@ -18,15 +18,19 @@ from ..models import (
     WhenBucket,
 )
 from ..security import csrf_protect, require_html_auth
+from ..services import (
+    apply_task_update,
+    archive_task as mutate_archive_task,
+    complete_task as mutate_complete_task,
+    reopen_task as mutate_reopen_task,
+    restore_task as mutate_restore_task,
+)
 from ..utils.coach import build_coach_context_json, project_summary, task_summary
 from ..utils.inbox_intents import (
     INBOX_INTENT_ENJOY_RECOVER,
     INBOX_INTENT_LEARN_EXPLORE,
     INBOX_INTENT_PARK_LET_GO,
-    reset_to_unprocessed_inbox,
 )
-from ..utils.rules import parse_block_type, parse_optional_int
-from ..utils.time import utc_now
 
 router = APIRouter(dependencies=[Depends(require_html_auth), Depends(csrf_protect)])
 
@@ -263,24 +267,18 @@ def update_task(
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
 
-    if verb_noun is not None:
-        cleaned = verb_noun.strip()
-        if cleaned:
-            task.verb_noun = cleaned
-    if description is not None:
-        task.description = description.strip() or None
-
-    task.project_id = int(project_id) if project_id not in (None, "", "null") else None
-    task.when_bucket = when_bucket
-    task.block_type = parse_block_type(block_type) if block_type not in (None, "", "null") else None
-    duration_value = parse_optional_int(duration_minutes)
-    if duration_value is not None and duration_value <= 0:
-        duration_value = None
-    task.duration_minutes = duration_value
-    task.frog = bool(frog)
-    task.alignment = Alignment(alignment) if alignment else None
-    if send_to_inbox:
-        reset_to_unprocessed_inbox(task)
+    apply_task_update(
+        task,
+        verb_noun=verb_noun,
+        description=description,
+        project_id=project_id,
+        when_bucket=when_bucket,
+        block_type=block_type,
+        duration_minutes=duration_minutes,
+        frog=frog,
+        alignment=alignment,
+        send_to_inbox=send_to_inbox,
+    )
 
     db.add(task)
     db.commit()
@@ -309,9 +307,7 @@ def complete_task(
     task = db.get(Task, task_id)
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
-    task.status = TaskStatus.DONE
-    task.completed_at = utc_now()
-    task.in_inbox = False
+    mutate_complete_task(task)
     db.add(task)
     db.commit()
     return _safe_redirect(next_url, "/tasks/time", f"Completed: {task.verb_noun}")
@@ -326,8 +322,7 @@ def reopen_task(
     task = db.get(Task, task_id)
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
-    task.status = TaskStatus.PENDING
-    task.completed_at = None
+    mutate_reopen_task(task)
     db.add(task)
     db.commit()
     return _safe_redirect(next_url, "/tasks/completed", "Reopened")
@@ -342,9 +337,7 @@ def archive_task(
     task = db.get(Task, task_id)
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
-    task.status = TaskStatus.ARCHIVED
-    task.in_inbox = False
-    task.archived_from_inbox = False
+    mutate_archive_task(task)
     db.add(task)
     db.commit()
     return _safe_redirect(next_url, "/tasks/archived", "Archived")
@@ -360,9 +353,7 @@ def archive_tasks_bulk(
         return _safe_redirect(next_url, "/tasks/completed", "Nothing to archive")
     tasks = db.query(Task).filter(Task.id.in_(task_ids)).all()
     for task in tasks:
-        task.status = TaskStatus.ARCHIVED
-        task.in_inbox = False
-        task.archived_from_inbox = False
+        mutate_archive_task(task)
         db.add(task)
     db.commit()
     return _safe_redirect(next_url, "/tasks/archived", "Archived")
@@ -377,12 +368,7 @@ def restore_task(
     task = db.get(Task, task_id)
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
-    task.status = TaskStatus.PENDING
-    task.completed_at = None
-    if task.archived_from_inbox:
-        reset_to_unprocessed_inbox(task)
-    else:
-        task.in_inbox = False
+    mutate_restore_task(task)
     db.add(task)
     db.commit()
     return _safe_redirect(next_url, "/tasks/time", "Restored")
