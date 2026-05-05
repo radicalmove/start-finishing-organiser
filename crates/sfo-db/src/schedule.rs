@@ -244,7 +244,7 @@ async fn clear_task_schedule(
 }
 
 #[derive(Debug, FromRow)]
-struct BlockRow {
+pub(crate) struct BlockRow {
     id: String,
     title: Option<String>,
     date: String,

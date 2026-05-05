@@ -1,8 +1,10 @@
+pub mod bootstrap;
 pub mod error;
 pub mod planning;
 pub mod schedule;
 pub mod system;
 
+pub use bootstrap::BootstrapService;
 pub use error::ServiceError;
 pub use planning::PlanningService;
 pub use schedule::ScheduleService;

@@ -12,6 +12,7 @@ The Rust rewrite lives beside the current Python app while feature parity is bui
 ## Current API
 
 - `GET /healthz`
+- `GET /api/v1/bootstrap`
 - `GET /api/v1/projects`
 - `POST /api/v1/projects`
 - `PATCH /api/v1/projects/{project_id}`
@@ -57,6 +58,19 @@ Real import is exposed at `POST /api/v1/import/python-sqlite` with:
 - Re-running the same import is idempotent for imported projects, tasks, and blocks because upserts key off `legacy_id`.
 
 Unsupported Python tables are still reported as warnings and are not imported in this slice. The backup endpoint returns a JSON manifest over the Rust database with schema metadata and table counts.
+
+## Bootstrap Summary
+
+`GET /api/v1/bootstrap` returns the first daily dashboard contract for future Mac and iPhone clients:
+
+- Active weekly projects.
+- Inbox/container counts.
+- Today tasks.
+- Today blocks.
+- Current and next block for the requested time.
+- Compact system state with database status, schema, backup table counts, and supported import tables.
+
+The endpoint defaults to server date/time and accepts optional `date=YYYY-MM-DD` and `time=HH:MM:SS` query parameters for deterministic clients and tests.
 
 ## Local Verification
 

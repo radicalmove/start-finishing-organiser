@@ -287,7 +287,7 @@ pub async fn delete_task(pool: &sqlx::SqlitePool, id: TaskId) -> Result<bool, Db
 }
 
 #[derive(Debug, FromRow)]
-struct ProjectRow {
+pub(crate) struct ProjectRow {
     id: String,
     title: String,
     description: Option<String>,
@@ -326,7 +326,7 @@ impl TryFrom<ProjectRow> for Project {
 }
 
 #[derive(Debug, FromRow)]
-struct TaskRow {
+pub(crate) struct TaskRow {
     id: String,
     project_id: Option<String>,
     verb_noun: String,

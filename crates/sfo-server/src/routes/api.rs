@@ -3,14 +3,17 @@ use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 use axum::routing::{get, patch, post};
 use axum::{Json, Router};
+use chrono::{NaiveDate, NaiveTime, Utc};
 use serde::{Deserialize, Serialize};
 use sfo_core::{
-    BackupManifest, Block, BlockCreate, BlockId, BlockUpdate, ImportDryRunReport,
+    BackupManifest, Block, BlockCreate, BlockId, BlockUpdate, BootstrapSummary, ImportDryRunReport,
     ImportDryRunRequest, Page, Project, ProjectCreate, ProjectId, ProjectUpdate,
     PythonSqliteImportReport, PythonSqliteImportRequest, QuickCapture, Task, TaskCreate, TaskId,
     TaskUpdate,
 };
-use sfo_services::{PlanningService, ScheduleService, ServiceError, SystemService};
+use sfo_services::{
+    BootstrapService, PlanningService, ScheduleService, ServiceError, SystemService,
+};
 use std::str::FromStr;
 
 use crate::AppState;
@@ -19,6 +22,12 @@ use crate::AppState;
 struct PageQuery {
     page: Option<i64>,
     page_size: Option<i64>,
+}
+
+#[derive(Debug, Deserialize)]
+struct BootstrapQuery {
+    date: Option<NaiveDate>,
+    time: Option<NaiveTime>,
 }
 
 #[derive(Debug, Serialize)]
@@ -85,6 +94,7 @@ impl From<ServiceError> for ApiError {
 
 pub fn router() -> Router<AppState> {
     Router::new()
+        .route("/bootstrap", get(bootstrap))
         .route("/projects", get(list_projects).post(create_project))
         .route(
             "/projects/{project_id}",
@@ -108,6 +118,17 @@ pub fn router() -> Router<AppState> {
         )
         .route("/import/python-sqlite", post(import_python_sqlite))
         .route("/export/backup", post(export_backup))
+}
+
+async fn bootstrap(
+    State(state): State<AppState>,
+    Query(query): Query<BootstrapQuery>,
+) -> Result<Json<BootstrapSummary>, ApiError> {
+    let now = Utc::now();
+    let today = query.date.unwrap_or_else(|| now.date_naive());
+    let current_time = Some(query.time.unwrap_or_else(|| now.time()));
+    let service = BootstrapService::new(state.db);
+    Ok(Json(service.summary(today, current_time).await?))
 }
 
 async fn list_projects(

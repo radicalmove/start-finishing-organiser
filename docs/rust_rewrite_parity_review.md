@@ -13,6 +13,7 @@ The Rust branch currently has:
 - Projects API with weekly 4+3 cap enforcement.
 - Tasks API with CRUD, pagination, complete, reopen, archive, restore, and quick capture.
 - Blocks API with CRUD and task schedule-date sync when task blocks are created or deleted.
+- Bootstrap/Home Summary API with weekly projects, inbox counts, today tasks, today blocks, current/next block, and compact system state.
 - Python SQLite dry-run import and real import for projects/tasks/blocks.
 - Rust database backup file creation before import writes.
 - Backup manifest endpoint for current Rust tables.
@@ -29,7 +30,7 @@ This is a good foundation, but it is still only the planning/task substrate. It 
 | Guided capture | Wizard decides task/project/inbox/OPP and routes source inbox items | Not covered | Very high | Port after Bootstrap because it defines the app's behavior quality. |
 | Inbox containers | Learning, Enjoy, Parked, Recycle bin, undo, metrics | Data fields only | Very high | Port as a dedicated slice, not as incidental task updates. |
 | Blocks/calendar | Focus/Admin/Social/Recovery blocks, appointments, week calendar | Core API, import, backup | Very high | Covered enough for a Bootstrap/Home summary slice; UI and external calendars are still pending. |
-| Home/Today | Inbox, Today calendar, Now strip, One Thing/Frog, Today tasks | Not covered | Very high | Best next product slice via a Bootstrap/Home summary endpoint. |
+| Home/Today | Inbox, Today calendar, Now strip, One Thing/Frog, Today tasks | Read-only Bootstrap summary | Very high | Next UX review checkpoint; One Thing/Frog and rituals still need Rust data support. |
 | Weekly review | 4+3 focus, resurfacing, block planning, archive completed | Not covered | High | Port after Home primitives; depends on projects, tasks, blocks, resurface. |
 | Resurface | Pull Month/Quarter/Later due items into Week | Partly possible through task fields | Medium-high | Add with weekly review or just before it. |
 | Waiting On / OPP | Captures other-owned priorities and follow-up dates | Not covered | Medium-high | Port alongside guided capture because OPP creation happens there. |
@@ -53,7 +54,27 @@ The iPhone client should be reviewed against these same workflows. It should not
 
 ## Recommended Next Slices
 
-### 1. Bootstrap/Home Summary API
+### 1. Inbox Processing And Containers
+
+Port the approved inbox strategy as service behavior:
+
+- Process-time intent classification.
+- Learning / Enjoy / Park routing.
+- Recycle bin and undo.
+- Container counts and metrics.
+
+This is the highest UX-quality slice after the dashboard contract because capture quality is what keeps the app trustworthy.
+
+### 2. Auth And Mac Mini Deployment
+
+Before real phone use, the Rust server needs private-network auth and deployment basics:
+
+- User/session token model.
+- Server config file or env contract.
+- Launch service/runbook for the Mac mini.
+- Backup location policy.
+
+## Completed Slice: Bootstrap/Home Summary API
 
 Add a read-only endpoint that gives clients the minimum state needed to draw an initial dashboard: active projects, inbox count, today tasks, today blocks, current/next block, and backup/import status.
 
@@ -78,26 +99,6 @@ Out of scope:
 - Full HTML Home replacement.
 - External Cozi calendar events.
 - Personalized recommendations or nudges.
-
-### 2. Inbox Processing And Containers
-
-Port the approved inbox strategy as service behavior:
-
-- Process-time intent classification.
-- Learning / Enjoy / Park routing.
-- Recycle bin and undo.
-- Container counts and metrics.
-
-This is the highest UX-quality slice after the dashboard contract because capture quality is what keeps the app trustworthy.
-
-### 3. Auth And Mac Mini Deployment
-
-Before real phone use, the Rust server needs private-network auth and deployment basics:
-
-- User/session token model.
-- Server config file or env contract.
-- Launch service/runbook for the Mac mini.
-- Backup location policy.
 
 ## Completed Slice: Blocks And Calendar Primitives
 
@@ -128,4 +129,4 @@ Out of scope for the first Blocks slice:
 
 ## Current Recommendation
 
-The next coding slice should be **Bootstrap/Home Summary API**. Blocks now provide the scheduling primitive, so the next step is a single dashboard contract that lets Mac and iPhone clients render the first useful daily view without needing to understand every individual backend route.
+The next coding slice should be **Inbox Processing And Containers**. Bootstrap now gives clients a coherent read-only daily payload; the next behavior gap is turning captured inbox items into explicit containers without creating more ambiguous task backlog.
