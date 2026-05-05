@@ -11,6 +11,7 @@ pub use state::AppState;
 pub fn build_router(state: AppState) -> Router {
     Router::new()
         .route("/healthz", get(routes::health::healthz))
+        .nest("/api/v1", routes::api::router())
         .layer(TraceLayer::new_for_http())
         .with_state(state)
 }

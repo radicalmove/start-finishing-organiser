@@ -1,5 +1,6 @@
 pub mod config;
 pub mod error;
+pub mod planning;
 
 use sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePoolOptions};
 use std::str::FromStr;

@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use std::{fmt, str::FromStr};
 use uuid::Uuid;
 
 macro_rules! id_type {
@@ -29,6 +30,20 @@ macro_rules! id_type {
                 Self::new()
             }
         }
+
+        impl fmt::Display for $name {
+            fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+                self.0.fmt(formatter)
+            }
+        }
+
+        impl FromStr for $name {
+            type Err = uuid::Error;
+
+            fn from_str(value: &str) -> Result<Self, Self::Err> {
+                Uuid::parse_str(value).map(Self)
+            }
+        }
     };
 }
 
@@ -52,5 +67,12 @@ mod tests {
         let json = serde_json::to_string(&original).expect("serialize task id");
         let decoded: TaskId = serde_json::from_str(&json).expect("deserialize task id");
         assert_eq!(decoded, original);
+    }
+
+    #[test]
+    fn ids_parse_from_displayed_uuid_strings() {
+        let original = ProjectId::new();
+        let parsed: ProjectId = original.to_string().parse().expect("parse project id");
+        assert_eq!(parsed, original);
     }
 }

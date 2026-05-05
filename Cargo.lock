@@ -232,7 +232,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c673075a2e0e5f4a1dde27ce9dee1ea4558c7ffe648f576438a20ca1d2acc4b0"
 dependencies = [
  "iana-time-zone",
+ "js-sys",
  "num-traits",
+ "serde",
+ "wasm-bindgen",
  "windows-link",
 ]
 
@@ -1409,6 +1412,7 @@ dependencies = [
 name = "sfo-core"
 version = "0.1.0"
 dependencies = [
+ "chrono",
  "serde",
  "serde_json",
  "thiserror",
@@ -1419,6 +1423,8 @@ dependencies = [
 name = "sfo-db"
 version = "0.1.0"
 dependencies = [
+ "chrono",
+ "sfo-core",
  "sqlx",
  "thiserror",
  "tokio",
@@ -1433,7 +1439,9 @@ dependencies = [
  "http-body-util",
  "serde",
  "serde_json",
+ "sfo-core",
  "sfo-db",
+ "sfo-services",
  "sqlx",
  "thiserror",
  "tokio",
@@ -1441,6 +1449,18 @@ dependencies = [
  "tower-http",
  "tracing",
  "tracing-subscriber",
+]
+
+[[package]]
+name = "sfo-services"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "sfo-core",
+ "sfo-db",
+ "sqlx",
+ "thiserror",
+ "tokio",
 ]
 
 [[package]]

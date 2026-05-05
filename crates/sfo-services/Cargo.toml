@@ -1,5 +1,5 @@
 [package]
-name = "sfo-db"
+name = "sfo-services"
 version = "0.1.0"
 edition.workspace = true
 rust-version.workspace = true
@@ -9,9 +9,9 @@ repository.workspace = true
 [dependencies]
 chrono.workspace = true
 sfo-core = { path = "../sfo-core" }
+sfo-db = { path = "../sfo-db" }
 sqlx.workspace = true
 thiserror.workspace = true
-tracing.workspace = true
 
 [dev-dependencies]
 tokio.workspace = true

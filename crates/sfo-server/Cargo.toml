@@ -9,7 +9,9 @@ repository.workspace = true
 [dependencies]
 axum.workspace = true
 serde.workspace = true
+sfo-core = { path = "../sfo-core" }
 sfo-db = { path = "../sfo-db" }
+sfo-services = { path = "../sfo-services" }
 sqlx.workspace = true
 thiserror.workspace = true
 tokio.workspace = true
