@@ -7,7 +7,7 @@ The Rust rewrite lives beside the current Python app while feature parity is bui
 - `crates/sfo-core`: shared domain types.
 - `crates/sfo-db`: SQLite connection and migrations.
 - `crates/sfo-server`: Axum server shell.
-- `crates/sfo-services`: use-case rules for projects, tasks, blocks, and inbox processing.
+- `crates/sfo-services`: use-case rules for projects, tasks, blocks, inbox processing, and guided capture.
 
 ## Current API
 
@@ -35,6 +35,7 @@ The Rust rewrite lives beside the current Python app while feature parity is bui
 - `POST /api/v1/inbox/{task_id}/undo`
 - `POST /api/v1/inbox/{task_id}/recycle`
 - `POST /api/v1/inbox/{task_id}/restore`
+- `POST /api/v1/capture/guided`
 - `POST /api/v1/import/python-sqlite/dry-run`
 - `POST /api/v1/import/python-sqlite`
 - `POST /api/v1/export/backup`
@@ -87,6 +88,20 @@ The first Rust inbox-processing slice keeps the approved Python semantics for re
 - `POST /api/v1/inbox/{task_id}/recycle` moves an active inbox item to the inbox recycle bin.
 - `POST /api/v1/inbox/{task_id}/restore` returns a recycled or quick-routed item to the unprocessed inbox.
 - `GET /api/v1/inbox/containers` returns container counts plus Learning, Enjoy, Parked, and Recycle bin item lists.
+
+## Guided Capture
+
+`POST /api/v1/capture/guided` is the first Rust API for the primary `Process` path:
+
+- Create a clarified task from guided capture input.
+- Create a clarified project with target-date and action-title checks.
+- Preserve `year` as a project horizon while mapping `year` task captures to the `later` task bucket.
+- Process an inbox source item by requiring an explicit `inbox_intent`.
+- Route source inbox items to Learning, Enjoy, or Parked without creating duplicate task backlog.
+- Convert a source inbox item into an actionable support-project task only when an existing `project_id` is supplied.
+- Mark a source inbox item as processed/archived when it becomes a new project.
+
+Waiting On / OPP storage is not part of this endpoint yet because the Rust rewrite does not have the `waiting_on` schema slice.
 
 ## Local Verification
 

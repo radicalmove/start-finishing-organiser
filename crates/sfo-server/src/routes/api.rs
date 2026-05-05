@@ -6,13 +6,15 @@ use axum::{Json, Router};
 use chrono::{NaiveDate, NaiveTime, Utc};
 use serde::{Deserialize, Serialize};
 use sfo_core::{
-    BackupManifest, Block, BlockCreate, BlockId, BlockUpdate, BootstrapSummary, ImportDryRunReport,
-    ImportDryRunRequest, InboxContainers, InboxRouteRequest, Page, Project, ProjectCreate,
-    ProjectId, ProjectUpdate, PythonSqliteImportReport, PythonSqliteImportRequest, QuickCapture,
-    Task, TaskCreate, TaskId, TaskUpdate,
+    BackupManifest, Block, BlockCreate, BlockId, BlockUpdate, BootstrapSummary,
+    GuidedCaptureRequest, GuidedCaptureResponse, ImportDryRunReport, ImportDryRunRequest,
+    InboxContainers, InboxRouteRequest, Page, Project, ProjectCreate, ProjectId, ProjectUpdate,
+    PythonSqliteImportReport, PythonSqliteImportRequest, QuickCapture, Task, TaskCreate, TaskId,
+    TaskUpdate,
 };
 use sfo_services::{
-    BootstrapService, InboxService, PlanningService, ScheduleService, ServiceError, SystemService,
+    BootstrapService, CaptureService, InboxService, PlanningService, ScheduleService, ServiceError,
+    SystemService,
 };
 use std::str::FromStr;
 
@@ -117,6 +119,7 @@ pub fn router() -> Router<AppState> {
         .route("/inbox/{task_id}/undo", post(undo_inbox_route))
         .route("/inbox/{task_id}/recycle", post(recycle_inbox_item))
         .route("/inbox/{task_id}/restore", post(restore_inbox_item))
+        .route("/capture/guided", post(guided_capture))
         .route(
             "/import/python-sqlite/dry-run",
             post(dry_run_python_sqlite_import),
@@ -303,6 +306,14 @@ async fn restore_inbox_item(
 ) -> Result<Json<Task>, ApiError> {
     let service = InboxService::new(state.db);
     Ok(Json(service.restore_item(parse_task_id(&task_id)?).await?))
+}
+
+async fn guided_capture(
+    State(state): State<AppState>,
+    Json(payload): Json<GuidedCaptureRequest>,
+) -> Result<Json<GuidedCaptureResponse>, ApiError> {
+    let service = CaptureService::new(state.db);
+    Ok(Json(service.submit_guided(payload).await?))
 }
 
 async fn list_blocks(

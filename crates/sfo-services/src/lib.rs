@@ -1,4 +1,5 @@
 pub mod bootstrap;
+pub mod capture;
 pub mod error;
 pub mod inbox;
 pub mod planning;
@@ -6,6 +7,7 @@ pub mod schedule;
 pub mod system;
 
 pub use bootstrap::BootstrapService;
+pub use capture::CaptureService;
 pub use error::ServiceError;
 pub use inbox::InboxService;
 pub use planning::PlanningService;

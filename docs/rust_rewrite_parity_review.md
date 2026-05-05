@@ -15,11 +15,12 @@ The Rust branch currently has:
 - Blocks API with CRUD and task schedule-date sync when task blocks are created or deleted.
 - Bootstrap/Home Summary API with weekly projects, inbox counts, today tasks, today blocks, current/next block, and compact system state.
 - Inbox container API with quick routing to Learning/Enjoy/Park, undo, recycle, restore, and container item lists.
+- Guided capture API with task/project creation, source inbox intent handling, support-project task conversion, and source-to-project archiving.
 - Python SQLite dry-run import and real import for projects/tasks/blocks.
 - Rust database backup file creation before import writes.
 - Backup manifest endpoint for current Rust tables.
 
-This is a good foundation, but it is still mostly the planning/task substrate. It now covers the first reversible inbox-routing workflow, but not the full guided processing workflow.
+This is a good foundation, but it is still backend-only. It covers the first reversible inbox-routing workflow and the first guided processing API, but not Waiting On/OPP or the native client UX.
 
 ## Product Parity Matrix
 
@@ -28,13 +29,13 @@ This is a good foundation, but it is still mostly the planning/task substrate. I
 | Projects | Weekly focus, long-range planning, success cues, roadmaps | Core CRUD and weekly cap | High | Keep extending through long-range/project success fields after daily workflow primitives exist. |
 | Tasks | Time/project board, lifecycle, inbox flags, completion/archive history | Core CRUD and lifecycle | High | Covered enough for the next client/bootstrap slice. |
 | Quick capture | Modal and capture page can send undecided items to Inbox | API quick capture | High | Keep. It is the right first capture primitive. |
-| Guided capture | Wizard decides task/project/inbox/OPP and routes source inbox items | Not covered | Very high | Port next because it defines the app's behavior quality. |
+| Guided capture | Wizard decides task/project/inbox/OPP and routes source inbox items | Backend task/project/source processing API, without OPP | Very high | Add Waiting On / OPP next, then review native client UX. |
 | Inbox containers | Learning, Enjoy, Parked, Recycle bin, undo, metrics | Backend route/recycle/restore/containers API | Very high | Add UI/client review after guided processing exists. |
 | Blocks/calendar | Focus/Admin/Social/Recovery blocks, appointments, week calendar | Core API, import, backup | Very high | Covered enough for a Bootstrap/Home summary slice; UI and external calendars are still pending. |
 | Home/Today | Inbox, Today calendar, Now strip, One Thing/Frog, Today tasks | Read-only Bootstrap summary | Very high | Next UX review checkpoint; One Thing/Frog and rituals still need Rust data support. |
 | Weekly review | 4+3 focus, resurfacing, block planning, archive completed | Not covered | High | Port after Home primitives; depends on projects, tasks, blocks, resurface. |
 | Resurface | Pull Month/Quarter/Later due items into Week | Partly possible through task fields | Medium-high | Add with weekly review or just before it. |
-| Waiting On / OPP | Captures other-owned priorities and follow-up dates | Not covered | Medium-high | Port alongside guided capture because OPP creation happens there. |
+| Waiting On / OPP | Captures other-owned priorities and follow-up dates | Not covered | Medium-high | Port next so guided capture can represent owner boundaries. |
 | Rituals | Morning/midday/evening check-ins and Home status | Not covered | Medium | Defer until Home/Blocks exist. |
 | Health | Full health/training module | Not covered | Medium | Large independent slice; do not block first Mac/iPhone planning app. |
 | Coach/guidance | Chat, nudges, reminders, pattern detection | Not covered | Medium | Defer until core workflows are stable. |
@@ -55,17 +56,17 @@ The iPhone client should be reviewed against these same workflows. It should not
 
 ## Recommended Next Slices
 
-### 1. Guided Capture And Support-Project Processing
+### 1. Waiting On / OPP Backend
 
-Port the primary inbox `Process` path rather than only the secondary quick-route actions:
+Add the missing ownership-boundary slice that guided capture currently defers:
 
-- Process-time intent classification.
-- Convert an inbox source item into an actionable task.
-- Convert an inbox source item into a support-project outcome without leaving duplicate ambiguous backlog.
-- Preserve reversible routing to Learning / Enjoy / Park for non-work items.
-- Add OPP / Waiting On support if it is still part of the capture decision tree.
+- Rust `waiting_on` table and domain types.
+- Create/list/update/resolve Waiting On items.
+- Optional `owner_type` support for tasks if still needed in Rust.
+- Guided capture integration for OPP captures with `waiting_person`.
+- Bootstrap count or summary for future Home clients.
 
-This is the highest UX-quality slice after container routing because the primary app promise is turning ambiguous thoughts into clear commitments.
+This should come before UI review because the capture UX cannot be judged properly if "someone else owns this" has nowhere to go.
 
 ### 2. Auth And Mac Mini Deployment
 
@@ -123,6 +124,28 @@ Out of scope:
 - Waiting On / OPP creation.
 - Native Mac or iPhone UI.
 
+## Completed Slice: Guided Capture And Support-Project Processing
+
+This slice added the first Rust backend for the primary guided `Process` path.
+
+Minimum scope delivered:
+
+- `POST /api/v1/capture/guided`
+- Create guided tasks and projects.
+- Enforce displacement acknowledgement for task/project commitments.
+- Require project target dates and action-like project titles unless acknowledged.
+- Preserve `year` project horizon while mapping `year` tasks to `later`.
+- Require explicit inbox intent when processing a source inbox item.
+- Route source items to Learning / Enjoy / Park without creating duplicate tasks.
+- Convert source inbox items into support-project tasks only when `project_id` is supplied.
+- Mark source inbox items as support-project processed and archived when converted into a new project.
+
+Out of scope:
+
+- Waiting On / OPP schema and capture integration.
+- Full native Mac/iPhone guided-capture UI.
+- Suggestion/heuristic endpoint for task vs project.
+
 ## Completed Slice: Blocks And Calendar Primitives
 
 This slice added Rust domain types, migrations, repository/service functions, API endpoints, backup support, and Python import for blocks.
@@ -152,4 +175,4 @@ Out of scope for the first Blocks slice:
 
 ## Current Recommendation
 
-The next coding slice should be **Guided Capture And Support-Project Processing**. Inbox quick routing now exists in Rust; the remaining behavior gap is the primary `Process` action that turns ambiguous inbox items into tasks, support-project outcomes, or waiting-on commitments.
+The next coding slice should be **Waiting On / OPP Backend**. Guided capture can now create tasks/projects and process inbox source items, but it still cannot represent "this is owned by someone else" or follow-up dates.
