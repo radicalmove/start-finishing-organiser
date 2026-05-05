@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use sfo_core::{BackupManifest, ImportDryRunReport};
+use sfo_core::{BackupManifest, ImportDryRunReport, PythonSqliteImportReport};
 
 use crate::ServiceError;
 
@@ -28,6 +28,33 @@ impl SystemService {
         }
 
         sfo_db::import::dry_run_python_sqlite_import(source_path)
+            .await
+            .map_err(Into::into)
+    }
+
+    pub async fn import_python_sqlite(
+        &self,
+        source_path: impl Into<PathBuf>,
+        backup_dir: Option<impl Into<PathBuf>>,
+    ) -> Result<PythonSqliteImportReport, ServiceError> {
+        let source_path = source_path.into();
+        if source_path.as_os_str().is_empty() {
+            return Err(ServiceError::Validation {
+                field: "source_path",
+                message: "must not be empty",
+            });
+        }
+        let backup_dir = backup_dir
+            .map(Into::into)
+            .unwrap_or_else(|| PathBuf::from("backups"));
+        if backup_dir.as_os_str().is_empty() {
+            return Err(ServiceError::Validation {
+                field: "backup_dir",
+                message: "must not be empty",
+            });
+        }
+
+        sfo_db::import::import_python_sqlite(&self.db, source_path, backup_dir)
             .await
             .map_err(Into::into)
     }
@@ -74,6 +101,29 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn service_delegates_python_sqlite_import() {
+        let service = service().await;
+        let path = temp_db_path("service-import-real");
+        let backup_dir = temp_dir_path("service-import-real-backups");
+        create_python_fixture(&path).await;
+        std::fs::create_dir_all(&backup_dir).expect("create backup dir");
+
+        let report = service
+            .import_python_sqlite(&path, Some(&backup_dir))
+            .await
+            .expect("import report");
+
+        assert!(std::path::Path::new(&report.backup_path).exists());
+        assert!(report
+            .tables
+            .iter()
+            .any(|table| table.table == "projects" && table.imported_rows == 1));
+
+        let _ = std::fs::remove_file(path);
+        let _ = std::fs::remove_dir_all(backup_dir);
+    }
+
+    #[tokio::test]
     async fn service_delegates_backup_manifest() {
         let pool = connect(&DbConfig::new("sqlite::memory:"))
             .await
@@ -115,14 +165,76 @@ mod tests {
             .await
             .expect("fixture connection");
 
-        sqlx::query("CREATE TABLE projects (id INTEGER PRIMARY KEY, title TEXT NOT NULL)")
-            .execute(&pool)
-            .await
-            .expect("create projects");
-        sqlx::query("INSERT INTO projects (title) VALUES ('A')")
-            .execute(&pool)
-            .await
-            .expect("insert project");
+        sqlx::query(
+            r#"
+            CREATE TABLE projects (
+                id INTEGER PRIMARY KEY,
+                title TEXT NOT NULL,
+                description TEXT,
+                category TEXT NOT NULL,
+                status TEXT NOT NULL,
+                size TEXT,
+                time_horizon TEXT,
+                target_date TEXT,
+                level_of_success TEXT,
+                why_link_text TEXT,
+                active_this_week INTEGER NOT NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT
+            )
+            "#,
+        )
+        .execute(&pool)
+        .await
+        .expect("create projects");
+        sqlx::query(
+            r#"
+            INSERT INTO projects (
+                id, title, description, category, status, size, time_horizon,
+                target_date, level_of_success, why_link_text, active_this_week,
+                created_at, updated_at
+            )
+            VALUES (
+                1, 'A', NULL, 'work', 'active', NULL, NULL,
+                NULL, NULL, NULL, 0, '2026-01-02 03:04:05', NULL
+            )
+            "#,
+        )
+        .execute(&pool)
+        .await
+        .expect("insert project");
+
+        sqlx::query(
+            r#"
+            CREATE TABLE tasks (
+                id INTEGER PRIMARY KEY,
+                project_id INTEGER,
+                verb_noun TEXT NOT NULL,
+                description TEXT,
+                in_inbox INTEGER NOT NULL,
+                archived_from_inbox INTEGER NOT NULL,
+                intake_intent TEXT NOT NULL,
+                intake_container TEXT NOT NULL,
+                intake_processed_at TEXT,
+                when_bucket TEXT NOT NULL,
+                block_type TEXT,
+                duration_minutes INTEGER,
+                priority INTEGER,
+                frog INTEGER NOT NULL,
+                alignment TEXT,
+                first_action TEXT,
+                status TEXT NOT NULL,
+                scheduled_for TEXT,
+                owner_type TEXT NOT NULL,
+                resurface_on TEXT,
+                completed_at TEXT,
+                created_at TEXT NOT NULL
+            )
+            "#,
+        )
+        .execute(&pool)
+        .await
+        .expect("create tasks");
 
         pool.close().await;
     }
@@ -130,6 +242,14 @@ mod tests {
     fn temp_db_path(label: &str) -> std::path::PathBuf {
         std::env::temp_dir().join(format!(
             "sfo-{label}-{}-{}.db",
+            std::process::id(),
+            chrono::Utc::now().timestamp_nanos_opt().unwrap_or_default()
+        ))
+    }
+
+    fn temp_dir_path(label: &str) -> std::path::PathBuf {
+        std::env::temp_dir().join(format!(
+            "sfo-{label}-{}-{}",
             std::process::id(),
             chrono::Utc::now().timestamp_nanos_opt().unwrap_or_default()
         ))

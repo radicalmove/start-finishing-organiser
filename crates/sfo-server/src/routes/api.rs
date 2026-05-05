@@ -6,7 +6,8 @@ use axum::{Json, Router};
 use serde::{Deserialize, Serialize};
 use sfo_core::{
     BackupManifest, ImportDryRunReport, ImportDryRunRequest, Page, Project, ProjectCreate,
-    ProjectId, ProjectUpdate, QuickCapture, Task, TaskCreate, TaskId, TaskUpdate,
+    ProjectId, ProjectUpdate, PythonSqliteImportReport, PythonSqliteImportRequest, QuickCapture,
+    Task, TaskCreate, TaskId, TaskUpdate,
 };
 use sfo_services::{PlanningService, ServiceError, SystemService};
 use std::str::FromStr;
@@ -99,6 +100,7 @@ pub fn router() -> Router<AppState> {
             "/import/python-sqlite/dry-run",
             post(dry_run_python_sqlite_import),
         )
+        .route("/import/python-sqlite", post(import_python_sqlite))
         .route("/export/backup", post(export_backup))
 }
 
@@ -234,6 +236,18 @@ async fn dry_run_python_sqlite_import(
     let service = SystemService::new(state.db);
     let report = service
         .dry_run_python_sqlite_import(payload.source_path)
+        .await?;
+    Ok(Json(report))
+}
+
+async fn import_python_sqlite(
+    State(state): State<AppState>,
+    Json(payload): Json<PythonSqliteImportRequest>,
+) -> Result<Json<PythonSqliteImportReport>, ApiError> {
+    let service = SystemService::new(state.db);
+    let backup_dir = payload.backup_dir.map(std::path::PathBuf::from);
+    let report = service
+        .import_python_sqlite(payload.source_path, backup_dir)
         .await?;
     Ok(Json(report))
 }
