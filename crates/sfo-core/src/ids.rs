@@ -49,6 +49,7 @@ macro_rules! id_type {
 
 id_type!(ProjectId);
 id_type!(TaskId);
+id_type!(BlockId);
 
 #[cfg(test)]
 mod tests {

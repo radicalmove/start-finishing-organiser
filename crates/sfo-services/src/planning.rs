@@ -109,6 +109,10 @@ impl PlanningService {
             .map_err(Into::into)
     }
 
+    pub async fn get_task(&self, id: TaskId) -> Result<Task, ServiceError> {
+        self.task_or_not_found(id).await
+    }
+
     pub async fn update_task(&self, id: TaskId, payload: TaskUpdate) -> Result<Task, ServiceError> {
         let mut task = self.task_or_not_found(id).await?;
 

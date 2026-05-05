@@ -7,7 +7,7 @@ The Rust rewrite lives beside the current Python app while feature parity is bui
 - `crates/sfo-core`: shared domain types.
 - `crates/sfo-db`: SQLite connection and migrations.
 - `crates/sfo-server`: Axum server shell.
-- `crates/sfo-services`: use-case rules for projects, tasks, and inbox quick capture.
+- `crates/sfo-services`: use-case rules for projects, tasks, blocks, and inbox quick capture.
 
 ## Current API
 
@@ -24,6 +24,10 @@ The Rust rewrite lives beside the current Python app while feature parity is bui
 - `POST /api/v1/tasks/{task_id}/reopen`
 - `POST /api/v1/tasks/{task_id}/archive`
 - `POST /api/v1/tasks/{task_id}/restore`
+- `GET /api/v1/blocks`
+- `POST /api/v1/blocks`
+- `PATCH /api/v1/blocks/{block_id}`
+- `DELETE /api/v1/blocks/{block_id}`
 - `POST /api/v1/inbox/quick-capture`
 - `POST /api/v1/import/python-sqlite/dry-run`
 - `POST /api/v1/import/python-sqlite`
@@ -31,7 +35,7 @@ The Rust rewrite lives beside the current Python app while feature parity is bui
 
 ## Import And Backup
 
-The Rust importer supports dry-run inspection and real import for the current project/task slice. Dry-run opens a copied Python SFO SQLite database read-only, computes its SHA-256 checksum, reports table row counts, and warns about tables that are not imported in the current slice.
+The Rust importer supports dry-run inspection and real import for the current project/task/block slice. Dry-run opens a copied Python SFO SQLite database read-only, computes its SHA-256 checksum, reports table row counts, and warns about tables that are not imported in the current slice.
 
 Real import is exposed at `POST /api/v1/import/python-sqlite` with:
 
@@ -46,9 +50,11 @@ Real import is exposed at `POST /api/v1/import/python-sqlite` with:
 
 - Python `projects.id` is preserved as Rust `projects.legacy_id`.
 - Python `tasks.id` is preserved as Rust `tasks.legacy_id`.
+- Python `blocks.id` is preserved as Rust `blocks.legacy_id`.
 - Task `project_id` values are mapped through imported project `legacy_id` values.
+- Block `project_id` and `task_id` values are mapped through imported project/task `legacy_id` values.
 - Legacy SQLite timestamps like `2026-01-02 03:04:05` are normalized to RFC 3339 UTC text.
-- Re-running the same import is idempotent for imported projects and tasks because upserts key off `legacy_id`.
+- Re-running the same import is idempotent for imported projects, tasks, and blocks because upserts key off `legacy_id`.
 
 Unsupported Python tables are still reported as warnings and are not imported in this slice. The backup endpoint returns a JSON manifest over the Rust database with schema metadata and table counts.
 
@@ -76,3 +82,5 @@ curl http://127.0.0.1:8088/healthz
 ## Notes
 
 The current `src-tauri` shell is still the existing Python-backed desktop wrapper. The Rust rewrite will replace that shell in a later milestone after the server and client API stabilize.
+
+See `docs/rust_rewrite_parity_review.md` for the current product parity and UX sequencing review.

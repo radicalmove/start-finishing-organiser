@@ -3,6 +3,7 @@ pub mod config;
 pub mod error;
 pub mod import;
 pub mod planning;
+pub mod schedule;
 
 use sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePoolOptions};
 use std::str::FromStr;

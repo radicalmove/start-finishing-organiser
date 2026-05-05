@@ -5,11 +5,12 @@ use axum::routing::{get, patch, post};
 use axum::{Json, Router};
 use serde::{Deserialize, Serialize};
 use sfo_core::{
-    BackupManifest, ImportDryRunReport, ImportDryRunRequest, Page, Project, ProjectCreate,
-    ProjectId, ProjectUpdate, PythonSqliteImportReport, PythonSqliteImportRequest, QuickCapture,
-    Task, TaskCreate, TaskId, TaskUpdate,
+    BackupManifest, Block, BlockCreate, BlockId, BlockUpdate, ImportDryRunReport,
+    ImportDryRunRequest, Page, Project, ProjectCreate, ProjectId, ProjectUpdate,
+    PythonSqliteImportReport, PythonSqliteImportRequest, QuickCapture, Task, TaskCreate, TaskId,
+    TaskUpdate,
 };
-use sfo_services::{PlanningService, ServiceError, SystemService};
+use sfo_services::{PlanningService, ScheduleService, ServiceError, SystemService};
 use std::str::FromStr;
 
 use crate::AppState;
@@ -95,6 +96,11 @@ pub fn router() -> Router<AppState> {
         .route("/tasks/{task_id}/reopen", post(reopen_task))
         .route("/tasks/{task_id}/archive", post(archive_task))
         .route("/tasks/{task_id}/restore", post(restore_task))
+        .route("/blocks", get(list_blocks).post(create_block))
+        .route(
+            "/blocks/{block_id}",
+            patch(update_block).delete(delete_block),
+        )
         .route("/inbox/quick-capture", post(quick_capture))
         .route(
             "/import/python-sqlite/dry-run",
@@ -229,6 +235,47 @@ async fn quick_capture(
     Ok((StatusCode::CREATED, Json(task)))
 }
 
+async fn list_blocks(
+    State(state): State<AppState>,
+    Query(query): Query<PageQuery>,
+) -> Result<Json<Page<Block>>, ApiError> {
+    let service = ScheduleService::new(state.db);
+    let page = service
+        .list_blocks(query.page.unwrap_or(1), query.page_size.unwrap_or(50))
+        .await?;
+    Ok(Json(page))
+}
+
+async fn create_block(
+    State(state): State<AppState>,
+    Json(payload): Json<BlockCreate>,
+) -> Result<(StatusCode, Json<Block>), ApiError> {
+    let service = ScheduleService::new(state.db);
+    let block = service.create_block(payload).await?;
+    Ok((StatusCode::CREATED, Json(block)))
+}
+
+async fn update_block(
+    State(state): State<AppState>,
+    Path(block_id): Path<String>,
+    Json(payload): Json<BlockUpdate>,
+) -> Result<Json<Block>, ApiError> {
+    let service = ScheduleService::new(state.db);
+    let block = service
+        .update_block(parse_block_id(&block_id)?, payload)
+        .await?;
+    Ok(Json(block))
+}
+
+async fn delete_block(
+    State(state): State<AppState>,
+    Path(block_id): Path<String>,
+) -> Result<StatusCode, ApiError> {
+    let service = ScheduleService::new(state.db);
+    service.delete_block(parse_block_id(&block_id)?).await?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
 async fn dry_run_python_sqlite_import(
     State(state): State<AppState>,
     Json(payload): Json<ImportDryRunRequest>,
@@ -263,4 +310,8 @@ fn parse_project_id(value: &str) -> Result<ProjectId, ApiError> {
 
 fn parse_task_id(value: &str) -> Result<TaskId, ApiError> {
     TaskId::from_str(value).map_err(|_| ApiError::bad_request("invalid task id"))
+}
+
+fn parse_block_id(value: &str) -> Result<BlockId, ApiError> {
+    BlockId::from_str(value).map_err(|_| ApiError::bad_request("invalid block id"))
 }

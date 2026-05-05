@@ -12,7 +12,7 @@ use std::str::FromStr;
 
 use crate::{backup::write_backup_file, DbError};
 
-pub const SUPPORTED_PYTHON_TABLES: &[&str] = &["projects", "tasks"];
+pub const SUPPORTED_PYTHON_TABLES: &[&str] = &["projects", "tasks", "blocks"];
 pub const KNOWN_PYTHON_TABLES: &[&str] = &[
     "projects",
     "tasks",
@@ -138,6 +138,24 @@ pub async fn import_python_sqlite(
         warnings.push("missing source table tasks".to_string());
         tables.push(TableImportResult {
             table: "tasks".to_string(),
+            source_rows: 0,
+            imported_rows: 0,
+        });
+    }
+
+    if table_names.iter().any(|table| table == "blocks") {
+        let (source_rows, imported_rows, block_warnings) =
+            import_blocks(&source_pool, &mut transaction).await?;
+        warnings.extend(block_warnings);
+        tables.push(TableImportResult {
+            table: "blocks".to_string(),
+            source_rows,
+            imported_rows,
+        });
+    } else {
+        warnings.push("missing source table blocks".to_string());
+        tables.push(TableImportResult {
+            table: "blocks".to_string(),
             source_rows: 0,
             imported_rows: 0,
         });
@@ -369,6 +387,102 @@ async fn import_tasks(
     Ok((source_rows, imported_rows, warnings))
 }
 
+async fn import_blocks(
+    source_pool: &sqlx::SqlitePool,
+    transaction: &mut sqlx::Transaction<'_, sqlx::Sqlite>,
+) -> Result<(i64, i64, Vec<String>), DbError> {
+    let rows = sqlx::query_as::<_, LegacyBlockRow>(
+        r#"
+        SELECT id, title, date, start_time, end_time, block_type,
+               project_id, task_id, notes, created_at
+        FROM blocks
+        ORDER BY id ASC
+        "#,
+    )
+    .fetch_all(source_pool)
+    .await?;
+    let source_rows =
+        i64::try_from(rows.len()).map_err(|error| DbError::InvalidData(error.to_string()))?;
+    let mut imported_rows = 0;
+    let mut warnings = Vec::new();
+
+    for row in rows {
+        let rust_id = sfo_core::BlockId::new().to_string();
+        let project_id = match row.project_id {
+            Some(legacy_project_id) => {
+                let mapped_project_id: Option<String> =
+                    sqlx::query_scalar("SELECT id FROM projects WHERE legacy_id = ?")
+                        .bind(legacy_project_id)
+                        .fetch_optional(&mut **transaction)
+                        .await?;
+                if mapped_project_id.is_none() {
+                    warnings.push(format!(
+                        "block {} references missing project {}",
+                        row.id, legacy_project_id
+                    ));
+                }
+                mapped_project_id
+            }
+            None => None,
+        };
+        let task_id = match row.task_id {
+            Some(legacy_task_id) => {
+                let mapped_task_id: Option<String> =
+                    sqlx::query_scalar("SELECT id FROM tasks WHERE legacy_id = ?")
+                        .bind(legacy_task_id)
+                        .fetch_optional(&mut **transaction)
+                        .await?;
+                if mapped_task_id.is_none() {
+                    warnings.push(format!(
+                        "block {} references missing task {}",
+                        row.id, legacy_task_id
+                    ));
+                }
+                mapped_task_id
+            }
+            None => None,
+        };
+        let created_at = normalize_required_datetime(row.created_at)?;
+
+        let result = sqlx::query(
+            r#"
+            INSERT INTO blocks (
+                id, legacy_id, title, date, start_time, end_time, block_type,
+                project_id, task_id, notes, created_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(legacy_id) DO UPDATE SET
+                title = excluded.title,
+                date = excluded.date,
+                start_time = excluded.start_time,
+                end_time = excluded.end_time,
+                block_type = excluded.block_type,
+                project_id = excluded.project_id,
+                task_id = excluded.task_id,
+                notes = excluded.notes,
+                created_at = excluded.created_at
+            "#,
+        )
+        .bind(rust_id)
+        .bind(row.id)
+        .bind(optional_text(row.title))
+        .bind(normalize_required_date(row.date)?)
+        .bind(normalize_optional_time(row.start_time)?)
+        .bind(normalize_optional_time(row.end_time)?)
+        .bind(default_text(row.block_type, "focus"))
+        .bind(project_id)
+        .bind(task_id)
+        .bind(optional_text(row.notes))
+        .bind(created_at)
+        .execute(&mut **transaction)
+        .await?;
+        imported_rows += i64::try_from(result.rows_affected())
+            .map_err(|error| DbError::InvalidData(error.to_string()))?;
+    }
+
+    Ok((source_rows, imported_rows, warnings))
+}
+
 fn file_sha256(path: &Path) -> Result<String, DbError> {
     let bytes = std::fs::read(path)?;
     let digest = Sha256::digest(bytes);
@@ -430,6 +544,20 @@ struct LegacyTaskRow {
     created_at: String,
 }
 
+#[derive(Debug, FromRow)]
+struct LegacyBlockRow {
+    id: i64,
+    title: Option<String>,
+    date: String,
+    start_time: Option<String>,
+    end_time: Option<String>,
+    block_type: String,
+    project_id: Option<i64>,
+    task_id: Option<i64>,
+    notes: Option<String>,
+    created_at: String,
+}
+
 fn optional_text(value: Option<String>) -> Option<String> {
     value.and_then(|value| {
         let trimmed = value.trim();
@@ -454,6 +582,35 @@ fn normalize_required_datetime(value: String) -> Result<String, DbError> {
     normalize_datetime(&value)?.ok_or_else(|| {
         DbError::InvalidData("required datetime was empty after normalization".to_string())
     })
+}
+
+fn normalize_required_date(value: String) -> Result<String, DbError> {
+    let value = value.trim();
+    if value.is_empty() {
+        return Err(DbError::InvalidData(
+            "required date was empty after normalization".to_string(),
+        ));
+    }
+    chrono::NaiveDate::parse_from_str(value, "%Y-%m-%d")
+        .map(|date| date.to_string())
+        .map_err(|error| DbError::InvalidData(error.to_string()))
+}
+
+fn normalize_optional_time(value: Option<String>) -> Result<Option<String>, DbError> {
+    match optional_text(value) {
+        Some(value) => {
+            let formats = ["%H:%M:%S%.f", "%H:%M:%S", "%H:%M"];
+            for format in formats {
+                if let Ok(time) = chrono::NaiveTime::parse_from_str(&value, format) {
+                    return Ok(Some(time.format("%H:%M:%S").to_string()));
+                }
+            }
+            Err(DbError::InvalidData(format!(
+                "could not parse source time `{value}`"
+            )))
+        }
+        None => Ok(None),
+    }
 }
 
 fn normalize_optional_datetime(value: Option<String>) -> Result<Option<String>, DbError> {
@@ -518,6 +675,7 @@ mod tests {
         assert!(std::path::Path::new(&report.backup_path).exists());
         assert_imported_table(&report.tables, "projects", 1, 1);
         assert_imported_table(&report.tables, "tasks", 2, 2);
+        assert_imported_table(&report.tables, "blocks", 2, 2);
 
         let project = sqlx::query_as::<_, ImportedProject>(
             "SELECT legacy_id, title, category, status, active_this_week, created_at FROM projects",
@@ -562,6 +720,32 @@ mod tests {
             Some("2026-01-05T06:07:08+00:00")
         );
 
+        let blocks = sqlx::query_as::<_, ImportedBlock>(
+            r#"
+            SELECT legacy_id, project_id, task_id, title, date, start_time, end_time,
+                   block_type, notes, created_at
+            FROM blocks
+            ORDER BY legacy_id
+            "#,
+        )
+        .fetch_all(&pool)
+        .await
+        .expect("block rows");
+        assert_eq!(blocks.len(), 2);
+        assert_eq!(blocks[0].legacy_id, 30);
+        assert!(blocks[0].project_id.is_some());
+        assert!(blocks[0].task_id.is_some());
+        assert_eq!(blocks[0].title.as_deref(), Some("Legacy Focus"));
+        assert_eq!(blocks[0].date, "2026-01-06");
+        assert_eq!(blocks[0].start_time.as_deref(), Some("09:00:00"));
+        assert_eq!(blocks[0].end_time.as_deref(), Some("09:45:00"));
+        assert_eq!(blocks[0].block_type, "focus");
+        assert_eq!(blocks[0].notes.as_deref(), Some("Imported"));
+        assert_eq!(blocks[0].created_at, "2026-01-02T06:00:00+00:00");
+        assert_eq!(blocks[1].legacy_id, 31);
+        assert_eq!(blocks[1].project_id, None);
+        assert_eq!(blocks[1].task_id, None);
+
         let _ = std::fs::remove_file(source_path);
         let _ = std::fs::remove_dir_all(backup_dir);
     }
@@ -592,9 +776,14 @@ mod tests {
             .fetch_one(&pool)
             .await
             .expect("task count");
+        let block_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM blocks")
+            .fetch_one(&pool)
+            .await
+            .expect("block count");
 
         assert_eq!(project_count, 1);
         assert_eq!(task_count, 2);
+        assert_eq!(block_count, 2);
 
         let _ = std::fs::remove_file(source_path);
         let _ = std::fs::remove_dir_all(backup_dir);
@@ -673,6 +862,20 @@ mod tests {
         when_bucket: String,
         status: String,
         completed_at: Option<String>,
+    }
+
+    #[derive(Debug, sqlx::FromRow)]
+    struct ImportedBlock {
+        legacy_id: i64,
+        project_id: Option<String>,
+        task_id: Option<String>,
+        title: Option<String>,
+        date: String,
+        start_time: Option<String>,
+        end_time: Option<String>,
+        block_type: String,
+        notes: Option<String>,
+        created_at: String,
     }
 
     async fn create_full_python_fixture(path: &std::path::Path) {
@@ -786,6 +989,46 @@ mod tests {
         .execute(&pool)
         .await
         .expect("insert tasks");
+
+        sqlx::query(
+            r#"
+            CREATE TABLE blocks (
+                id INTEGER PRIMARY KEY,
+                title TEXT,
+                date TEXT NOT NULL,
+                start_time TEXT,
+                end_time TEXT,
+                block_type TEXT NOT NULL,
+                project_id INTEGER,
+                task_id INTEGER,
+                notes TEXT,
+                created_at TEXT NOT NULL
+            )
+            "#,
+        )
+        .execute(&pool)
+        .await
+        .expect("create blocks");
+        sqlx::query(
+            r#"
+            INSERT INTO blocks (
+                id, title, date, start_time, end_time, block_type,
+                project_id, task_id, notes, created_at
+            )
+            VALUES
+                (
+                    30, 'Legacy Focus', '2026-01-06', '09:00:00', '09:45:00',
+                    'focus', 10, 20, 'Imported', '2026-01-02 06:00:00'
+                ),
+                (
+                    31, 'Orphan Admin', '2026-01-07', NULL, NULL,
+                    'admin', 999, 999, NULL, '2026-01-02 07:00:00'
+                )
+            "#,
+        )
+        .execute(&pool)
+        .await
+        .expect("insert blocks");
 
         pool.close().await;
     }
