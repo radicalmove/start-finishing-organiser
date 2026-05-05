@@ -25,6 +25,14 @@ The Rust rewrite lives beside the current Python app while feature parity is bui
 - `POST /api/v1/tasks/{task_id}/archive`
 - `POST /api/v1/tasks/{task_id}/restore`
 - `POST /api/v1/inbox/quick-capture`
+- `POST /api/v1/import/python-sqlite/dry-run`
+- `POST /api/v1/export/backup`
+
+## Import And Backup
+
+The Rust importer currently supports dry-run inspection only. It opens a copied Python SFO SQLite database read-only, computes its SHA-256 checksum, reports table row counts, and warns about tables that are not imported in the current slice.
+
+The backup endpoint currently returns a JSON manifest over the Rust database with schema metadata and table counts. Full SQLite snapshot export will be added after the import path can safely map real rows into the Rust schema.
 
 ## Local Verification
 

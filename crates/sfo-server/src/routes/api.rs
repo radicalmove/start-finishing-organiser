@@ -5,10 +5,10 @@ use axum::routing::{get, patch, post};
 use axum::{Json, Router};
 use serde::{Deserialize, Serialize};
 use sfo_core::{
-    Page, Project, ProjectCreate, ProjectId, ProjectUpdate, QuickCapture, Task, TaskCreate, TaskId,
-    TaskUpdate,
+    BackupManifest, ImportDryRunReport, ImportDryRunRequest, Page, Project, ProjectCreate,
+    ProjectId, ProjectUpdate, QuickCapture, Task, TaskCreate, TaskId, TaskUpdate,
 };
-use sfo_services::{PlanningService, ServiceError};
+use sfo_services::{PlanningService, ServiceError, SystemService};
 use std::str::FromStr;
 
 use crate::AppState;
@@ -95,6 +95,11 @@ pub fn router() -> Router<AppState> {
         .route("/tasks/{task_id}/archive", post(archive_task))
         .route("/tasks/{task_id}/restore", post(restore_task))
         .route("/inbox/quick-capture", post(quick_capture))
+        .route(
+            "/import/python-sqlite/dry-run",
+            post(dry_run_python_sqlite_import),
+        )
+        .route("/export/backup", post(export_backup))
 }
 
 async fn list_projects(
@@ -220,6 +225,22 @@ async fn quick_capture(
     let service = PlanningService::new(state.db);
     let task = service.quick_capture(payload).await?;
     Ok((StatusCode::CREATED, Json(task)))
+}
+
+async fn dry_run_python_sqlite_import(
+    State(state): State<AppState>,
+    Json(payload): Json<ImportDryRunRequest>,
+) -> Result<Json<ImportDryRunReport>, ApiError> {
+    let service = SystemService::new(state.db);
+    let report = service
+        .dry_run_python_sqlite_import(payload.source_path)
+        .await?;
+    Ok(Json(report))
+}
+
+async fn export_backup(State(state): State<AppState>) -> Result<Json<BackupManifest>, ApiError> {
+    let service = SystemService::new(state.db);
+    Ok(Json(service.backup_manifest().await?))
 }
 
 fn parse_project_id(value: &str) -> Result<ProjectId, ApiError> {

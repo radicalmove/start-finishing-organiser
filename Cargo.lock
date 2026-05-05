@@ -1425,6 +1425,7 @@ version = "0.1.0"
 dependencies = [
  "chrono",
  "sfo-core",
+ "sha2",
  "sqlx",
  "thiserror",
  "tokio",
@@ -1436,6 +1437,7 @@ name = "sfo-server"
 version = "0.1.0"
 dependencies = [
  "axum",
+ "chrono",
  "http-body-util",
  "serde",
  "serde_json",
