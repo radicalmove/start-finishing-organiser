@@ -7,12 +7,12 @@ use chrono::{NaiveDate, NaiveTime, Utc};
 use serde::{Deserialize, Serialize};
 use sfo_core::{
     BackupManifest, Block, BlockCreate, BlockId, BlockUpdate, BootstrapSummary, ImportDryRunReport,
-    ImportDryRunRequest, Page, Project, ProjectCreate, ProjectId, ProjectUpdate,
-    PythonSqliteImportReport, PythonSqliteImportRequest, QuickCapture, Task, TaskCreate, TaskId,
-    TaskUpdate,
+    ImportDryRunRequest, InboxContainers, InboxRouteRequest, Page, Project, ProjectCreate,
+    ProjectId, ProjectUpdate, PythonSqliteImportReport, PythonSqliteImportRequest, QuickCapture,
+    Task, TaskCreate, TaskId, TaskUpdate,
 };
 use sfo_services::{
-    BootstrapService, PlanningService, ScheduleService, ServiceError, SystemService,
+    BootstrapService, InboxService, PlanningService, ScheduleService, ServiceError, SystemService,
 };
 use std::str::FromStr;
 
@@ -111,7 +111,12 @@ pub fn router() -> Router<AppState> {
             "/blocks/{block_id}",
             patch(update_block).delete(delete_block),
         )
+        .route("/inbox/containers", get(inbox_containers))
         .route("/inbox/quick-capture", post(quick_capture))
+        .route("/inbox/{task_id}/route", post(route_inbox_item))
+        .route("/inbox/{task_id}/undo", post(undo_inbox_route))
+        .route("/inbox/{task_id}/recycle", post(recycle_inbox_item))
+        .route("/inbox/{task_id}/restore", post(restore_inbox_item))
         .route(
             "/import/python-sqlite/dry-run",
             post(dry_run_python_sqlite_import),
@@ -254,6 +259,50 @@ async fn quick_capture(
     let service = PlanningService::new(state.db);
     let task = service.quick_capture(payload).await?;
     Ok((StatusCode::CREATED, Json(task)))
+}
+
+async fn inbox_containers(
+    State(state): State<AppState>,
+) -> Result<Json<InboxContainers>, ApiError> {
+    let service = InboxService::new(state.db);
+    Ok(Json(service.containers().await?))
+}
+
+async fn route_inbox_item(
+    State(state): State<AppState>,
+    Path(task_id): Path<String>,
+    Json(payload): Json<InboxRouteRequest>,
+) -> Result<Json<Task>, ApiError> {
+    let service = InboxService::new(state.db);
+    Ok(Json(
+        service
+            .route_item(parse_task_id(&task_id)?, payload.intent)
+            .await?,
+    ))
+}
+
+async fn undo_inbox_route(
+    State(state): State<AppState>,
+    Path(task_id): Path<String>,
+) -> Result<Json<Task>, ApiError> {
+    let service = InboxService::new(state.db);
+    Ok(Json(service.undo_route(parse_task_id(&task_id)?).await?))
+}
+
+async fn recycle_inbox_item(
+    State(state): State<AppState>,
+    Path(task_id): Path<String>,
+) -> Result<Json<Task>, ApiError> {
+    let service = InboxService::new(state.db);
+    Ok(Json(service.recycle_item(parse_task_id(&task_id)?).await?))
+}
+
+async fn restore_inbox_item(
+    State(state): State<AppState>,
+    Path(task_id): Path<String>,
+) -> Result<Json<Task>, ApiError> {
+    let service = InboxService::new(state.db);
+    Ok(Json(service.restore_item(parse_task_id(&task_id)?).await?))
 }
 
 async fn list_blocks(

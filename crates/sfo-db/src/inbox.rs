@@ -1,0 +1,198 @@
+use sfo_core::{
+    InboxContainerCounts, InboxContainers, Task, INBOX_INTENT_ENJOY_RECOVER,
+    INBOX_INTENT_LEARN_EXPLORE, INBOX_INTENT_PARK_LET_GO,
+};
+
+use crate::planning::TaskRow;
+use crate::DbError;
+
+pub async fn containers(pool: &sqlx::SqlitePool) -> Result<InboxContainers, DbError> {
+    Ok(InboxContainers {
+        counts: counts(pool).await?,
+        learning: active_container_items(pool, INBOX_INTENT_LEARN_EXPLORE).await?,
+        enjoy: active_container_items(pool, INBOX_INTENT_ENJOY_RECOVER).await?,
+        parked: active_container_items(pool, INBOX_INTENT_PARK_LET_GO).await?,
+        recycle_bin: recycle_bin_items(pool).await?,
+    })
+}
+
+pub async fn counts(pool: &sqlx::SqlitePool) -> Result<InboxContainerCounts, DbError> {
+    Ok(InboxContainerCounts {
+        unprocessed: count_active_inbox(pool).await?,
+        learn_explore: count_active_container(pool, INBOX_INTENT_LEARN_EXPLORE).await?,
+        enjoy_recover: count_active_container(pool, INBOX_INTENT_ENJOY_RECOVER).await?,
+        park_let_go: count_active_container(pool, INBOX_INTENT_PARK_LET_GO).await?,
+        recycle_bin: count_recycle_bin(pool).await?,
+    })
+}
+
+async fn active_container_items(
+    pool: &sqlx::SqlitePool,
+    container: &str,
+) -> Result<Vec<Task>, DbError> {
+    let rows = sqlx::query_as::<_, TaskRow>(
+        r#"
+        SELECT * FROM tasks
+        WHERE intake_container = ?
+          AND status IN ('pending', 'in_progress')
+        ORDER BY created_at DESC
+        "#,
+    )
+    .bind(container)
+    .fetch_all(pool)
+    .await?;
+
+    rows.into_iter().map(Task::try_from).collect()
+}
+
+async fn recycle_bin_items(pool: &sqlx::SqlitePool) -> Result<Vec<Task>, DbError> {
+    let rows = sqlx::query_as::<_, TaskRow>(
+        r#"
+        SELECT * FROM tasks
+        WHERE archived_from_inbox = 1
+          AND status = 'archived'
+        ORDER BY created_at DESC
+        "#,
+    )
+    .fetch_all(pool)
+    .await?;
+
+    rows.into_iter().map(Task::try_from).collect()
+}
+
+async fn count_active_inbox(pool: &sqlx::SqlitePool) -> Result<i64, DbError> {
+    let count = sqlx::query_scalar(
+        r#"
+        SELECT COUNT(*) FROM tasks
+        WHERE in_inbox = 1
+          AND status IN ('pending', 'in_progress')
+        "#,
+    )
+    .fetch_one(pool)
+    .await?;
+    Ok(count)
+}
+
+async fn count_active_container(pool: &sqlx::SqlitePool, container: &str) -> Result<i64, DbError> {
+    let count = sqlx::query_scalar(
+        r#"
+        SELECT COUNT(*) FROM tasks
+        WHERE intake_container = ?
+          AND status IN ('pending', 'in_progress')
+        "#,
+    )
+    .bind(container)
+    .fetch_one(pool)
+    .await?;
+    Ok(count)
+}
+
+async fn count_recycle_bin(pool: &sqlx::SqlitePool) -> Result<i64, DbError> {
+    let count = sqlx::query_scalar(
+        r#"
+        SELECT COUNT(*) FROM tasks
+        WHERE archived_from_inbox = 1
+          AND status = 'archived'
+        "#,
+    )
+    .fetch_one(pool)
+    .await?;
+    Ok(count)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::planning::{create_task, update_task};
+    use crate::{connect, run_migrations, DbConfig};
+    use sfo_core::{TaskCreate, TaskStatus, WhenBucket, INBOX_INTENT_UNPROCESSED};
+
+    async fn migrated_pool() -> sqlx::SqlitePool {
+        let pool = connect(&DbConfig::new("sqlite::memory:"))
+            .await
+            .expect("connect");
+        run_migrations(&pool).await.expect("migrate");
+        pool
+    }
+
+    #[tokio::test]
+    async fn containers_return_active_items_and_recycle_bin() {
+        let pool = migrated_pool().await;
+        create_task(
+            &pool,
+            TaskCreate {
+                verb_noun: "Inbox item".to_string(),
+                project_id: None,
+                description: None,
+                in_inbox: true,
+                when_bucket: WhenBucket::Later,
+                block_type: None,
+                duration_minutes: None,
+                priority: None,
+                frog: false,
+                alignment: None,
+                first_action: None,
+                scheduled_for: None,
+            },
+        )
+        .await
+        .expect("inbox task");
+        let mut learning = create_task(
+            &pool,
+            TaskCreate {
+                verb_noun: "Learn thing".to_string(),
+                project_id: None,
+                description: None,
+                in_inbox: false,
+                when_bucket: WhenBucket::Later,
+                block_type: None,
+                duration_minutes: None,
+                priority: None,
+                frog: false,
+                alignment: None,
+                first_action: None,
+                scheduled_for: None,
+            },
+        )
+        .await
+        .expect("learning task");
+        learning.intake_intent = INBOX_INTENT_LEARN_EXPLORE.to_string();
+        learning.intake_container = INBOX_INTENT_LEARN_EXPLORE.to_string();
+        update_task(&pool, &learning)
+            .await
+            .expect("update learning");
+
+        let mut recycled = create_task(
+            &pool,
+            TaskCreate {
+                verb_noun: "Recycle thing".to_string(),
+                project_id: None,
+                description: None,
+                in_inbox: false,
+                when_bucket: WhenBucket::Later,
+                block_type: None,
+                duration_minutes: None,
+                priority: None,
+                frog: false,
+                alignment: None,
+                first_action: None,
+                scheduled_for: None,
+            },
+        )
+        .await
+        .expect("recycled task");
+        recycled.intake_intent = INBOX_INTENT_UNPROCESSED.to_string();
+        recycled.intake_container = INBOX_INTENT_UNPROCESSED.to_string();
+        recycled.archived_from_inbox = true;
+        recycled.status = TaskStatus::Archived;
+        update_task(&pool, &recycled).await.expect("update recycle");
+
+        let containers = containers(&pool).await.expect("containers");
+
+        assert_eq!(containers.counts.unprocessed, 1);
+        assert_eq!(containers.counts.learn_explore, 1);
+        assert_eq!(containers.counts.recycle_bin, 1);
+        assert_eq!(containers.learning[0].id, learning.id);
+        assert_eq!(containers.recycle_bin[0].id, recycled.id);
+    }
+}

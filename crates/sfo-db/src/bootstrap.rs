@@ -1,8 +1,5 @@
 use chrono::NaiveDate;
-use sfo_core::{
-    Block, BootstrapInboxSummary, Project, Task, INBOX_INTENT_ENJOY_RECOVER,
-    INBOX_INTENT_LEARN_EXPLORE, INBOX_INTENT_PARK_LET_GO,
-};
+use sfo_core::{Block, BootstrapInboxSummary, Project, Task};
 
 use crate::planning::{ProjectRow, TaskRow};
 use crate::schedule::BlockRow;
@@ -58,53 +55,14 @@ pub async fn today_blocks(
 }
 
 pub async fn inbox_summary(pool: &sqlx::SqlitePool) -> Result<BootstrapInboxSummary, DbError> {
+    let counts = crate::inbox::counts(pool).await?;
     Ok(BootstrapInboxSummary {
-        unprocessed: count_active_inbox(pool).await?,
-        learn_explore: count_active_container(pool, INBOX_INTENT_LEARN_EXPLORE).await?,
-        enjoy_recover: count_active_container(pool, INBOX_INTENT_ENJOY_RECOVER).await?,
-        park_let_go: count_active_container(pool, INBOX_INTENT_PARK_LET_GO).await?,
-        recycle_bin: count_recycle_bin(pool).await?,
+        unprocessed: counts.unprocessed,
+        learn_explore: counts.learn_explore,
+        enjoy_recover: counts.enjoy_recover,
+        park_let_go: counts.park_let_go,
+        recycle_bin: counts.recycle_bin,
     })
-}
-
-async fn count_active_inbox(pool: &sqlx::SqlitePool) -> Result<i64, DbError> {
-    let count = sqlx::query_scalar(
-        r#"
-        SELECT COUNT(*) FROM tasks
-        WHERE in_inbox = 1
-          AND status IN ('pending', 'in_progress')
-        "#,
-    )
-    .fetch_one(pool)
-    .await?;
-    Ok(count)
-}
-
-async fn count_active_container(pool: &sqlx::SqlitePool, container: &str) -> Result<i64, DbError> {
-    let count = sqlx::query_scalar(
-        r#"
-        SELECT COUNT(*) FROM tasks
-        WHERE intake_container = ?
-          AND status IN ('pending', 'in_progress')
-        "#,
-    )
-    .bind(container)
-    .fetch_one(pool)
-    .await?;
-    Ok(count)
-}
-
-async fn count_recycle_bin(pool: &sqlx::SqlitePool) -> Result<i64, DbError> {
-    let count = sqlx::query_scalar(
-        r#"
-        SELECT COUNT(*) FROM tasks
-        WHERE archived_from_inbox = 1
-          AND status = 'archived'
-        "#,
-    )
-    .fetch_one(pool)
-    .await?;
-    Ok(count)
 }
 
 #[cfg(test)]

@@ -14,11 +14,12 @@ The Rust branch currently has:
 - Tasks API with CRUD, pagination, complete, reopen, archive, restore, and quick capture.
 - Blocks API with CRUD and task schedule-date sync when task blocks are created or deleted.
 - Bootstrap/Home Summary API with weekly projects, inbox counts, today tasks, today blocks, current/next block, and compact system state.
+- Inbox container API with quick routing to Learning/Enjoy/Park, undo, recycle, restore, and container item lists.
 - Python SQLite dry-run import and real import for projects/tasks/blocks.
 - Rust database backup file creation before import writes.
 - Backup manifest endpoint for current Rust tables.
 
-This is a good foundation, but it is still only the planning/task substrate. It does not yet cover the main daily workflow UX.
+This is a good foundation, but it is still mostly the planning/task substrate. It now covers the first reversible inbox-routing workflow, but not the full guided processing workflow.
 
 ## Product Parity Matrix
 
@@ -27,8 +28,8 @@ This is a good foundation, but it is still only the planning/task substrate. It 
 | Projects | Weekly focus, long-range planning, success cues, roadmaps | Core CRUD and weekly cap | High | Keep extending through long-range/project success fields after daily workflow primitives exist. |
 | Tasks | Time/project board, lifecycle, inbox flags, completion/archive history | Core CRUD and lifecycle | High | Covered enough for the next client/bootstrap slice. |
 | Quick capture | Modal and capture page can send undecided items to Inbox | API quick capture | High | Keep. It is the right first capture primitive. |
-| Guided capture | Wizard decides task/project/inbox/OPP and routes source inbox items | Not covered | Very high | Port after Bootstrap because it defines the app's behavior quality. |
-| Inbox containers | Learning, Enjoy, Parked, Recycle bin, undo, metrics | Data fields only | Very high | Port as a dedicated slice, not as incidental task updates. |
+| Guided capture | Wizard decides task/project/inbox/OPP and routes source inbox items | Not covered | Very high | Port next because it defines the app's behavior quality. |
+| Inbox containers | Learning, Enjoy, Parked, Recycle bin, undo, metrics | Backend route/recycle/restore/containers API | Very high | Add UI/client review after guided processing exists. |
 | Blocks/calendar | Focus/Admin/Social/Recovery blocks, appointments, week calendar | Core API, import, backup | Very high | Covered enough for a Bootstrap/Home summary slice; UI and external calendars are still pending. |
 | Home/Today | Inbox, Today calendar, Now strip, One Thing/Frog, Today tasks | Read-only Bootstrap summary | Very high | Next UX review checkpoint; One Thing/Frog and rituals still need Rust data support. |
 | Weekly review | 4+3 focus, resurfacing, block planning, archive completed | Not covered | High | Port after Home primitives; depends on projects, tasks, blocks, resurface. |
@@ -54,16 +55,17 @@ The iPhone client should be reviewed against these same workflows. It should not
 
 ## Recommended Next Slices
 
-### 1. Inbox Processing And Containers
+### 1. Guided Capture And Support-Project Processing
 
-Port the approved inbox strategy as service behavior:
+Port the primary inbox `Process` path rather than only the secondary quick-route actions:
 
 - Process-time intent classification.
-- Learning / Enjoy / Park routing.
-- Recycle bin and undo.
-- Container counts and metrics.
+- Convert an inbox source item into an actionable task.
+- Convert an inbox source item into a support-project outcome without leaving duplicate ambiguous backlog.
+- Preserve reversible routing to Learning / Enjoy / Park for non-work items.
+- Add OPP / Waiting On support if it is still part of the capture decision tree.
 
-This is the highest UX-quality slice after the dashboard contract because capture quality is what keeps the app trustworthy.
+This is the highest UX-quality slice after container routing because the primary app promise is turning ambiguous thoughts into clear commitments.
 
 ### 2. Auth And Mac Mini Deployment
 
@@ -100,6 +102,27 @@ Out of scope:
 - External Cozi calendar events.
 - Personalized recommendations or nudges.
 
+## Completed Slice: Inbox Processing And Containers
+
+This slice added the Rust backend for the approved reversible inbox-routing model.
+
+Minimum scope delivered:
+
+- `GET /api/v1/inbox/containers`
+- `POST /api/v1/inbox/{task_id}/route`
+- `POST /api/v1/inbox/{task_id}/undo`
+- `POST /api/v1/inbox/{task_id}/recycle`
+- `POST /api/v1/inbox/{task_id}/restore`
+- Learning, Enjoy, Parked, and Recycle bin counts and item lists.
+- Python-parity mutation semantics for route, undo, recycle, and restore.
+
+Out of scope:
+
+- Full guided `Process` flow.
+- Support-project conversion.
+- Waiting On / OPP creation.
+- Native Mac or iPhone UI.
+
 ## Completed Slice: Blocks And Calendar Primitives
 
 This slice added Rust domain types, migrations, repository/service functions, API endpoints, backup support, and Python import for blocks.
@@ -129,4 +152,4 @@ Out of scope for the first Blocks slice:
 
 ## Current Recommendation
 
-The next coding slice should be **Inbox Processing And Containers**. Bootstrap now gives clients a coherent read-only daily payload; the next behavior gap is turning captured inbox items into explicit containers without creating more ambiguous task backlog.
+The next coding slice should be **Guided Capture And Support-Project Processing**. Inbox quick routing now exists in Rust; the remaining behavior gap is the primary `Process` action that turns ambiguous inbox items into tasks, support-project outcomes, or waiting-on commitments.

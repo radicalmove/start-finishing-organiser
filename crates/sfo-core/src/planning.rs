@@ -137,6 +137,7 @@ string_enum!(Alignment {
 });
 
 pub const INBOX_INTENT_UNPROCESSED: &str = "unprocessed";
+pub const INBOX_INTENT_SUPPORT_PROJECT: &str = "support_project";
 pub const INBOX_INTENT_LEARN_EXPLORE: &str = "learn_explore";
 pub const INBOX_INTENT_ENJOY_RECOVER: &str = "enjoy_recover";
 pub const INBOX_INTENT_PARK_LET_GO: &str = "park_let_go";

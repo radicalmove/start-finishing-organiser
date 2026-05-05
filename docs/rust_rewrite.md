@@ -7,7 +7,7 @@ The Rust rewrite lives beside the current Python app while feature parity is bui
 - `crates/sfo-core`: shared domain types.
 - `crates/sfo-db`: SQLite connection and migrations.
 - `crates/sfo-server`: Axum server shell.
-- `crates/sfo-services`: use-case rules for projects, tasks, blocks, and inbox quick capture.
+- `crates/sfo-services`: use-case rules for projects, tasks, blocks, and inbox processing.
 
 ## Current API
 
@@ -29,7 +29,12 @@ The Rust rewrite lives beside the current Python app while feature parity is bui
 - `POST /api/v1/blocks`
 - `PATCH /api/v1/blocks/{block_id}`
 - `DELETE /api/v1/blocks/{block_id}`
+- `GET /api/v1/inbox/containers`
 - `POST /api/v1/inbox/quick-capture`
+- `POST /api/v1/inbox/{task_id}/route`
+- `POST /api/v1/inbox/{task_id}/undo`
+- `POST /api/v1/inbox/{task_id}/recycle`
+- `POST /api/v1/inbox/{task_id}/restore`
 - `POST /api/v1/import/python-sqlite/dry-run`
 - `POST /api/v1/import/python-sqlite`
 - `POST /api/v1/export/backup`
@@ -71,6 +76,17 @@ Unsupported Python tables are still reported as warnings and are not imported in
 - Compact system state with database status, schema, backup table counts, and supported import tables.
 
 The endpoint defaults to server date/time and accepts optional `date=YYYY-MM-DD` and `time=HH:MM:SS` query parameters for deterministic clients and tests.
+
+## Inbox Containers
+
+The first Rust inbox-processing slice keeps the approved Python semantics for reversible low-friction routing:
+
+- `POST /api/v1/inbox/{task_id}/route` moves an active inbox item into `learn_explore`, `enjoy_recover`, or `park_let_go`.
+- Routing clears scheduling/project metadata that should not leak into non-work containers, marks the item processed, and keeps the item pending for later review.
+- `POST /api/v1/inbox/{task_id}/undo` returns a quick-routed item to the unprocessed inbox.
+- `POST /api/v1/inbox/{task_id}/recycle` moves an active inbox item to the inbox recycle bin.
+- `POST /api/v1/inbox/{task_id}/restore` returns a recycled or quick-routed item to the unprocessed inbox.
+- `GET /api/v1/inbox/containers` returns container counts plus Learning, Enjoy, Parked, and Recycle bin item lists.
 
 ## Local Verification
 

@@ -3,6 +3,7 @@ pub mod bootstrap;
 pub mod config;
 pub mod error;
 pub mod import;
+pub mod inbox;
 pub mod planning;
 pub mod schedule;
 
