@@ -19,6 +19,7 @@ env/
 node_modules/
 dist/
 build/
+target/
 src-tauri/target/
 src-tauri/bin/*
 !src-tauri/bin/.gitkeep
