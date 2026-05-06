@@ -1,5 +1,5 @@
 use axum::body::Body;
-use axum::http::{header, Method, Request, StatusCode};
+use axum::http::{header, HeaderMap, Method, Request, StatusCode};
 use http_body_util::BodyExt;
 use serde_json::{json, Value};
 use sfo_db::{connect, run_migrations, DbConfig};
@@ -84,6 +84,31 @@ async fn request_status_with_sfo_header(
     .await
     .expect("response")
     .status()
+}
+
+async fn cors_preflight_status(
+    app: axum::Router,
+    uri: &str,
+    origin: &str,
+) -> (StatusCode, HeaderMap) {
+    let response = app
+        .oneshot(
+            Request::builder()
+                .method(Method::OPTIONS)
+                .uri(uri)
+                .header(header::ORIGIN, origin)
+                .header(header::ACCESS_CONTROL_REQUEST_METHOD, "GET")
+                .header(
+                    header::ACCESS_CONTROL_REQUEST_HEADERS,
+                    "authorization,content-type",
+                )
+                .body(Body::empty())
+                .expect("request"),
+        )
+        .await
+        .expect("response");
+
+    (response.status(), response.headers().clone())
 }
 
 #[tokio::test]
@@ -174,4 +199,22 @@ async fn healthz_and_auth_status_do_not_require_token() {
         request_json(app, Method::GET, "/api/v1/auth/status", None, Value::Null).await;
     assert_eq!(status_status, StatusCode::OK);
     assert_eq!(status["auth_required"], true);
+}
+
+#[tokio::test]
+async fn cors_preflight_is_public_when_auth_is_configured() {
+    let app = build_router(AppState::new(test_pool().await).with_api_token("secret-token"));
+
+    let (status, headers) =
+        cors_preflight_status(app.clone(), "/api/v1/bootstrap", "tauri://localhost").await;
+
+    assert_eq!(status, StatusCode::OK);
+    assert!(headers.contains_key(header::ACCESS_CONTROL_ALLOW_ORIGIN));
+    assert!(headers.contains_key(header::ACCESS_CONTROL_ALLOW_HEADERS));
+
+    let (https_status, https_headers) =
+        cors_preflight_status(app, "/api/v1/bootstrap", "https://tauri.localhost").await;
+
+    assert_eq!(https_status, StatusCode::OK);
+    assert!(https_headers.contains_key(header::ACCESS_CONTROL_ALLOW_ORIGIN));
 }

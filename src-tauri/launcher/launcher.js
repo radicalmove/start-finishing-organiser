@@ -1,74 +1,210 @@
-const BASE_URL = "http://127.0.0.1:8000";
-const HEALTH_URL = `${BASE_URL}/healthz`;
-const statusEl = document.getElementById("status");
-const detailEl = document.getElementById("detail");
-const retryBtn = document.getElementById("retry");
+import {
+  buildBootstrapViewModel,
+  clearSettings,
+  loadSettings,
+  requestJson,
+  saveSettings,
+} from "./client.js";
 
-let attempts = 0;
-let lastError = "";
-let startupTimer = null;
+const elements = {
+  statusDot: document.getElementById("status-dot"),
+  status: document.getElementById("status"),
+  detail: document.getElementById("detail"),
+  connectionCard: document.getElementById("connection-card"),
+  connectionForm: document.getElementById("connection-form"),
+  serverUrl: document.getElementById("server-url"),
+  apiToken: document.getElementById("api-token"),
+  resetSettings: document.getElementById("reset-settings"),
+  dashboard: document.getElementById("dashboard"),
+  refreshDashboard: document.getElementById("refresh-dashboard"),
+  todayLabel: document.getElementById("today-label"),
+  quickCaptureForm: document.getElementById("quick-capture-form"),
+  quickCaptureInput: document.getElementById("quick-capture-input"),
+  nowTitle: document.getElementById("now-title"),
+  nowMeta: document.getElementById("now-meta"),
+  nextBlock: document.getElementById("next-block"),
+  inboxTotal: document.getElementById("inbox-total"),
+  inboxCounts: document.getElementById("inbox-counts"),
+  todayTasks: document.getElementById("today-tasks"),
+  weeklyProjects: document.getElementById("weekly-projects"),
+  todayBlocks: document.getElementById("today-blocks"),
+};
 
-function scheduleRetry(delayMs) {
-  if (startupTimer) clearTimeout(startupTimer);
-  startupTimer = setTimeout(checkBackend, delayMs);
+let settings = loadSettings(window.localStorage);
+
+function setConnectionState(state, message, detail = "") {
+  elements.statusDot.dataset.state = state;
+  elements.status.textContent = message;
+  elements.detail.textContent = detail;
 }
 
-async function probeBackend() {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 2500);
-  try {
-    const response = await fetch(HEALTH_URL, {
-      cache: "no-store",
-      headers: { Accept: "application/json" },
-      signal: controller.signal,
-    });
-    if (!response.ok) {
-      let detail = "";
-      try {
-        const payload = await response.json();
-        detail = payload?.detail || payload?.status || "";
-      } catch (err) {
-        detail = "";
-      }
-      throw new Error(detail || `Health check failed (${response.status})`);
-    }
-    const payload = await response.json();
-    if (payload?.status !== "ok") {
-      throw new Error(payload?.detail || "Backend not ready");
-    }
-    return true;
-  } finally {
-    clearTimeout(timeout);
-  }
+function applySettingsToForm() {
+  elements.serverUrl.value = settings.serverUrl;
+  elements.apiToken.value = settings.apiToken;
 }
 
-async function checkBackend() {
-  attempts += 1;
-  statusEl.textContent = "Starting the local engine...";
+async function connectAndLoad() {
+  saveSettings(window.localStorage, settings);
+  applySettingsToForm();
+  setConnectionState("loading", "Checking Rust server...", settings.serverUrl);
+
   try {
-    await probeBackend();
-    statusEl.textContent = "Opening SFO...";
-    detailEl.textContent = "";
-    window.location.replace(BASE_URL + "/");
+    const health = await requestJson(window.fetch.bind(window), settings, "/healthz");
+    if (health?.status !== "ok") {
+      throw new Error(health?.detail || "Server health check did not report ok");
+    }
+
+    const auth = await requestJson(window.fetch.bind(window), settings, "/api/v1/auth/status");
+    if (auth?.auth_required && !settings.apiToken) {
+      elements.dashboard.classList.add("hidden");
+      throw new Error("This server requires an API token.");
+    }
+
+    const summary = await requestJson(window.fetch.bind(window), settings, "/api/v1/bootstrap");
+    renderDashboard(buildBootstrapViewModel(summary));
+    setConnectionState(
+      "ready",
+      auth?.auth_required ? "Connected with API token" : "Connected without auth",
+      `${settings.serverUrl} · database ${summary?.system?.database_status || "unknown"}`,
+    );
   } catch (err) {
-    lastError = err instanceof Error ? err.message : String(err);
-    detailEl.textContent = `Attempt ${attempts}: ${lastError}`;
-    const delay = Math.min(1000 * 2 ** Math.min(attempts, 4), 12000);
-    scheduleRetry(delay);
-    if (attempts > 6) {
-      retryBtn.hidden = false;
-      statusEl.textContent = "SFO is taking longer than usual to start.";
-      detailEl.textContent = `${detailEl.textContent} Open ${HEALTH_URL} for diagnostics.`;
-    }
+    elements.dashboard.classList.add("hidden");
+    setConnectionState(
+      "error",
+      "Connection needs attention",
+      err instanceof Error ? err.message : String(err),
+    );
   }
 }
 
-retryBtn?.addEventListener("click", () => {
-  if (startupTimer) clearTimeout(startupTimer);
-  attempts = 0;
-  retryBtn.hidden = true;
-  detailEl.textContent = "";
-  checkBackend();
+function renderDashboard(model) {
+  elements.dashboard.classList.remove("hidden");
+  elements.todayLabel.textContent = model.currentTime
+    ? `${model.todayLabel} · ${model.currentTime}`
+    : model.todayLabel;
+  elements.nowTitle.textContent = model.now.title;
+  elements.nowMeta.textContent = [model.now.time, model.now.meta].filter(Boolean).join(" · ");
+  if (model.next) {
+    elements.nextBlock.classList.remove("hidden");
+    elements.nextBlock.textContent = `Next: ${model.next.time} · ${model.next.title}`;
+  } else {
+    elements.nextBlock.classList.add("hidden");
+    elements.nextBlock.textContent = "";
+  }
+
+  elements.inboxTotal.textContent = String(model.inboxTotal);
+  elements.inboxCounts.replaceChildren(
+    countPill("Inbox", model.inbox.unprocessed),
+    countPill("Learning", model.inbox.learn_explore),
+    countPill("Enjoy", model.inbox.enjoy_recover),
+    countPill("Parked", model.inbox.park_let_go),
+    countPill("Recycle", model.inbox.recycle_bin),
+  );
+  renderItems(elements.todayTasks, model.todayTasks, "No Today tasks yet.");
+  renderItems(elements.weeklyProjects, model.weeklyProjects, "No weekly projects selected.");
+  renderBlocks(elements.todayBlocks, model.todayBlocks);
+}
+
+function countPill(label, value) {
+  const pill = document.createElement("div");
+  pill.className = "count-pill";
+  pill.innerHTML = `<span>${label}</span><strong>${Number(value || 0)}</strong>`;
+  return pill;
+}
+
+function renderItems(container, items, emptyText) {
+  container.replaceChildren();
+  if (!items.length) {
+    container.append(emptyState(emptyText));
+    return;
+  }
+
+  for (const item of items.slice(0, 6)) {
+    const row = document.createElement("div");
+    row.className = "list-row";
+    const title = document.createElement("strong");
+    title.textContent = item.title;
+    const meta = document.createElement("span");
+    meta.textContent = item.meta || item.description || "";
+    row.append(title, meta);
+    container.append(row);
+  }
+}
+
+function renderBlocks(container, blocks) {
+  container.replaceChildren();
+  if (!blocks.length) {
+    container.append(emptyState("No blocks scheduled today."));
+    return;
+  }
+
+  for (const block of blocks) {
+    const card = document.createElement("div");
+    card.className = "block-card";
+    const time = document.createElement("span");
+    time.textContent = block.time || "Any time";
+    const title = document.createElement("strong");
+    title.textContent = block.title;
+    const meta = document.createElement("span");
+    meta.textContent = block.meta;
+    card.append(time, title, meta);
+    container.append(card);
+  }
+}
+
+function emptyState(text) {
+  const empty = document.createElement("div");
+  empty.className = "empty-state";
+  empty.textContent = text;
+  return empty;
+}
+
+elements.connectionForm.addEventListener("submit", (event) => {
+  event.preventDefault();
+  try {
+    settings = {
+      serverUrl: elements.serverUrl.value,
+      apiToken: elements.apiToken.value,
+    };
+    saveSettings(window.localStorage, settings);
+    settings = loadSettings(window.localStorage);
+    connectAndLoad();
+  } catch (err) {
+    setConnectionState("error", "Invalid connection settings", err.message);
+  }
 });
 
-checkBackend();
+elements.resetSettings.addEventListener("click", () => {
+  clearSettings(window.localStorage);
+  settings = loadSettings(window.localStorage);
+  applySettingsToForm();
+  connectAndLoad();
+});
+
+elements.refreshDashboard.addEventListener("click", () => {
+  connectAndLoad();
+});
+
+elements.quickCaptureForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const verbNoun = elements.quickCaptureInput.value.trim();
+  if (!verbNoun) return;
+
+  elements.quickCaptureInput.disabled = true;
+  try {
+    await requestJson(window.fetch.bind(window), settings, "/api/v1/inbox/quick-capture", {
+      method: "POST",
+      body: { verb_noun: verbNoun },
+    });
+    elements.quickCaptureInput.value = "";
+    await connectAndLoad();
+  } catch (err) {
+    setConnectionState("error", "Quick capture failed", err.message);
+  } finally {
+    elements.quickCaptureInput.disabled = false;
+    elements.quickCaptureInput.focus();
+  }
+});
+
+applySettingsToForm();
+connectAndLoad();

@@ -10,10 +10,35 @@ use tauri::Manager;
 struct BackendState(Mutex<Option<Child>>);
 
 fn should_spawn_backend() -> bool {
-  if let Ok(flag) = std::env::var("SFO_SPAWN_BACKEND") {
-    return flag == "1" || flag.eq_ignore_ascii_case("true");
+  should_spawn_backend_from_flag(std::env::var("SFO_SPAWN_BACKEND").ok().as_deref())
+}
+
+fn should_spawn_backend_from_flag(flag: Option<&str>) -> bool {
+  flag.is_some_and(|value| value == "1" || value.eq_ignore_ascii_case("true"))
+}
+
+#[cfg(test)]
+mod tests {
+  use super::should_spawn_backend_from_flag;
+
+  #[test]
+  fn backend_spawn_is_disabled_without_explicit_flag() {
+    assert!(!should_spawn_backend_from_flag(None));
   }
-  !cfg!(debug_assertions)
+
+  #[test]
+  fn backend_spawn_accepts_true_flags() {
+    assert!(should_spawn_backend_from_flag(Some("1")));
+    assert!(should_spawn_backend_from_flag(Some("true")));
+    assert!(should_spawn_backend_from_flag(Some("TRUE")));
+  }
+
+  #[test]
+  fn backend_spawn_rejects_other_flags() {
+    assert!(!should_spawn_backend_from_flag(Some("0")));
+    assert!(!should_spawn_backend_from_flag(Some("false")));
+    assert!(!should_spawn_backend_from_flag(Some("yes")));
+  }
 }
 
 fn spawn_backend(app: &tauri::AppHandle) -> Option<Child> {

@@ -8,6 +8,7 @@ The Rust rewrite lives beside the current Python app while feature parity is bui
 - `crates/sfo-db`: SQLite connection and migrations.
 - `crates/sfo-server`: Axum server shell.
 - `crates/sfo-services`: use-case rules for projects, tasks, blocks, inbox processing, guided capture, and Waiting On.
+- `src-tauri/launcher`: first static Rust client shell for server connection, auth, Home/Today summary, and quick capture.
 
 ## Current API
 
@@ -95,6 +96,23 @@ Rust server configuration is environment-first:
 
 `GET /healthz` is always unauthenticated so launch agents and local monitors can check process health. `GET /api/v1/auth/status` is also public and returns whether API auth is required; it does not reveal the token.
 
+## Native Client Shell
+
+The first Rust client shell lives in `src-tauri/launcher` and is intentionally static: there is no Node build step and no frontend framework yet. It connects to a configured Rust server URL, stores the server URL and API token in browser local storage, checks `/healthz` and `/api/v1/auth/status`, then renders `GET /api/v1/bootstrap`.
+
+Current shell behavior:
+
+- Server URL and API token form.
+- Public health/auth status checks before loading data.
+- Home/Today summary from `/api/v1/bootstrap`.
+- Quick capture to `POST /api/v1/inbox/quick-capture`.
+- No automatic Python backend spawn unless `SFO_SPAWN_BACKEND=1` is explicitly set.
+- Server CORS preflight support for Tauri production origins.
+
+Token storage is a temporary client-shell compromise. Before using this as a polished production Mac/iPhone client, move token storage to Keychain or platform-secure storage.
+
+For iPhone, note that some production webview origins are HTTPS. If the webview blocks plain HTTP as mixed content, the Mac mini server will need HTTPS through a local certificate, Caddy/nginx, VPN hostname, or a Tauri-native HTTP path.
+
 ## Inbox Containers
 
 The first Rust inbox-processing slice keeps the approved Python semantics for reversible low-friction routing:
@@ -150,10 +168,22 @@ SFO_RUST_DATABASE_URL=sqlite://sfo-rust.db cargo run -p sfo-server
 curl http://127.0.0.1:8088/healthz
 ```
 
+Run the launcher utility tests:
+
+```bash
+node --test src-tauri/launcher/client.test.mjs
+```
+
+Check the Tauri shell:
+
+```bash
+cargo check --manifest-path src-tauri/Cargo.toml
+```
+
 See `docs/rust_mac_mini_deployment.md` for the private Mac mini runbook.
 
 ## Notes
 
-The current `src-tauri` shell is still the existing Python-backed desktop wrapper. The Rust rewrite will replace that shell in a later milestone after the server and client API stabilize.
+The current `src-tauri` shell is now a first Rust-server client shell, not the old Python redirect launcher. It is deliberately thin so the next UX review can expose missing Home/Today API support before a larger native client build.
 
 See `docs/rust_rewrite_parity_review.md` for the current product parity and UX sequencing review.

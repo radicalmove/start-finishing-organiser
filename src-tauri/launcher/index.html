@@ -7,14 +7,93 @@
     <link rel="stylesheet" href="launcher.css" />
   </head>
   <body>
-    <div class="shell">
-      <div class="logo">SFO</div>
-      <h1>Start Finishing Organiser</h1>
-      <p id="status">Starting the local engine...</p>
-      <div class="spinner" aria-hidden="true"></div>
-      <div id="detail"></div>
-      <button id="retry" hidden>Retry</button>
-    </div>
-    <script src="launcher.js"></script>
+    <main class="app-shell">
+      <section class="hero-card">
+        <div>
+          <div class="eyebrow">Rust client shell</div>
+          <h1>Start with the real data, then refine the workflow.</h1>
+          <p class="lede">
+            Connect to the Rust server on this Mac or your Mac mini. This shell is the first reviewable
+            client surface for Home, Today, and capture.
+          </p>
+        </div>
+        <div class="status-card" aria-live="polite">
+          <div class="status-dot" id="status-dot"></div>
+          <div>
+            <div class="status-label" id="status">Checking server...</div>
+            <div class="status-detail" id="detail">Default target: http://127.0.0.1:8088</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="connection-card" id="connection-card">
+        <div class="section-heading">
+          <div>
+            <h2>Server Connection</h2>
+            <p>Use your local Rust server now, or the Mac mini address once it is running.</p>
+          </div>
+          <button class="ghost-button" id="reset-settings" type="button">Reset</button>
+        </div>
+        <form class="connection-form" id="connection-form">
+          <label>
+            <span>Server URL</span>
+            <input id="server-url" name="server-url" autocomplete="url" placeholder="http://127.0.0.1:8088" />
+          </label>
+          <label>
+            <span>API token</span>
+            <input id="api-token" name="api-token" autocomplete="current-password" placeholder="Only needed when auth is enabled" type="password" />
+          </label>
+          <button class="primary-button" type="submit">Connect</button>
+        </form>
+      </section>
+
+      <section class="dashboard hidden" id="dashboard">
+        <div class="dashboard-topline">
+          <div>
+            <div class="eyebrow" id="today-label">Today</div>
+            <h2>Home / Today</h2>
+          </div>
+          <div class="topline-actions">
+            <button class="ghost-button" id="refresh-dashboard" type="button">Refresh</button>
+          </div>
+        </div>
+
+        <form class="quick-capture" id="quick-capture-form">
+          <input id="quick-capture-input" name="quick-capture" placeholder="Quick capture to Inbox..." autocomplete="off" />
+          <button class="primary-button" type="submit">Capture</button>
+        </form>
+
+        <div class="dashboard-grid">
+          <article class="panel now-panel">
+            <div class="panel-kicker">Now</div>
+            <h3 id="now-title">No block active</h3>
+            <p id="now-meta">Choose the next protected block.</p>
+            <div class="next-block hidden" id="next-block"></div>
+          </article>
+
+          <article class="panel inbox-panel">
+            <div class="panel-kicker">Inbox</div>
+            <div class="big-number" id="inbox-total">0</div>
+            <div class="count-grid" id="inbox-counts"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-kicker">Today Tasks</div>
+            <div class="item-list" id="today-tasks"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-kicker">Weekly Projects</div>
+            <div class="item-list" id="weekly-projects"></div>
+          </article>
+
+          <article class="panel wide-panel">
+            <div class="panel-kicker">Today Blocks</div>
+            <div class="block-strip" id="today-blocks"></div>
+          </article>
+        </div>
+      </section>
+    </main>
+    <script type="module" src="launcher.js"></script>
   </body>
 </html>

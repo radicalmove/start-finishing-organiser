@@ -1,0 +1,157 @@
+export const DEFAULT_SERVER_URL = "http://127.0.0.1:8088";
+
+const SERVER_URL_KEY = "sfo.rust.serverUrl";
+const API_TOKEN_KEY = "sfo.rust.apiToken";
+
+export function normalizeServerUrl(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return DEFAULT_SERVER_URL;
+
+  let url;
+  try {
+    url = new URL(raw);
+  } catch (err) {
+    throw new Error("Server URL must be a valid URL");
+  }
+
+  if (url.protocol !== "http:" && url.protocol !== "https:") {
+    throw new Error("Server URL must use http or https");
+  }
+
+  return url.toString().replace(/\/+$/, "");
+}
+
+export function buildApiUrl(serverUrl, path) {
+  const base = normalizeServerUrl(serverUrl);
+  return `${base}${path.startsWith("/") ? path : `/${path}`}`;
+}
+
+export function buildJsonHeaders(apiToken) {
+  const headers = {
+    Accept: "application/json",
+    "Content-Type": "application/json",
+  };
+  const token = String(apiToken || "").trim();
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+  return headers;
+}
+
+export function loadSettings(storage) {
+  return {
+    serverUrl: normalizeServerUrl(storage?.getItem(SERVER_URL_KEY) || DEFAULT_SERVER_URL),
+    apiToken: String(storage?.getItem(API_TOKEN_KEY) || "").trim(),
+  };
+}
+
+export function saveSettings(storage, settings) {
+  storage?.setItem(SERVER_URL_KEY, normalizeServerUrl(settings.serverUrl));
+  const token = String(settings.apiToken || "").trim();
+  if (token) {
+    storage?.setItem(API_TOKEN_KEY, token);
+  } else {
+    storage?.removeItem(API_TOKEN_KEY);
+  }
+}
+
+export function clearSettings(storage) {
+  storage?.removeItem(SERVER_URL_KEY);
+  storage?.removeItem(API_TOKEN_KEY);
+}
+
+export async function requestJson(fetchImpl, settings, path, options = {}) {
+  const method = options.method || "GET";
+  const body = options.body === undefined ? undefined : JSON.stringify(options.body);
+  const response = await fetchImpl(buildApiUrl(settings.serverUrl, path), {
+    method,
+    cache: "no-store",
+    headers: buildJsonHeaders(settings.apiToken),
+    body,
+  });
+
+  const text = await response.text();
+  let payload = null;
+  if (text) {
+    try {
+      payload = JSON.parse(text);
+    } catch (err) {
+      payload = { detail: text };
+    }
+  }
+
+  if (!response.ok) {
+    const detail = payload?.detail || payload?.status || `Request failed (${response.status})`;
+    throw new Error(detail);
+  }
+
+  return payload;
+}
+
+export function buildBootstrapViewModel(summary) {
+  const inbox = summary?.inbox || {};
+  const weeklyProjects = (summary?.weekly_projects || []).map((project) => ({
+    title: project.title || "Untitled project",
+    meta: compactJoin([project.category, project.time_horizon]),
+  }));
+  const todayTasks = (summary?.today_tasks || []).map((task) => ({
+    title: task.verb_noun || "Untitled task",
+    description: task.description || "No notes yet.",
+    meta: compactJoin([
+      task.block_type,
+      task.frog ? "Frog" : "",
+      task.alignment,
+    ]),
+  }));
+  const todayBlocks = (summary?.today_blocks || []).map(blockView);
+
+  return {
+    todayLabel: summary?.today || "Today",
+    currentTime: trimSeconds(summary?.current_time || ""),
+    inbox,
+    inboxTotal:
+      Number(inbox.unprocessed || 0) +
+      Number(inbox.learn_explore || 0) +
+      Number(inbox.enjoy_recover || 0) +
+      Number(inbox.park_let_go || 0) +
+      Number(inbox.recycle_bin || 0),
+    weeklyProjects,
+    todayTasks,
+    todayBlocks,
+    now: summary?.current_block
+      ? blockView(summary.current_block)
+      : {
+          title: "No block active",
+          time: "",
+          meta: "Choose the next protected block.",
+        },
+    next: summary?.next_block ? blockView(summary.next_block) : null,
+    systemStatus: summary?.system?.database_status || "unknown",
+    schema: summary?.system?.schema || "",
+  };
+}
+
+function blockView(block) {
+  return {
+    title: block.title || titleCase(`${block.block_type || "time"} block`),
+    time: compactJoin([trimSeconds(block.start_time), trimSeconds(block.end_time)], "-"),
+    meta: titleCase(block.block_type || ""),
+  };
+}
+
+function compactJoin(values, separator = " · ") {
+  return values
+    .map((value) => String(value || "").trim())
+    .filter(Boolean)
+    .join(separator);
+}
+
+function trimSeconds(value) {
+  return String(value || "").replace(/:00$/, "");
+}
+
+function titleCase(value) {
+  return String(value || "")
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+}

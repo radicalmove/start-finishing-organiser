@@ -18,11 +18,12 @@ The Rust branch currently has:
 - Guided capture API with task/project creation, source inbox intent handling, support-project task conversion, and source-to-project archiving.
 - Waiting On / OPP API with task owner type, create/list/update/resolve, and guided capture integration.
 - API token auth with public auth-status discovery, env-based server config, and Mac mini deployment runbook.
+- First static Tauri client shell with server settings, API token auth, Bootstrap/Home rendering, and quick capture.
 - Python SQLite dry-run import and real import for projects/tasks/blocks/waiting_on.
 - Rust database backup file creation before import writes.
 - Backup manifest endpoint for current Rust tables.
 
-This is a good foundation, but it is still backend-only. It covers the first reversible inbox-routing workflow, guided processing API, Waiting On/OPP storage, and basic private-network server posture, but not the native client UX.
+This is a good foundation and now has a first reviewable client surface. It covers the first reversible inbox-routing workflow, guided processing API, Waiting On/OPP storage, basic private-network server posture, and a thin Home/Today shell, but not the deeper native UX.
 
 ## Product Parity Matrix
 
@@ -30,11 +31,11 @@ This is a good foundation, but it is still backend-only. It covers the first rev
 | --- | --- | --- | --- | --- |
 | Projects | Weekly focus, long-range planning, success cues, roadmaps | Core CRUD and weekly cap | High | Keep extending through long-range/project success fields after daily workflow primitives exist. |
 | Tasks | Time/project board, lifecycle, inbox flags, completion/archive history | Core CRUD and lifecycle | High | Covered enough for the next client/bootstrap slice. |
-| Quick capture | Modal and capture page can send undecided items to Inbox | API quick capture | High | Keep. It is the right first capture primitive. |
+| Quick capture | Modal and capture page can send undecided items to Inbox | API quick capture and first shell form | High | Covered enough for the next UX pass. |
 | Guided capture | Wizard decides task/project/inbox/OPP and routes source inbox items | Backend task/project/source processing API, including OPP waiting item creation | Very high | Add native client UX after deployment basics. |
 | Inbox containers | Learning, Enjoy, Parked, Recycle bin, undo, metrics | Backend route/recycle/restore/containers API | Very high | Add UI/client review after guided processing exists. |
 | Blocks/calendar | Focus/Admin/Social/Recovery blocks, appointments, week calendar | Core API, import, backup | Very high | Covered enough for a Bootstrap/Home summary slice; UI and external calendars are still pending. |
-| Home/Today | Inbox, Today calendar, Now strip, One Thing/Frog, Today tasks | Read-only Bootstrap summary | Very high | Next UX review checkpoint; One Thing/Frog and rituals still need Rust data support. |
+| Home/Today | Inbox, Today calendar, Now strip, One Thing/Frog, Today tasks | Read-only Bootstrap summary and first shell rendering | Very high | Next API gap slice; One Thing/Frog, Waiting On summary, and rituals still need Rust data support. |
 | Weekly review | 4+3 focus, resurfacing, block planning, archive completed | Not covered | High | Port after Home primitives; depends on projects, tasks, blocks, resurface. |
 | Resurface | Pull Month/Quarter/Later due items into Week | Partly possible through task fields | Medium-high | Add with weekly review or just before it. |
 | Waiting On / OPP | Captures other-owned priorities and follow-up dates | Backend API and guided capture integration | Medium-high | Add Home/bootstrap summary later if the client needs it. |
@@ -58,16 +59,7 @@ The iPhone client should be reviewed against these same workflows. It should not
 
 ## Recommended Next Slices
 
-### 1. Native Client UX Review And Shell
-
-Review and build the first Mac/iPhone client shell against real workflows:
-
-- Server connection settings.
-- Login/auth setup.
-- Bootstrap/Home view.
-- Quick capture, guided processing, Today, and Waiting On.
-
-### 2. Home/Today API Gaps
+### 1. Home/Today API Gaps
 
 After the first client shell exposes the real interaction shape, fill the missing Home/Today behavior:
 
@@ -75,6 +67,36 @@ After the first client shell exposes the real interaction shape, fill the missin
 - Waiting On summary in bootstrap.
 - Ritual/check-in state if it improves the Today workflow.
 - Any missing task/block fields discovered by the UX pass.
+
+### 2. Native Guided Processing UX
+
+Once Home/Today has the required data, build the first real processing flow:
+
+- Process inbox item into task/project/container/OPP.
+- Preserve the low-friction Learning/Enjoy/Park actions.
+- Keep the phone flow capture-first, not desktop-compressed.
+
+## Completed Slice: Native Client UX Review And Shell
+
+This slice replaced the old Python redirect launcher with a static Rust-server client shell.
+
+Minimum scope delivered:
+
+- Server URL and API token settings in `src-tauri/launcher`.
+- `/healthz` and `/api/v1/auth/status` checks before loading private API data.
+- `GET /api/v1/bootstrap` rendering for Now, Inbox, Today tasks, Weekly projects, and Today blocks.
+- Quick capture form that writes to `POST /api/v1/inbox/quick-capture`.
+- CORS preflight support for Tauri production origins.
+- Launcher utility tests with Node's built-in test runner.
+- Tauri wrapper no longer spawns the old Python backend unless `SFO_SPAWN_BACKEND=1` is set.
+
+Out of scope:
+
+- Polished Mac/iPhone navigation.
+- Platform-secure token storage.
+- iPhone HTTPS/mixed-content hardening for remote Mac mini access.
+- Guided processing UI.
+- One Thing/Frog, rituals, or Waiting On summary data that the Rust API does not yet expose.
 
 ## Completed Slice: Auth And Mac Mini Deployment
 
@@ -213,4 +235,4 @@ Out of scope for the first Blocks slice:
 
 ## Current Recommendation
 
-The next coding slice should be **Native Client UX Review And Shell**. The Rust backend now has enough core planning/capture data and basic private-network auth posture to justify building the first client surface, then using that UX review to decide which Home/Today gaps matter most.
+The next coding slice should be **Home/Today API Gaps**. The first shell now makes the missing daily-execution primitives visible, so the next backend work should add the smallest data support needed for One Thing/Frog, Waiting On summary, and any ritual state that improves the daily workflow.

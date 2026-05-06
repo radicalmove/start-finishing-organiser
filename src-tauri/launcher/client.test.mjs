@@ -1,0 +1,111 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+
+import {
+  DEFAULT_SERVER_URL,
+  buildJsonHeaders,
+  buildBootstrapViewModel,
+  loadSettings,
+  normalizeServerUrl,
+  saveSettings,
+} from "./client.js";
+
+function memoryStorage(seed = {}) {
+  const values = new Map(Object.entries(seed));
+  return {
+    getItem(key) {
+      return values.has(key) ? values.get(key) : null;
+    },
+    setItem(key, value) {
+      values.set(key, String(value));
+    },
+    removeItem(key) {
+      values.delete(key);
+    },
+  };
+}
+
+test("normalizeServerUrl trims and removes trailing slashes", () => {
+  assert.equal(normalizeServerUrl(" http://mac-mini.local:8088/// "), "http://mac-mini.local:8088");
+});
+
+test("normalizeServerUrl falls back to local Rust server when empty", () => {
+  assert.equal(normalizeServerUrl(""), DEFAULT_SERVER_URL);
+});
+
+test("normalizeServerUrl rejects non-http protocols", () => {
+  assert.throws(() => normalizeServerUrl("file:///tmp/sfo"), /http or https/);
+});
+
+test("buildJsonHeaders includes bearer token only when provided", () => {
+  assert.deepEqual(buildJsonHeaders(""), {
+    Accept: "application/json",
+    "Content-Type": "application/json",
+  });
+  assert.deepEqual(buildJsonHeaders(" secret-token "), {
+    Accept: "application/json",
+    "Content-Type": "application/json",
+    Authorization: "Bearer secret-token",
+  });
+});
+
+test("settings round-trip through storage", () => {
+  const storage = memoryStorage();
+
+  saveSettings(storage, {
+    serverUrl: " http://mac-mini.local:8088/ ",
+    apiToken: " token ",
+  });
+
+  assert.deepEqual(loadSettings(storage), {
+    serverUrl: "http://mac-mini.local:8088",
+    apiToken: "token",
+  });
+});
+
+test("bootstrap view model favors current work and bounded counts", () => {
+  const model = buildBootstrapViewModel({
+    today: "2026-05-06",
+    current_time: "09:30:00",
+    weekly_projects: [{ title: "Ship client shell", category: "work" }],
+    inbox: {
+      unprocessed: 2,
+      learn_explore: 1,
+      enjoy_recover: 3,
+      park_let_go: 4,
+      recycle_bin: 5,
+    },
+    today_tasks: [
+      { verb_noun: "Write shell tests", block_type: "focus", frog: true },
+      { verb_noun: "Check docs", block_type: "admin", frog: false },
+    ],
+    today_blocks: [
+      {
+        title: "Deep work",
+        start_time: "09:00:00",
+        end_time: "10:30:00",
+        block_type: "focus",
+      },
+    ],
+    current_block: {
+      title: "Deep work",
+      start_time: "09:00:00",
+      end_time: "10:30:00",
+      block_type: "focus",
+    },
+    next_block: null,
+    system: {
+      database_status: "ok",
+      schema: "sfo-rust-foundation",
+      import_supported_tables: ["projects", "tasks"],
+      backup_tables: [],
+    },
+  });
+
+  assert.equal(model.todayLabel, "2026-05-06");
+  assert.equal(model.now.title, "Deep work");
+  assert.equal(model.now.time, "09:00-10:30");
+  assert.equal(model.inboxTotal, 15);
+  assert.equal(model.todayTasks[0].meta, "focus · Frog");
+  assert.equal(model.weeklyProjects[0].title, "Ship client shell");
+});

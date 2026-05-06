@@ -4,8 +4,7 @@
   "version": "0.732.0",
   "identifier": "com.rcd58.sfo",
   "build": {
-    "frontendDist": "launcher",
-    "devUrl": "http://127.0.0.1:8000/"
+    "frontendDist": "launcher"
   },
   "app": {
     "windows": [
@@ -32,10 +31,6 @@
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
-    ],
-    "resources": {
-      "resources/gmail_credentials.json": "resources/gmail_credentials.json",
-      "bin/sfo-backend": "bin/sfo-backend"
-    }
+    ]
   }
 }
