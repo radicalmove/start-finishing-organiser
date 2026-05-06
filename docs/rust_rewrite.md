@@ -7,7 +7,7 @@ The Rust rewrite lives beside the current Python app while feature parity is bui
 - `crates/sfo-core`: shared domain types.
 - `crates/sfo-db`: SQLite connection and migrations.
 - `crates/sfo-server`: Axum server shell.
-- `crates/sfo-services`: use-case rules for projects, tasks, blocks, inbox processing, and guided capture.
+- `crates/sfo-services`: use-case rules for projects, tasks, blocks, inbox processing, guided capture, and Waiting On.
 
 ## Current API
 
@@ -36,13 +36,17 @@ The Rust rewrite lives beside the current Python app while feature parity is bui
 - `POST /api/v1/inbox/{task_id}/recycle`
 - `POST /api/v1/inbox/{task_id}/restore`
 - `POST /api/v1/capture/guided`
+- `GET /api/v1/waiting`
+- `POST /api/v1/waiting`
+- `PATCH /api/v1/waiting/{waiting_id}`
+- `POST /api/v1/waiting/{waiting_id}/resolve`
 - `POST /api/v1/import/python-sqlite/dry-run`
 - `POST /api/v1/import/python-sqlite`
 - `POST /api/v1/export/backup`
 
 ## Import And Backup
 
-The Rust importer supports dry-run inspection and real import for the current project/task/block slice. Dry-run opens a copied Python SFO SQLite database read-only, computes its SHA-256 checksum, reports table row counts, and warns about tables that are not imported in the current slice.
+The Rust importer supports dry-run inspection and real import for the current project/task/block/waiting slice. Dry-run opens a copied Python SFO SQLite database read-only, computes its SHA-256 checksum, reports table row counts, and warns about tables that are not imported in the current slice.
 
 Real import is exposed at `POST /api/v1/import/python-sqlite` with:
 
@@ -58,10 +62,12 @@ Real import is exposed at `POST /api/v1/import/python-sqlite` with:
 - Python `projects.id` is preserved as Rust `projects.legacy_id`.
 - Python `tasks.id` is preserved as Rust `tasks.legacy_id`.
 - Python `blocks.id` is preserved as Rust `blocks.legacy_id`.
+- Python `waiting_on.id` is preserved as Rust `waiting_on.legacy_id`.
 - Task `project_id` values are mapped through imported project `legacy_id` values.
 - Block `project_id` and `task_id` values are mapped through imported project/task `legacy_id` values.
+- Waiting On `project_id` values are mapped through imported project `legacy_id` values.
 - Legacy SQLite timestamps like `2026-01-02 03:04:05` are normalized to RFC 3339 UTC text.
-- Re-running the same import is idempotent for imported projects, tasks, and blocks because upserts key off `legacy_id`.
+- Re-running the same import is idempotent for imported projects, tasks, blocks, and waiting items because upserts key off `legacy_id`.
 
 Unsupported Python tables are still reported as warnings and are not imported in this slice. The backup endpoint returns a JSON manifest over the Rust database with schema metadata and table counts.
 
@@ -100,8 +106,17 @@ The first Rust inbox-processing slice keeps the approved Python semantics for re
 - Route source inbox items to Learning, Enjoy, or Parked without creating duplicate task backlog.
 - Convert a source inbox item into an actionable support-project task only when an existing `project_id` is supplied.
 - Mark a source inbox item as processed/archived when it becomes a new project.
+- Create a Waiting On item when `owner_type` is `opp`, using `waiting_person` when supplied.
 
-Waiting On / OPP storage is not part of this endpoint yet because the Rust rewrite does not have the `waiting_on` schema slice.
+## Waiting On / OPP
+
+The Rust rewrite now has a first-class Waiting On backend:
+
+- `GET /api/v1/waiting` returns paginated waiting items.
+- `POST /api/v1/waiting` creates an item with description, optional person, optional project, and optional follow-up date.
+- `PATCH /api/v1/waiting/{waiting_id}` updates fields and supports `null` to clear optional values.
+- `POST /api/v1/waiting/{waiting_id}/resolve` deletes/resolves the waiting item.
+- Tasks now store `owner_type` as `mine`, `shared`, or `opp`.
 
 ## Local Verification
 

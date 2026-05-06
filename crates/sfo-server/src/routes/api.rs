@@ -10,11 +10,11 @@ use sfo_core::{
     GuidedCaptureRequest, GuidedCaptureResponse, ImportDryRunReport, ImportDryRunRequest,
     InboxContainers, InboxRouteRequest, Page, Project, ProjectCreate, ProjectId, ProjectUpdate,
     PythonSqliteImportReport, PythonSqliteImportRequest, QuickCapture, Task, TaskCreate, TaskId,
-    TaskUpdate,
+    TaskUpdate, WaitingId, WaitingOn, WaitingOnCreate, WaitingOnUpdate,
 };
 use sfo_services::{
     BootstrapService, CaptureService, InboxService, PlanningService, ScheduleService, ServiceError,
-    SystemService,
+    SystemService, WaitingService,
 };
 use std::str::FromStr;
 
@@ -120,6 +120,9 @@ pub fn router() -> Router<AppState> {
         .route("/inbox/{task_id}/recycle", post(recycle_inbox_item))
         .route("/inbox/{task_id}/restore", post(restore_inbox_item))
         .route("/capture/guided", post(guided_capture))
+        .route("/waiting", get(list_waiting).post(create_waiting))
+        .route("/waiting/{waiting_id}", patch(update_waiting))
+        .route("/waiting/{waiting_id}/resolve", post(resolve_waiting))
         .route(
             "/import/python-sqlite/dry-run",
             post(dry_run_python_sqlite_import),
@@ -316,6 +319,49 @@ async fn guided_capture(
     Ok(Json(service.submit_guided(payload).await?))
 }
 
+async fn list_waiting(
+    State(state): State<AppState>,
+    Query(query): Query<PageQuery>,
+) -> Result<Json<Page<WaitingOn>>, ApiError> {
+    let service = WaitingService::new(state.db);
+    let page = service
+        .list_waiting_on(query.page.unwrap_or(1), query.page_size.unwrap_or(50))
+        .await?;
+    Ok(Json(page))
+}
+
+async fn create_waiting(
+    State(state): State<AppState>,
+    Json(payload): Json<WaitingOnCreate>,
+) -> Result<(StatusCode, Json<WaitingOn>), ApiError> {
+    let service = WaitingService::new(state.db);
+    let item = service.create_waiting_on(payload).await?;
+    Ok((StatusCode::CREATED, Json(item)))
+}
+
+async fn update_waiting(
+    State(state): State<AppState>,
+    Path(waiting_id): Path<String>,
+    Json(payload): Json<WaitingOnUpdate>,
+) -> Result<Json<WaitingOn>, ApiError> {
+    let service = WaitingService::new(state.db);
+    let item = service
+        .update_waiting_on(parse_waiting_id(&waiting_id)?, payload)
+        .await?;
+    Ok(Json(item))
+}
+
+async fn resolve_waiting(
+    State(state): State<AppState>,
+    Path(waiting_id): Path<String>,
+) -> Result<StatusCode, ApiError> {
+    let service = WaitingService::new(state.db);
+    service
+        .resolve_waiting_on(parse_waiting_id(&waiting_id)?)
+        .await?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
 async fn list_blocks(
     State(state): State<AppState>,
     Query(query): Query<PageQuery>,
@@ -395,4 +441,8 @@ fn parse_task_id(value: &str) -> Result<TaskId, ApiError> {
 
 fn parse_block_id(value: &str) -> Result<BlockId, ApiError> {
     BlockId::from_str(value).map_err(|_| ApiError::bad_request("invalid block id"))
+}
+
+fn parse_waiting_id(value: &str) -> Result<WaitingId, ApiError> {
+    WaitingId::from_str(value).map_err(|_| ApiError::bad_request("invalid waiting id"))
 }

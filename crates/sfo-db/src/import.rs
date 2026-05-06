@@ -1,7 +1,7 @@
 use chrono::{DateTime, NaiveDateTime, Utc};
 use sfo_core::{
     ImportDryRunReport, ProjectId, PythonSqliteImportReport, TableImportResult, TableImportSummary,
-    TaskId, INBOX_INTENT_UNPROCESSED,
+    TaskId, WaitingId, INBOX_INTENT_UNPROCESSED,
 };
 use sha2::{Digest, Sha256};
 use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
@@ -12,7 +12,7 @@ use std::str::FromStr;
 
 use crate::{backup::write_backup_file, DbError};
 
-pub const SUPPORTED_PYTHON_TABLES: &[&str] = &["projects", "tasks", "blocks"];
+pub const SUPPORTED_PYTHON_TABLES: &[&str] = &["projects", "tasks", "blocks", "waiting_on"];
 pub const KNOWN_PYTHON_TABLES: &[&str] = &[
     "projects",
     "tasks",
@@ -138,6 +138,24 @@ pub async fn import_python_sqlite(
         warnings.push("missing source table tasks".to_string());
         tables.push(TableImportResult {
             table: "tasks".to_string(),
+            source_rows: 0,
+            imported_rows: 0,
+        });
+    }
+
+    if table_names.iter().any(|table| table == "waiting_on") {
+        let (source_rows, imported_rows, waiting_warnings) =
+            import_waiting_on(&source_pool, &mut transaction).await?;
+        warnings.extend(waiting_warnings);
+        tables.push(TableImportResult {
+            table: "waiting_on".to_string(),
+            source_rows,
+            imported_rows,
+        });
+    } else {
+        warnings.push("missing source table waiting_on".to_string());
+        tables.push(TableImportResult {
+            table: "waiting_on".to_string(),
             source_rows: 0,
             imported_rows: 0,
         });
@@ -289,7 +307,7 @@ async fn import_tasks(
         SELECT id, project_id, verb_noun, description, in_inbox, archived_from_inbox,
                intake_intent, intake_container, intake_processed_at, when_bucket,
                block_type, duration_minutes, priority, frog, alignment, first_action,
-               status, scheduled_for, resurface_on, completed_at, created_at
+               status, scheduled_for, owner_type, resurface_on, completed_at, created_at
         FROM tasks
         ORDER BY id ASC
         "#,
@@ -330,9 +348,9 @@ async fn import_tasks(
                 id, legacy_id, project_id, verb_noun, description, in_inbox,
                 archived_from_inbox, intake_intent, intake_container, intake_processed_at,
                 when_bucket, block_type, duration_minutes, priority, frog, alignment,
-                first_action, status, scheduled_for, resurface_on, completed_at, created_at
+                first_action, status, scheduled_for, owner_type, resurface_on, completed_at, created_at
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(legacy_id) DO UPDATE SET
                 project_id = excluded.project_id,
                 verb_noun = excluded.verb_noun,
@@ -351,6 +369,7 @@ async fn import_tasks(
                 first_action = excluded.first_action,
                 status = excluded.status,
                 scheduled_for = excluded.scheduled_for,
+                owner_type = excluded.owner_type,
                 resurface_on = excluded.resurface_on,
                 completed_at = excluded.completed_at,
                 created_at = excluded.created_at
@@ -375,6 +394,7 @@ async fn import_tasks(
         .bind(optional_text(row.first_action))
         .bind(default_text(row.status, "pending"))
         .bind(optional_text(row.scheduled_for))
+        .bind(default_text(row.owner_type, "mine"))
         .bind(optional_text(row.resurface_on))
         .bind(completed_at)
         .bind(created_at)
@@ -483,6 +503,75 @@ async fn import_blocks(
     Ok((source_rows, imported_rows, warnings))
 }
 
+async fn import_waiting_on(
+    source_pool: &sqlx::SqlitePool,
+    transaction: &mut sqlx::Transaction<'_, sqlx::Sqlite>,
+) -> Result<(i64, i64, Vec<String>), DbError> {
+    let rows = sqlx::query_as::<_, LegacyWaitingOnRow>(
+        r#"
+        SELECT id, project_id, description, person, created_at, last_followup
+        FROM waiting_on
+        ORDER BY id ASC
+        "#,
+    )
+    .fetch_all(source_pool)
+    .await?;
+    let source_rows =
+        i64::try_from(rows.len()).map_err(|error| DbError::InvalidData(error.to_string()))?;
+    let mut imported_rows = 0;
+    let mut warnings = Vec::new();
+
+    for row in rows {
+        let rust_id = WaitingId::new().to_string();
+        let project_id = match row.project_id {
+            Some(legacy_project_id) => {
+                let mapped_project_id: Option<String> =
+                    sqlx::query_scalar("SELECT id FROM projects WHERE legacy_id = ?")
+                        .bind(legacy_project_id)
+                        .fetch_optional(&mut **transaction)
+                        .await?;
+                if mapped_project_id.is_none() {
+                    warnings.push(format!(
+                        "waiting item {} references missing project {}",
+                        row.id, legacy_project_id
+                    ));
+                }
+                mapped_project_id
+            }
+            None => None,
+        };
+        let created_at = normalize_required_datetime(row.created_at)?;
+
+        let result = sqlx::query(
+            r#"
+            INSERT INTO waiting_on (
+                id, legacy_id, project_id, description, person, last_followup, created_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(legacy_id) DO UPDATE SET
+                project_id = excluded.project_id,
+                description = excluded.description,
+                person = excluded.person,
+                last_followup = excluded.last_followup,
+                created_at = excluded.created_at
+            "#,
+        )
+        .bind(rust_id)
+        .bind(row.id)
+        .bind(project_id)
+        .bind(row.description)
+        .bind(optional_text(row.person))
+        .bind(optional_text(row.last_followup))
+        .bind(created_at)
+        .execute(&mut **transaction)
+        .await?;
+        imported_rows += i64::try_from(result.rows_affected())
+            .map_err(|error| DbError::InvalidData(error.to_string()))?;
+    }
+
+    Ok((source_rows, imported_rows, warnings))
+}
+
 fn file_sha256(path: &Path) -> Result<String, DbError> {
     let bytes = std::fs::read(path)?;
     let digest = Sha256::digest(bytes);
@@ -539,9 +628,20 @@ struct LegacyTaskRow {
     first_action: Option<String>,
     status: String,
     scheduled_for: Option<String>,
+    owner_type: String,
     resurface_on: Option<String>,
     completed_at: Option<String>,
     created_at: String,
+}
+
+#[derive(Debug, FromRow)]
+struct LegacyWaitingOnRow {
+    id: i64,
+    project_id: Option<i64>,
+    description: String,
+    person: Option<String>,
+    created_at: String,
+    last_followup: Option<String>,
 }
 
 #[derive(Debug, FromRow)]
@@ -675,6 +775,7 @@ mod tests {
         assert!(std::path::Path::new(&report.backup_path).exists());
         assert_imported_table(&report.tables, "projects", 1, 1);
         assert_imported_table(&report.tables, "tasks", 2, 2);
+        assert_imported_table(&report.tables, "waiting_on", 2, 2);
         assert_imported_table(&report.tables, "blocks", 2, 2);
 
         let project = sqlx::query_as::<_, ImportedProject>(
@@ -693,7 +794,7 @@ mod tests {
         let tasks = sqlx::query_as::<_, ImportedTask>(
             r#"
             SELECT legacy_id, project_id, verb_noun, in_inbox, archived_from_inbox,
-                   intake_intent, intake_container, when_bucket, status, completed_at
+                   intake_intent, intake_container, when_bucket, status, owner_type, completed_at
             FROM tasks
             ORDER BY legacy_id
             "#,
@@ -711,14 +812,36 @@ mod tests {
         assert_eq!(tasks[0].intake_container, "project");
         assert_eq!(tasks[0].when_bucket, "today");
         assert_eq!(tasks[0].status, "pending");
+        assert_eq!(tasks[0].owner_type, "mine");
         assert_eq!(tasks[0].completed_at, None);
         assert_eq!(tasks[1].legacy_id, 21);
         assert_eq!(tasks[1].project_id, None);
         assert_eq!(tasks[1].status, "done");
+        assert_eq!(tasks[1].owner_type, "mine");
         assert_eq!(
             tasks[1].completed_at.as_deref(),
             Some("2026-01-05T06:07:08+00:00")
         );
+
+        let waiting = sqlx::query_as::<_, ImportedWaitingOn>(
+            r#"
+            SELECT legacy_id, project_id, description, person, last_followup, created_at
+            FROM waiting_on
+            ORDER BY legacy_id
+            "#,
+        )
+        .fetch_all(&pool)
+        .await
+        .expect("waiting rows");
+        assert_eq!(waiting.len(), 2);
+        assert_eq!(waiting[0].legacy_id, 40);
+        assert!(waiting[0].project_id.is_some());
+        assert_eq!(waiting[0].description, "Waiting for review");
+        assert_eq!(waiting[0].person.as_deref(), Some("Sam"));
+        assert_eq!(waiting[0].last_followup.as_deref(), Some("2026-01-08"));
+        assert_eq!(waiting[0].created_at, "2026-01-02T08:00:00+00:00");
+        assert_eq!(waiting[1].legacy_id, 41);
+        assert_eq!(waiting[1].project_id, None);
 
         let blocks = sqlx::query_as::<_, ImportedBlock>(
             r#"
@@ -780,10 +903,15 @@ mod tests {
             .fetch_one(&pool)
             .await
             .expect("block count");
+        let waiting_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM waiting_on")
+            .fetch_one(&pool)
+            .await
+            .expect("waiting count");
 
         assert_eq!(project_count, 1);
         assert_eq!(task_count, 2);
         assert_eq!(block_count, 2);
+        assert_eq!(waiting_count, 2);
 
         let _ = std::fs::remove_file(source_path);
         let _ = std::fs::remove_dir_all(backup_dir);
@@ -861,7 +989,18 @@ mod tests {
         intake_container: String,
         when_bucket: String,
         status: String,
+        owner_type: String,
         completed_at: Option<String>,
+    }
+
+    #[derive(Debug, sqlx::FromRow)]
+    struct ImportedWaitingOn {
+        legacy_id: i64,
+        project_id: Option<String>,
+        description: String,
+        person: Option<String>,
+        last_followup: Option<String>,
+        created_at: String,
     }
 
     #[derive(Debug, sqlx::FromRow)]
@@ -989,6 +1128,35 @@ mod tests {
         .execute(&pool)
         .await
         .expect("insert tasks");
+
+        sqlx::query(
+            r#"
+            CREATE TABLE waiting_on (
+                id INTEGER PRIMARY KEY,
+                project_id INTEGER,
+                description TEXT NOT NULL,
+                person TEXT,
+                created_at TEXT NOT NULL,
+                last_followup TEXT
+            )
+            "#,
+        )
+        .execute(&pool)
+        .await
+        .expect("create waiting_on");
+        sqlx::query(
+            r#"
+            INSERT INTO waiting_on (
+                id, project_id, description, person, created_at, last_followup
+            )
+            VALUES
+                (40, 10, 'Waiting for review', 'Sam', '2026-01-02 08:00:00', '2026-01-08'),
+                (41, 999, 'Waiting on missing project', NULL, '2026-01-02 09:00:00', NULL)
+            "#,
+        )
+        .execute(&pool)
+        .await
+        .expect("insert waiting_on");
 
         sqlx::query(
             r#"

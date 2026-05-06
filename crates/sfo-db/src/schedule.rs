@@ -420,6 +420,7 @@ mod tests {
                 alignment: None,
                 first_action: None,
                 scheduled_for: None,
+                owner_type: Default::default(),
             },
         )
         .await
@@ -488,6 +489,7 @@ mod tests {
                 alignment: None,
                 first_action: None,
                 scheduled_for: None,
+                owner_type: Default::default(),
             },
         )
         .await

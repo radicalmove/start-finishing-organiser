@@ -6,6 +6,7 @@ pub mod import;
 pub mod inbox;
 pub mod planning;
 pub mod schedule;
+pub mod waiting;
 
 use sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePoolOptions};
 use std::str::FromStr;

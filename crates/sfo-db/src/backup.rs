@@ -5,7 +5,8 @@ use std::path::{Path, PathBuf};
 
 use crate::{connect, health_check, run_migrations, DbConfig, DbError};
 
-pub const RUST_BACKUP_TABLES: &[&str] = &["app_metadata", "projects", "tasks", "blocks"];
+pub const RUST_BACKUP_TABLES: &[&str] =
+    &["app_metadata", "projects", "tasks", "blocks", "waiting_on"];
 
 pub async fn backup_manifest(pool: &sqlx::SqlitePool) -> Result<BackupManifest, DbError> {
     health_check(pool).await?;
@@ -70,8 +71,14 @@ async fn copy_current_tables(
     let block_rows = sqlx::query_as::<_, BackupBlockRow>("SELECT * FROM blocks")
         .fetch_all(source_pool)
         .await?;
+    let waiting_rows = sqlx::query_as::<_, BackupWaitingOnRow>("SELECT * FROM waiting_on")
+        .fetch_all(source_pool)
+        .await?;
 
     let mut transaction = backup_pool.begin().await?;
+    sqlx::query("DELETE FROM waiting_on")
+        .execute(&mut *transaction)
+        .await?;
     sqlx::query("DELETE FROM blocks")
         .execute(&mut *transaction)
         .await?;
@@ -123,6 +130,28 @@ async fn copy_current_tables(
         .await?;
     }
 
+    for row in waiting_rows {
+        sqlx::query(
+            r#"
+            INSERT INTO waiting_on (
+                id, legacy_id, project_id, description, person, last_followup,
+                created_at, updated_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            "#,
+        )
+        .bind(row.id)
+        .bind(row.legacy_id)
+        .bind(row.project_id)
+        .bind(row.description)
+        .bind(row.person)
+        .bind(row.last_followup)
+        .bind(row.created_at)
+        .bind(row.updated_at)
+        .execute(&mut *transaction)
+        .await?;
+    }
+
     for row in task_rows {
         sqlx::query(
             r#"
@@ -130,10 +159,10 @@ async fn copy_current_tables(
                 id, legacy_id, project_id, verb_noun, description, in_inbox,
                 archived_from_inbox, intake_intent, intake_container, intake_processed_at,
                 when_bucket, block_type, duration_minutes, priority, frog, alignment,
-                first_action, status, scheduled_for, resurface_on, completed_at,
+                first_action, status, scheduled_for, owner_type, resurface_on, completed_at,
                 created_at, updated_at
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             "#,
         )
         .bind(row.id)
@@ -155,6 +184,7 @@ async fn copy_current_tables(
         .bind(row.first_action)
         .bind(row.status)
         .bind(row.scheduled_for)
+        .bind(row.owner_type)
         .bind(row.resurface_on)
         .bind(row.completed_at)
         .bind(row.created_at)
@@ -251,8 +281,21 @@ struct BackupTaskRow {
     first_action: Option<String>,
     status: String,
     scheduled_for: Option<String>,
+    owner_type: String,
     resurface_on: Option<String>,
     completed_at: Option<String>,
+    created_at: String,
+    updated_at: Option<String>,
+}
+
+#[derive(Debug, FromRow)]
+struct BackupWaitingOnRow {
+    id: String,
+    legacy_id: Option<i64>,
+    project_id: Option<String>,
+    description: String,
+    person: Option<String>,
+    last_followup: Option<String>,
     created_at: String,
     updated_at: Option<String>,
 }
@@ -322,6 +365,7 @@ mod tests {
                 alignment: None,
                 first_action: None,
                 scheduled_for: None,
+                owner_type: Default::default(),
             },
         )
         .await

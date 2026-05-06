@@ -136,6 +136,18 @@ string_enum!(Alignment {
     Unaligned => "unaligned",
 });
 
+string_enum!(OwnerType {
+    Mine => "mine",
+    Shared => "shared",
+    Opp => "opp",
+});
+
+impl Default for OwnerType {
+    fn default() -> Self {
+        Self::Mine
+    }
+}
+
 pub const INBOX_INTENT_UNPROCESSED: &str = "unprocessed";
 pub const INBOX_INTENT_SUPPORT_PROJECT: &str = "support_project";
 pub const INBOX_INTENT_LEARN_EXPLORE: &str = "learn_explore";
@@ -229,6 +241,8 @@ pub struct TaskCreate {
     pub first_action: Option<String>,
     #[serde(default)]
     pub scheduled_for: Option<NaiveDate>,
+    #[serde(default)]
+    pub owner_type: OwnerType,
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
@@ -259,6 +273,8 @@ pub struct TaskUpdate {
     pub scheduled_for: Option<Option<NaiveDate>>,
     #[serde(default)]
     pub status: Option<TaskStatus>,
+    #[serde(default)]
+    pub owner_type: Option<OwnerType>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -281,6 +297,7 @@ pub struct Task {
     pub first_action: Option<String>,
     pub status: TaskStatus,
     pub scheduled_for: Option<NaiveDate>,
+    pub owner_type: OwnerType,
     pub resurface_on: Option<NaiveDate>,
     pub completed_at: Option<DateTime<Utc>>,
     pub created_at: DateTime<Utc>,

@@ -1,12 +1,12 @@
 use chrono::{Duration, Utc};
 use sfo_core::{
     CaptureHorizon, GuidedCaptureKind, GuidedCaptureRequest, GuidedCaptureResponse,
-    GuidedInboxIntent, ProjectCreate, Task, TaskCreate, TaskId, TaskStatus, WhenBucket,
-    INBOX_INTENT_SUPPORT_PROJECT, INBOX_INTENT_UNPROCESSED,
+    GuidedInboxIntent, OwnerType, ProjectCreate, Task, TaskCreate, TaskId, TaskStatus,
+    WaitingOnCreate, WhenBucket, INBOX_INTENT_SUPPORT_PROJECT, INBOX_INTENT_UNPROCESSED,
 };
 use sfo_db::planning as planning_repo;
 
-use crate::{PlanningService, ServiceError};
+use crate::{PlanningService, ServiceError, WaitingService};
 
 const PROJECT_DATE_REQUIRED: &str = "Set a target date for this project. No date = no finish.";
 const PROJECT_VERB_REQUIRED: &str =
@@ -79,7 +79,7 @@ impl CaptureService {
 
         match payload.item_kind {
             GuidedCaptureKind::DecideLater => {
-                self.capture_decide_later(title, description, source_task)
+                self.capture_decide_later(title, description, source_task, payload.owner_type)
                     .await
             }
             GuidedCaptureKind::Project => {
@@ -98,6 +98,7 @@ impl CaptureService {
         title: String,
         description: Option<String>,
         source_task: Option<Task>,
+        owner_type: sfo_core::OwnerType,
     ) -> Result<GuidedCaptureResponse, ServiceError> {
         if let Some(mut task) = source_task {
             task.verb_noun = title;
@@ -126,6 +127,7 @@ impl CaptureService {
                 alignment: None,
                 first_action: None,
                 scheduled_for: None,
+                owner_type,
             })
             .await?;
 
@@ -209,6 +211,7 @@ impl CaptureService {
             task.block_type = payload.block_type;
             task.duration_minutes = duration_minutes;
             task.frog = payload.frog;
+            task.owner_type = payload.owner_type;
             task.alignment = None;
             task.resurface_on = resurface_on;
             task.status = TaskStatus::Pending;
@@ -230,11 +233,16 @@ impl CaptureService {
                     alignment: None,
                     first_action: None,
                     scheduled_for: None,
+                    owner_type: payload.owner_type,
                 })
                 .await?;
             task.resurface_on = resurface_on;
             planning_repo::update_task(&self.db, &task).await?
         };
+        if task.owner_type == OwnerType::Opp {
+            self.create_waiting_for_opp(&task, payload.waiting_person)
+                .await?;
+        }
 
         Ok(GuidedCaptureResponse {
             message: "Captured".to_string(),
@@ -262,6 +270,22 @@ impl CaptureService {
             });
         }
         Ok(Some(task))
+    }
+
+    async fn create_waiting_for_opp(
+        &self,
+        task: &Task,
+        person: Option<String>,
+    ) -> Result<(), ServiceError> {
+        WaitingService::new(self.db.clone())
+            .create_waiting_on(WaitingOnCreate {
+                description: task.verb_noun.clone(),
+                person,
+                project_id: task.project_id,
+                last_followup: None,
+            })
+            .await?;
+        Ok(())
     }
 }
 
@@ -442,6 +466,8 @@ mod tests {
                 block_type: None,
                 duration_minutes: None,
                 frog: false,
+                owner_type: Default::default(),
+                waiting_person: None,
             })
             .await
             .expect("guided capture");
@@ -482,6 +508,8 @@ mod tests {
                 block_type: None,
                 duration_minutes: None,
                 frog: false,
+                owner_type: Default::default(),
+                waiting_person: None,
             })
             .await
             .expect_err("validation error");

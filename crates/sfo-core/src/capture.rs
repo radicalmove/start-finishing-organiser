@@ -1,7 +1,7 @@
 use chrono::NaiveDate;
 use serde::{Deserialize, Serialize};
 
-use crate::{BlockType, Project, ProjectCategory, ProjectId, Task, TaskId, WhenBucket};
+use crate::{BlockType, OwnerType, Project, ProjectCategory, ProjectId, Task, TaskId, WhenBucket};
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -109,6 +109,10 @@ pub struct GuidedCaptureRequest {
     pub duration_minutes: Option<i64>,
     #[serde(default)]
     pub frog: bool,
+    #[serde(default)]
+    pub owner_type: OwnerType,
+    #[serde(default)]
+    pub waiting_person: Option<String>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

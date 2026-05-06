@@ -1,7 +1,7 @@
 use chrono::{DateTime, NaiveDate, Utc};
 use sfo_core::{
-    Page, Project, ProjectCategory, ProjectCreate, ProjectId, ProjectStatus, Task, TaskCreate,
-    TaskId, TaskStatus, INBOX_INTENT_UNPROCESSED,
+    OwnerType, Page, Project, ProjectCategory, ProjectCreate, ProjectId, ProjectStatus, Task,
+    TaskCreate, TaskId, TaskStatus, INBOX_INTENT_UNPROCESSED,
 };
 use sqlx::FromRow;
 use std::str::FromStr;
@@ -161,9 +161,9 @@ pub async fn create_task(pool: &sqlx::SqlitePool, payload: TaskCreate) -> Result
         INSERT INTO tasks (
             id, project_id, verb_noun, description, in_inbox, archived_from_inbox,
             intake_intent, intake_container, when_bucket, block_type, duration_minutes,
-            priority, frog, alignment, first_action, status, scheduled_for
+            priority, frog, alignment, first_action, status, scheduled_for, owner_type
         )
-        VALUES (?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         "#,
     )
     .bind(id.to_string())
@@ -182,6 +182,7 @@ pub async fn create_task(pool: &sqlx::SqlitePool, payload: TaskCreate) -> Result
     .bind(payload.first_action)
     .bind(TaskStatus::Pending.as_str())
     .bind(scheduled_for)
+    .bind(payload.owner_type.as_str())
     .execute(pool)
     .await?;
 
@@ -244,7 +245,7 @@ pub async fn update_task(pool: &sqlx::SqlitePool, task: &Task) -> Result<Task, D
             archived_from_inbox = ?, intake_intent = ?, intake_container = ?,
             intake_processed_at = ?, when_bucket = ?, block_type = ?, duration_minutes = ?,
             priority = ?, frog = ?, alignment = ?, first_action = ?, status = ?,
-            scheduled_for = ?, resurface_on = ?, completed_at = ?, updated_at = ?
+            scheduled_for = ?, owner_type = ?, resurface_on = ?, completed_at = ?, updated_at = ?
         WHERE id = ?
         "#,
     )
@@ -265,6 +266,7 @@ pub async fn update_task(pool: &sqlx::SqlitePool, task: &Task) -> Result<Task, D
     .bind(&task.first_action)
     .bind(task.status.as_str())
     .bind(scheduled_for)
+    .bind(task.owner_type.as_str())
     .bind(resurface_on)
     .bind(completed_at)
     .bind(now_text())
@@ -345,6 +347,7 @@ pub(crate) struct TaskRow {
     first_action: Option<String>,
     status: String,
     scheduled_for: Option<String>,
+    owner_type: String,
     resurface_on: Option<String>,
     completed_at: Option<String>,
     created_at: String,
@@ -374,6 +377,7 @@ impl TryFrom<TaskRow> for Task {
             first_action: row.first_action,
             status: parse_enum(&row.status)?,
             scheduled_for: parse_optional_date(row.scheduled_for)?,
+            owner_type: parse_enum(&row.owner_type).unwrap_or(OwnerType::Mine),
             resurface_on: parse_optional_date(row.resurface_on)?,
             completed_at: parse_optional_datetime(row.completed_at)?,
             created_at: parse_datetime(&row.created_at)?,
@@ -553,6 +557,7 @@ mod tests {
                 alignment: None,
                 first_action: None,
                 scheduled_for: None,
+                owner_type: Default::default(),
             },
         )
         .await

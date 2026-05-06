@@ -160,6 +160,9 @@ impl PlanningService {
                 other => task.status = other,
             }
         }
+        if let Some(owner_type) = payload.owner_type {
+            task.owner_type = owner_type;
+        }
 
         repo::update_task(&self.db, &task).await.map_err(Into::into)
     }
@@ -210,6 +213,7 @@ impl PlanningService {
             alignment: None,
             first_action: None,
             scheduled_for: None,
+            owner_type: Default::default(),
         })
         .await
     }
