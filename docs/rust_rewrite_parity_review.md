@@ -17,11 +17,12 @@ The Rust branch currently has:
 - Inbox container API with quick routing to Learning/Enjoy/Park, undo, recycle, restore, and container item lists.
 - Guided capture API with task/project creation, source inbox intent handling, support-project task conversion, and source-to-project archiving.
 - Waiting On / OPP API with task owner type, create/list/update/resolve, and guided capture integration.
+- API token auth with public auth-status discovery, env-based server config, and Mac mini deployment runbook.
 - Python SQLite dry-run import and real import for projects/tasks/blocks/waiting_on.
 - Rust database backup file creation before import writes.
 - Backup manifest endpoint for current Rust tables.
 
-This is a good foundation, but it is still backend-only. It covers the first reversible inbox-routing workflow, guided processing API, and Waiting On/OPP storage, but not the native client UX or private-network deployment posture.
+This is a good foundation, but it is still backend-only. It covers the first reversible inbox-routing workflow, guided processing API, Waiting On/OPP storage, and basic private-network server posture, but not the native client UX.
 
 ## Product Parity Matrix
 
@@ -41,7 +42,7 @@ This is a good foundation, but it is still backend-only. It covers the first rev
 | Health | Full health/training module | Not covered | Medium | Large independent slice; do not block first Mac/iPhone planning app. |
 | Coach/guidance | Chat, nudges, reminders, pattern detection | Not covered | Medium | Defer until core workflows are stable. |
 | Export | ZIP with JSON/CSV, checksums, SQLite snapshot | Backup manifest only | High for safety | Expand after more Rust tables exist. |
-| Auth/deployment | Optional auth in Python wrapper | Not covered in Rust | High for Mac mini/iPhone | Add before any real multi-device use. |
+| Auth/deployment | Optional auth in Python wrapper | API token guard, auth status endpoint, and Mac mini runbook | High for Mac mini/iPhone | Covered enough for private LAN development; add richer sessions later only if needed. |
 
 ## UX Review Targets
 
@@ -57,26 +58,42 @@ The iPhone client should be reviewed against these same workflows. It should not
 
 ## Recommended Next Slices
 
-### 1. Auth And Mac Mini Deployment
+### 1. Native Client UX Review And Shell
 
-Before real phone use, the Rust server needs private-network auth and deployment basics:
-
-- User/session token or API token model.
-- Server config file or env contract.
-- Launch service/runbook for the Mac mini.
-- Backup location policy.
-- A safe iPhone connection story for local-network use.
-
-This should come before native client work because the iPhone app needs a stable and private server target.
-
-### 2. Native Client UX Review And Shell
-
-After deployment basics, review and build the first Mac/iPhone client shell against real workflows:
+Review and build the first Mac/iPhone client shell against real workflows:
 
 - Server connection settings.
 - Login/auth setup.
 - Bootstrap/Home view.
 - Quick capture, guided processing, Today, and Waiting On.
+
+### 2. Home/Today API Gaps
+
+After the first client shell exposes the real interaction shape, fill the missing Home/Today behavior:
+
+- One Thing and Frog data support.
+- Waiting On summary in bootstrap.
+- Ritual/check-in state if it improves the Today workflow.
+- Any missing task/block fields discovered by the UX pass.
+
+## Completed Slice: Auth And Mac Mini Deployment
+
+This slice added the minimum private-network posture needed before Mac/iPhone clients start using the Rust server as shared infrastructure.
+
+Minimum scope delivered:
+
+- `SFO_RUST_API_TOKEN` env config.
+- Bearer-token and `x-sfo-api-token` request support for `/api/v1/*`.
+- Public `GET /api/v1/auth/status` so clients can discover whether auth is required.
+- Public `/healthz` for local service monitoring.
+- Mac mini deployment notes in `docs/rust_mac_mini_deployment.md`.
+
+Out of scope:
+
+- Multi-user sessions.
+- TLS or direct internet exposure.
+- Rate limiting.
+- Installing or loading the launchd service on the actual Mac mini.
 
 ## Completed Slice: Bootstrap/Home Summary API
 
@@ -196,4 +213,4 @@ Out of scope for the first Blocks slice:
 
 ## Current Recommendation
 
-The next coding slice should be **Auth And Mac Mini Deployment**. The Rust backend now has enough core planning/capture data to justify hardening how it will run privately on the Mac mini and be reached by the future iPhone app.
+The next coding slice should be **Native Client UX Review And Shell**. The Rust backend now has enough core planning/capture data and basic private-network auth posture to justify building the first client surface, then using that UX review to decide which Home/Today gaps matter most.

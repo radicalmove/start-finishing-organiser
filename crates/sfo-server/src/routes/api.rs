@@ -37,6 +37,11 @@ struct ErrorBody {
     detail: String,
 }
 
+#[derive(Debug, Serialize)]
+struct AuthStatusBody {
+    auth_required: bool,
+}
+
 #[derive(Debug)]
 struct ApiError {
     status: StatusCode,
@@ -96,6 +101,7 @@ impl From<ServiceError> for ApiError {
 
 pub fn router() -> Router<AppState> {
     Router::new()
+        .route("/auth/status", get(auth_status))
         .route("/bootstrap", get(bootstrap))
         .route("/projects", get(list_projects).post(create_project))
         .route(
@@ -129,6 +135,12 @@ pub fn router() -> Router<AppState> {
         )
         .route("/import/python-sqlite", post(import_python_sqlite))
         .route("/export/backup", post(export_backup))
+}
+
+async fn auth_status(State(state): State<AppState>) -> Json<AuthStatusBody> {
+    Json(AuthStatusBody {
+        auth_required: state.auth_required(),
+    })
 }
 
 async fn bootstrap(

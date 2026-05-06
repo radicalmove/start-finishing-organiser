@@ -14,8 +14,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     run_migrations(&db).await?;
 
     let listener = tokio::net::TcpListener::bind(&config.bind_addr).await?;
-    tracing::info!(bind_addr = %config.bind_addr, "starting SFO Rust server");
+    let state = AppState::new(db);
+    let state = if let Some(api_token) = config.api_token {
+        state.with_api_token(api_token)
+    } else {
+        tracing::warn!("SFO_RUST_API_TOKEN is not set; /api/v1 is open");
+        state
+    };
+    tracing::info!(
+        bind_addr = %config.bind_addr,
+        auth_required = state.auth_required(),
+        "starting SFO Rust server"
+    );
 
-    axum::serve(listener, build_router(AppState::new(db))).await?;
+    axum::serve(listener, build_router(state)).await?;
     Ok(())
 }

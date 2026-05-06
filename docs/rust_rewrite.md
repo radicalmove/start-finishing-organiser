@@ -12,6 +12,7 @@ The Rust rewrite lives beside the current Python app while feature parity is bui
 ## Current API
 
 - `GET /healthz`
+- `GET /api/v1/auth/status`
 - `GET /api/v1/bootstrap`
 - `GET /api/v1/projects`
 - `POST /api/v1/projects`
@@ -84,6 +85,16 @@ Unsupported Python tables are still reported as warnings and are not imported in
 
 The endpoint defaults to server date/time and accepts optional `date=YYYY-MM-DD` and `time=HH:MM:SS` query parameters for deterministic clients and tests.
 
+## Auth And Server Config
+
+Rust server configuration is environment-first:
+
+- `SFO_RUST_BIND`: bind address, default `127.0.0.1:8088`.
+- `SFO_RUST_DATABASE_URL`: SQLite URL, default `sqlite://sfo-rust.db`.
+- `SFO_RUST_API_TOKEN`: optional API token. When set, every `/api/v1/*` route except `/api/v1/auth/status` requires `Authorization: Bearer <token>` or `x-sfo-api-token: <token>`.
+
+`GET /healthz` is always unauthenticated so launch agents and local monitors can check process health. `GET /api/v1/auth/status` is also public and returns whether API auth is required; it does not reveal the token.
+
 ## Inbox Containers
 
 The first Rust inbox-processing slice keeps the approved Python semantics for reversible low-friction routing:
@@ -138,6 +149,8 @@ Run the Rust server locally:
 SFO_RUST_DATABASE_URL=sqlite://sfo-rust.db cargo run -p sfo-server
 curl http://127.0.0.1:8088/healthz
 ```
+
+See `docs/rust_mac_mini_deployment.md` for the private Mac mini runbook.
 
 ## Notes
 
