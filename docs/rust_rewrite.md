@@ -8,7 +8,7 @@ The Rust rewrite lives beside the current Python app while feature parity is bui
 - `crates/sfo-db`: SQLite connection and migrations.
 - `crates/sfo-server`: Axum server shell.
 - `crates/sfo-services`: use-case rules for projects, tasks, blocks, inbox processing, guided capture, and Waiting On.
-- `src-tauri/launcher`: first static Rust client shell for server connection, auth, Home/Today summary, quick capture, and first-pass inbox processing.
+- `src-tauri/launcher`: first static Rust client shell for server connection, auth, Home/Today summary, quick capture, inbox processing, and inline guided inbox conversion.
 
 ## Current API
 
@@ -123,6 +123,7 @@ Current shell behavior:
 - Waiting On and ritual status summaries.
 - Quick capture to `POST /api/v1/inbox/quick-capture`.
 - Inbox processing list from `GET /api/v1/inbox/containers` with Learning, Enjoy, Park, and Recycle actions.
+- Inline guided conversion from inbox item to task, project, or OPP/Waiting On item through `POST /api/v1/capture/guided`.
 - No automatic Python backend spawn unless `SFO_SPAWN_BACKEND=1` is explicitly set.
 - Server CORS preflight support for Tauri production origins.
 
@@ -153,6 +154,9 @@ The first Rust inbox-processing slice keeps the approved Python semantics for re
 - Convert a source inbox item into an actionable support-project task only when an existing `project_id` is supplied.
 - Mark a source inbox item as processed/archived when it becomes a new project.
 - Create a Waiting On item when `owner_type` is `opp`, using `waiting_person` when supplied.
+
+The current shell exposes this as an inline clarification form under each unprocessed inbox row.
+Task and OPP conversions require an existing project selection because the backend protects against turning inbox material into free-floating work.
 
 ## Waiting On / OPP
 

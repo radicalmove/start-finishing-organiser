@@ -182,6 +182,58 @@ export function buildInboxProcessingViewModel(containers) {
   };
 }
 
+export function buildProjectOptions(projectPage) {
+  return (projectPage?.items || []).map((project) => ({
+    id: project.id,
+    label: compactJoin([
+      project.title || "Untitled project",
+      project.category,
+      project.active_this_week ? "this week" : "",
+    ]),
+  }));
+}
+
+export function buildGuidedCapturePayload(decision, sourceTaskId, values) {
+  const title = optionalText(values.capture_text) || "";
+  const payload = {
+    capture_text: title,
+    item_kind: decision === "project" ? "project" : "task",
+    source_task_id: sourceTaskId,
+    inbox_intent: "support_project",
+    horizon: values.horizon || "week",
+    displacement_ack: Boolean(values.displacement_ack),
+  };
+
+  setOptional(payload, "description", values.description);
+
+  if (decision === "project") {
+    payload.category = values.category || "work";
+    setOptional(payload, "target_date", values.target_date);
+    payload.include_this_week = Boolean(values.include_this_week);
+    payload.verb_check_ack = Boolean(values.verb_check_ack);
+    return payload;
+  }
+
+  setOptional(payload, "project_id", values.project_id);
+  setOptional(payload, "block_type", values.block_type);
+  const duration = positiveInteger(values.duration_minutes);
+  if (duration) {
+    payload.duration_minutes = duration;
+  }
+  if (values.frog) {
+    payload.frog = true;
+  }
+
+  if (decision === "opp") {
+    payload.owner_type = "opp";
+    setOptional(payload, "waiting_person", values.waiting_person);
+  } else {
+    payload.owner_type = "mine";
+  }
+
+  return payload;
+}
+
 function blockView(block) {
   return {
     title: block.title || titleCase(`${block.block_type || "time"} block`),
@@ -195,6 +247,23 @@ function compactJoin(values, separator = " · ") {
     .map((value) => String(value || "").trim())
     .filter(Boolean)
     .join(separator);
+}
+
+function optionalText(value) {
+  const text = String(value || "").trim();
+  return text || null;
+}
+
+function setOptional(target, key, value) {
+  const text = optionalText(value);
+  if (text) {
+    target[key] = text;
+  }
+}
+
+function positiveInteger(value) {
+  const number = Number.parseInt(String(value || ""), 10);
+  return Number.isFinite(number) && number > 0 ? number : null;
 }
 
 function trimSeconds(value) {

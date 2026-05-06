@@ -1,5 +1,7 @@
 import {
+  buildGuidedCapturePayload,
   buildInboxProcessingViewModel,
+  buildProjectOptions,
   buildBootstrapViewModel,
   clearSettings,
   loadSettings,
@@ -12,6 +14,23 @@ const INBOX_ROUTE_ACTIONS = {
   enjoy_recover: "Enjoy",
   park_let_go: "Park",
 };
+
+const HORIZON_OPTIONS = [
+  ["week", "This week"],
+  ["today", "Today"],
+  ["month", "This month"],
+  ["quarter", "This quarter"],
+  ["year", "This year"],
+  ["later", "Later"],
+];
+
+const BLOCK_TYPE_OPTIONS = [
+  ["", "No block type"],
+  ["focus", "Focus"],
+  ["admin", "Admin"],
+  ["social", "Social"],
+  ["recovery", "Recovery"],
+];
 
 const elements = {
   statusDot: document.getElementById("status-dot"),
@@ -73,12 +92,16 @@ async function connectAndLoad() {
       throw new Error("This server requires an API token.");
     }
 
-    const [summary, inboxContainers] = await Promise.all([
+    const [summary, inboxContainers, projectsPage] = await Promise.all([
       requestJson(window.fetch.bind(window), settings, "/api/v1/bootstrap"),
       requestJson(window.fetch.bind(window), settings, "/api/v1/inbox/containers"),
+      requestJson(window.fetch.bind(window), settings, "/api/v1/projects?page=1&page_size=100"),
     ]);
     renderDashboard(buildBootstrapViewModel(summary));
-    renderInboxProcessing(buildInboxProcessingViewModel(inboxContainers));
+    renderInboxProcessing(
+      buildInboxProcessingViewModel(inboxContainers),
+      buildProjectOptions(projectsPage),
+    );
     setConnectionState(
       "ready",
       auth?.auth_required ? "Connected with API token" : "Connected without auth",
@@ -126,7 +149,7 @@ function renderDashboard(model) {
   renderBlocks(elements.todayBlocks, model.todayBlocks);
 }
 
-function renderInboxProcessing(model) {
+function renderInboxProcessing(model, projectOptions = []) {
   elements.inboxItems.replaceChildren();
   if (!model.items.length) {
     elements.inboxItems.append(emptyState("Inbox is clear. Capture something when it appears."));
@@ -168,8 +191,183 @@ function renderInboxProcessing(model) {
     recycle.textContent = "Recycle";
     actions.append(recycle);
 
-    row.append(body, actions);
+    row.append(body, actions, guidedCaptureDetails(item, projectOptions));
     elements.inboxItems.append(row);
+  }
+}
+
+function guidedCaptureDetails(item, projectOptions) {
+  const details = document.createElement("details");
+  details.className = "guided-details";
+
+  const summary = document.createElement("summary");
+  summary.textContent = "Clarify into Task / Project / OPP";
+
+  const form = document.createElement("form");
+  form.className = "guided-form";
+  form.dataset.sourceTaskId = item.id;
+
+  form.append(
+    formField(
+      "Decision",
+      selectInput("decision", [
+        ["task", "Task in a project"],
+        ["project", "New project"],
+        ["opp", "OPP / Waiting On"],
+      ]),
+    ),
+    formField("Title", textInput("capture_text", item.title, "Action title")),
+    formField(
+      "Notes",
+      textAreaInput(
+        "description",
+        item.description === "No notes yet." ? "" : item.description,
+        "Useful context, constraints, or first thoughts",
+      ),
+    ),
+    formField("Existing project", projectSelect(projectOptions), "support-project-only"),
+    formField("Horizon", selectInput("horizon", HORIZON_OPTIONS)),
+    formField("Block type", selectInput("block_type", BLOCK_TYPE_OPTIONS), "task-only"),
+    formField(
+      "Minutes",
+      textInput("duration_minutes", "", "Optional", "number"),
+      "task-only",
+    ),
+    checkboxField("Mark as frog", "frog", false, "task-only"),
+    formField(
+      "Project category",
+      selectInput("category", [
+        ["work", "Work"],
+        ["personal", "Personal"],
+      ]),
+      "project-only",
+    ),
+    formField("Target date", textInput("target_date", "", "YYYY-MM-DD", "date"), "project-only"),
+    checkboxField("Include this project this week", "include_this_week", true, "project-only"),
+    checkboxField("Allow non-action project title", "verb_check_ack", false, "project-only"),
+    formField(
+      "Waiting person",
+      textInput("waiting_person", "", "Who owns the next move?"),
+      "opp-only",
+    ),
+    checkboxField("I have checked this deserves time or attention", "displacement_ack", true),
+  );
+
+  const actions = document.createElement("div");
+  actions.className = "guided-actions";
+  const submit = document.createElement("button");
+  submit.className = "primary-button";
+  submit.type = "submit";
+  submit.textContent = "Save decision";
+  actions.append(submit);
+  form.append(actions);
+
+  details.append(summary, form);
+  syncGuidedForm(form);
+  return details;
+}
+
+function formField(labelText, control, className = "") {
+  const label = document.createElement("label");
+  label.className = className;
+  const labelSpan = document.createElement("span");
+  labelSpan.textContent = labelText;
+  label.append(labelSpan, control);
+  return label;
+}
+
+function checkboxField(labelText, name, checked, className = "") {
+  const label = document.createElement("label");
+  label.className = `checkbox-field ${className}`.trim();
+  const input = document.createElement("input");
+  input.type = "checkbox";
+  input.name = name;
+  input.checked = checked;
+  if (name === "displacement_ack") {
+    input.required = true;
+  }
+  const text = document.createElement("span");
+  text.textContent = labelText;
+  label.append(input, text);
+  return label;
+}
+
+function textInput(name, value, placeholder, type = "text") {
+  const input = document.createElement("input");
+  input.name = name;
+  input.type = type;
+  input.value = value || "";
+  input.placeholder = placeholder || "";
+  if (name === "capture_text") {
+    input.required = true;
+  }
+  return input;
+}
+
+function textAreaInput(name, value, placeholder) {
+  const textarea = document.createElement("textarea");
+  textarea.name = name;
+  textarea.value = value || "";
+  textarea.placeholder = placeholder || "";
+  return textarea;
+}
+
+function selectInput(name, options) {
+  const select = document.createElement("select");
+  select.name = name;
+  for (const [value, label] of options) {
+    const option = document.createElement("option");
+    option.value = value;
+    option.textContent = label;
+    select.append(option);
+  }
+  return select;
+}
+
+function projectSelect(projectOptions) {
+  const select = document.createElement("select");
+  select.name = "project_id";
+
+  const empty = document.createElement("option");
+  empty.value = "";
+  empty.textContent = projectOptions.length
+    ? "Choose project"
+    : "No projects available";
+  select.append(empty);
+
+  for (const project of projectOptions) {
+    const option = document.createElement("option");
+    option.value = project.id;
+    option.textContent = project.label;
+    select.append(option);
+  }
+  return select;
+}
+
+function syncGuidedForm(form) {
+  const decision = form.elements.decision.value;
+  setSectionState(form, "project-only", decision === "project");
+  setSectionState(form, "support-project-only", decision === "task" || decision === "opp");
+  setSectionState(form, "task-only", decision === "task");
+  setSectionState(form, "opp-only", decision === "opp");
+
+  if (form.elements.project_id) {
+    form.elements.project_id.required = decision === "task" || decision === "opp";
+  }
+  if (form.elements.target_date) {
+    form.elements.target_date.required = decision === "project";
+  }
+  if (form.elements.waiting_person) {
+    form.elements.waiting_person.required = decision === "opp";
+  }
+}
+
+function setSectionState(form, className, enabled) {
+  for (const element of form.querySelectorAll(`.${className}`)) {
+    element.classList.toggle("hidden", !enabled);
+    for (const control of element.querySelectorAll("input, select, textarea")) {
+      control.disabled = !enabled;
+    }
   }
 }
 
@@ -342,6 +540,38 @@ elements.inboxItems.addEventListener("click", async (event) => {
     setConnectionState("error", "Inbox action failed", err.message);
   } finally {
     button.disabled = false;
+  }
+});
+
+elements.inboxItems.addEventListener("change", (event) => {
+  if (!event.target.matches('select[name="decision"]')) return;
+  syncGuidedForm(event.target.closest("form"));
+});
+
+elements.inboxItems.addEventListener("submit", async (event) => {
+  const form = event.target.closest(".guided-form");
+  if (!form) return;
+  event.preventDefault();
+
+  const values = Object.fromEntries(new FormData(form).entries());
+  const payload = buildGuidedCapturePayload(
+    values.decision,
+    form.dataset.sourceTaskId,
+    values,
+  );
+  const submit = form.querySelector('button[type="submit"]');
+
+  submit.disabled = true;
+  try {
+    await requestJson(window.fetch.bind(window), settings, "/api/v1/capture/guided", {
+      method: "POST",
+      body: payload,
+    });
+    await connectAndLoad();
+  } catch (err) {
+    setConnectionState("error", "Guided capture failed", err.message);
+  } finally {
+    submit.disabled = false;
   }
 });
 

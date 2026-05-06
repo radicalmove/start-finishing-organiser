@@ -18,7 +18,7 @@ The Rust branch currently has:
 - Guided capture API with task/project creation, source inbox intent handling, support-project task conversion, and source-to-project archiving.
 - Waiting On / OPP API with task owner type, create/list/update/resolve, and guided capture integration.
 - API token auth with public auth-status discovery, env-based server config, and Mac mini deployment runbook.
-- First static Tauri client shell with server settings, API token auth, Bootstrap/Home rendering, quick capture, and direct inbox processing.
+- First static Tauri client shell with server settings, API token auth, Bootstrap/Home rendering, quick capture, direct inbox processing, and inline guided inbox conversion.
 - Home/Today daily context with One Thing/Frog, ritual status, Waiting On counts, and shell editing for daily focus.
 - Python SQLite dry-run import and real import for projects/tasks/blocks/waiting_on.
 - Rust database backup file creation before import writes.
@@ -33,8 +33,8 @@ This is a good foundation and now has a first reviewable client surface. It cove
 | Projects | Weekly focus, long-range planning, success cues, roadmaps | Core CRUD and weekly cap | High | Keep extending through long-range/project success fields after daily workflow primitives exist. |
 | Tasks | Time/project board, lifecycle, inbox flags, completion/archive history | Core CRUD and lifecycle | High | Covered enough for the next client/bootstrap slice. |
 | Quick capture | Modal and capture page can send undecided items to Inbox | API quick capture and first shell form | High | Covered enough for the next UX pass. |
-| Guided capture | Wizard decides task/project/inbox/OPP and routes source inbox items | Backend task/project/source processing API, including OPP waiting item creation | Very high | Add the full native wizard after direct routing is proven in the shell. |
-| Inbox containers | Learning, Enjoy, Parked, Recycle bin, undo, metrics | Backend route/recycle/restore/containers API and first shell processing panel | Very high | Continue with task/project/OPP conversion UI; add undo UI if routing mistakes are common. |
+| Guided capture | Wizard decides task/project/inbox/OPP and routes source inbox items | Backend task/project/source processing API, including OPP waiting item creation, plus first inline shell form | Very high | Review the workflow in real use before making it a polished Mac/iPhone wizard. |
+| Inbox containers | Learning, Enjoy, Parked, Recycle bin, undo, metrics | Backend route/recycle/restore/containers API and first shell processing panel | Very high | Add undo UI if routing mistakes are common during hands-on review. |
 | Blocks/calendar | Focus/Admin/Social/Recovery blocks, appointments, week calendar | Core API, import, backup | Very high | Covered enough for a Bootstrap/Home summary slice; UI and external calendars are still pending. |
 | Home/Today | Inbox, Today calendar, Now strip, One Thing/Frog, Today tasks | Bootstrap summary, first shell rendering, daily focus, ritual status, and Waiting On counts | Very high | Covered enough for a hands-on UX pass; fuller ritual flows can follow if useful. |
 | Weekly review | 4+3 focus, resurfacing, block planning, archive completed | Not covered | High | Port after Home primitives; depends on projects, tasks, blocks, resurface. |
@@ -60,22 +60,23 @@ The iPhone client should be reviewed against these same workflows. It should not
 
 ## Recommended Next Slices
 
-### 1. Native Guided Task/Project/OPP Wizard
-
-Extend the first direct-routing inbox panel into the full decision flow:
-
-- Process inbox item into task/project/container/OPP.
-- Preserve the low-friction Learning/Enjoy/Park actions already in the shell.
-- Keep the phone flow capture-first, not desktop-compressed.
-
-### 2. Hands-On Client UX Review
+### 1. Hands-On Client UX Review
 
 Use the current shell against seeded or imported data and review the actual daily workflow:
 
 - Does Now/One Thing/Frog make the next action obvious?
+- Does inline inbox processing feel clear or too dense?
 - Are Waiting On and ritual summaries useful or just noise?
 - What must be visible on iPhone versus Mac?
 - Which missing backend fields are proven by real use?
+
+### 2. Native Guided Processing Polish
+
+Refine the inbox decision flow based on hands-on review:
+
+- Turn the inline form into a clearer stepped flow if needed.
+- Keep the low-friction Learning/Enjoy/Park actions.
+- Add mistake recovery in the UI if undo/restore proves necessary.
 
 ## Completed Slice: Home/Today API Gaps
 
@@ -115,6 +116,26 @@ Out of scope:
 - Undo/restore UI, though the backend endpoints already exist.
 - Multi-step phone-specific processing flow.
 - Rich route confirmation or mistake-recovery affordances.
+
+## Completed Slice: Native Guided Task/Project/OPP Form
+
+This slice connected the Rust shell to the existing guided processing backend.
+
+Minimum scope delivered:
+
+- Shell fetches active projects for guided inbox conversion.
+- Each unprocessed inbox row has an inline clarification form.
+- Inbox rows can be converted into project-linked tasks.
+- Inbox rows can become new projects with target date/category/week controls.
+- Inbox rows can become OPP/Waiting On task items with a waiting person.
+- Launcher client tests cover project-option mapping and guided payload construction.
+
+Out of scope:
+
+- Polished multi-step Mac/iPhone wizard.
+- Client-side suggestion heuristics for task vs project.
+- Creating a new project and a task under it in one flow.
+- Undo/restore affordance in the shell.
 
 ## Completed Slice: Native Client UX Review And Shell
 
@@ -275,4 +296,4 @@ Out of scope for the first Blocks slice:
 
 ## Current Recommendation
 
-The next coding slice should be **Native Guided Task/Project/OPP Wizard**. The shell can now handle reversible direct routing; the remaining gap is turning an inbox item into a clarified task, project, or Waiting On/OPP item without falling back to the Python UI.
+The next step should be a **Hands-On Client UX Review** using the Rust shell with real or seeded data. The shell now covers Home/Today, quick capture, direct inbox routing, and first-pass guided conversion, so the next useful work is identifying which workflow feels wrong before polishing the Mac/iPhone client shape.

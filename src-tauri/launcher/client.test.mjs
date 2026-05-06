@@ -3,8 +3,10 @@ import test from "node:test";
 
 import {
   DEFAULT_SERVER_URL,
+  buildGuidedCapturePayload,
   buildInboxProcessingViewModel,
   buildJsonHeaders,
+  buildProjectOptions,
   buildBootstrapViewModel,
   loadSettings,
   normalizeServerUrl,
@@ -189,4 +191,94 @@ test("inbox processing view model exposes actionable unprocessed items", () => {
     meta: "Captured 2026-05-06T09:00:00Z",
   });
   assert.equal(model.items[1].title, "Untitled inbox item");
+});
+
+test("project options preserve active project ids and labels", () => {
+  const options = buildProjectOptions({
+    items: [
+      { id: "project-1", title: "Ship Rust shell", category: "work", active_this_week: true },
+      { id: "project-2", title: "", category: "personal", active_this_week: false },
+    ],
+  });
+
+  assert.deepEqual(options, [
+    { id: "project-1", label: "Ship Rust shell · work · this week" },
+    { id: "project-2", label: "Untitled project · personal" },
+  ]);
+});
+
+test("guided capture payload converts an inbox item into a project task", () => {
+  const payload = buildGuidedCapturePayload("task", "task-1", {
+    capture_text: "Draft Rust wizard",
+    description: "Use existing guided API",
+    project_id: "project-1",
+    horizon: "month",
+    block_type: "focus",
+    duration_minutes: "45",
+    frog: "on",
+    displacement_ack: "on",
+  });
+
+  assert.deepEqual(payload, {
+    capture_text: "Draft Rust wizard",
+    description: "Use existing guided API",
+    item_kind: "task",
+    source_task_id: "task-1",
+    inbox_intent: "support_project",
+    project_id: "project-1",
+    horizon: "month",
+    block_type: "focus",
+    duration_minutes: 45,
+    frog: true,
+    owner_type: "mine",
+    displacement_ack: true,
+  });
+});
+
+test("guided capture payload converts an inbox item into a project", () => {
+  const payload = buildGuidedCapturePayload("project", "task-1", {
+    capture_text: "Plan family trip",
+    description: "",
+    category: "personal",
+    horizon: "quarter",
+    target_date: "2026-08-01",
+    include_this_week: "on",
+    verb_check_ack: "on",
+    displacement_ack: "on",
+  });
+
+  assert.deepEqual(payload, {
+    capture_text: "Plan family trip",
+    item_kind: "project",
+    source_task_id: "task-1",
+    inbox_intent: "support_project",
+    category: "personal",
+    horizon: "quarter",
+    target_date: "2026-08-01",
+    include_this_week: true,
+    verb_check_ack: true,
+    displacement_ack: true,
+  });
+});
+
+test("guided capture payload converts an inbox item into an opp waiting item", () => {
+  const payload = buildGuidedCapturePayload("opp", "task-1", {
+    capture_text: "Review Sam's budget",
+    project_id: "project-1",
+    horizon: "week",
+    waiting_person: "Sam",
+    displacement_ack: "on",
+  });
+
+  assert.deepEqual(payload, {
+    capture_text: "Review Sam's budget",
+    item_kind: "task",
+    source_task_id: "task-1",
+    inbox_intent: "support_project",
+    project_id: "project-1",
+    horizon: "week",
+    owner_type: "opp",
+    waiting_person: "Sam",
+    displacement_ack: true,
+  });
 });
