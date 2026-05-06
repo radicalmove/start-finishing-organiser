@@ -118,6 +118,47 @@ async fn bootstrap_endpoint_returns_home_summary_contract() {
     .await;
     assert_eq!(next_status, StatusCode::CREATED);
 
+    let (focus_status, focus) = request_json(
+        app.clone(),
+        Method::PUT,
+        "/api/v1/daily-focus",
+        json!({
+            "date": "2026-05-06",
+            "one_thing": "Ship the Rust client shell",
+            "frog": "Make the first uncomfortable call"
+        }),
+    )
+    .await;
+    assert_eq!(focus_status, StatusCode::OK);
+    assert_eq!(focus["one_thing"], "Ship the Rust client shell");
+    assert_eq!(focus["frog"], "Make the first uncomfortable call");
+
+    let (waiting_today_status, _waiting_today) = request_json(
+        app.clone(),
+        Method::POST,
+        "/api/v1/waiting",
+        json!({
+            "description": "Waiting on Sam",
+            "person": "Sam",
+            "last_followup": "2026-05-06"
+        }),
+    )
+    .await;
+    assert_eq!(waiting_today_status, StatusCode::CREATED);
+
+    let (waiting_later_status, _waiting_later) = request_json(
+        app.clone(),
+        Method::POST,
+        "/api/v1/waiting",
+        json!({
+            "description": "Waiting on Alex",
+            "person": "Alex",
+            "last_followup": "2026-05-09"
+        }),
+    )
+    .await;
+    assert_eq!(waiting_later_status, StatusCode::CREATED);
+
     let (status, body) = request_json(
         app,
         Method::GET,
@@ -135,6 +176,21 @@ async fn bootstrap_endpoint_returns_home_summary_contract() {
     assert_eq!(body["today_blocks"].as_array().unwrap().len(), 2);
     assert_eq!(body["current_block"]["title"], "Current");
     assert_eq!(body["next_block"]["title"], "Next");
+    assert_eq!(
+        body["daily_focus"]["one_thing"],
+        "Ship the Rust client shell"
+    );
+    assert_eq!(
+        body["daily_focus"]["frog"],
+        "Make the first uncomfortable call"
+    );
+    assert_eq!(body["rituals"]["morning"], true);
+    assert_eq!(body["rituals"]["midday"], false);
+    assert_eq!(body["rituals"]["evening"], false);
+    assert_eq!(body["rituals"]["next_key"], "midday");
+    assert_eq!(body["waiting"]["total"], 2);
+    assert_eq!(body["waiting"]["due"], 1);
+    assert_eq!(body["waiting"]["overdue"], 0);
     assert_eq!(body["system"]["database_status"], "ok");
     assert!(body["system"]["import_supported_tables"]
         .as_array()

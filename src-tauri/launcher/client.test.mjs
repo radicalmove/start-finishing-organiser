@@ -94,6 +94,22 @@ test("bootstrap view model favors current work and bounded counts", () => {
       block_type: "focus",
     },
     next_block: null,
+    daily_focus: {
+      one_thing: "Ship the Rust client shell",
+      frog: "Make the first uncomfortable call",
+    },
+    rituals: {
+      morning: true,
+      midday: false,
+      evening: false,
+      next_key: "midday",
+      next_label: "Midday reset",
+    },
+    waiting: {
+      total: 2,
+      due: 1,
+      overdue: 0,
+    },
     system: {
       database_status: "ok",
       schema: "sfo-rust-foundation",
@@ -108,4 +124,32 @@ test("bootstrap view model favors current work and bounded counts", () => {
   assert.equal(model.inboxTotal, 15);
   assert.equal(model.todayTasks[0].meta, "focus · Frog");
   assert.equal(model.weeklyProjects[0].title, "Ship client shell");
+  assert.equal(model.dailyFocus.oneThing, "Ship the Rust client shell");
+  assert.equal(model.dailyFocus.frog, "Make the first uncomfortable call");
+  assert.equal(model.rituals.nextLabel, "Midday reset");
+  assert.equal(model.waiting.label, "1 due");
+});
+
+test("bootstrap view model falls back to daily focus when no block is active", () => {
+  const model = buildBootstrapViewModel({
+    today: "2026-05-06",
+    current_time: "14:30:00",
+    weekly_projects: [],
+    inbox: {},
+    today_tasks: [],
+    today_blocks: [],
+    current_block: null,
+    next_block: null,
+    daily_focus: {
+      one_thing: "Write proposal",
+      frog: "Call the supplier",
+    },
+    rituals: {},
+    waiting: {},
+    system: {},
+  });
+
+  assert.equal(model.now.title, "Write proposal");
+  assert.equal(model.now.meta, "One Thing");
+  assert.equal(model.dailyFocus.frog, "Call the supplier");
 });

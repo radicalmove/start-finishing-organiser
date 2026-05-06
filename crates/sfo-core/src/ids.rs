@@ -51,6 +51,7 @@ id_type!(ProjectId);
 id_type!(TaskId);
 id_type!(BlockId);
 id_type!(WaitingId);
+id_type!(RitualId);
 
 #[cfg(test)]
 mod tests {

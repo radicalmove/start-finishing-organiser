@@ -104,6 +104,20 @@ export function buildBootstrapViewModel(summary) {
     ]),
   }));
   const todayBlocks = (summary?.today_blocks || []).map(blockView);
+  const dailyFocus = {
+    oneThing: summary?.daily_focus?.one_thing || "",
+    frog: summary?.daily_focus?.frog || "",
+  };
+  const waiting = {
+    total: Number(summary?.waiting?.total || 0),
+    due: Number(summary?.waiting?.due || 0),
+    overdue: Number(summary?.waiting?.overdue || 0),
+  };
+  waiting.label = waiting.overdue
+    ? `${waiting.overdue} overdue`
+    : waiting.due
+      ? `${waiting.due} due`
+      : `${waiting.total} waiting`;
 
   return {
     todayLabel: summary?.today || "Today",
@@ -120,12 +134,33 @@ export function buildBootstrapViewModel(summary) {
     todayBlocks,
     now: summary?.current_block
       ? blockView(summary.current_block)
-      : {
-          title: "No block active",
-          time: "",
-          meta: "Choose the next protected block.",
-        },
+      : dailyFocus.oneThing
+        ? {
+            title: dailyFocus.oneThing,
+            time: "",
+            meta: "One Thing",
+          }
+        : dailyFocus.frog
+          ? {
+              title: dailyFocus.frog,
+              time: "",
+              meta: "Frog",
+            }
+          : {
+              title: "No block active",
+              time: "",
+              meta: "Choose the next protected block.",
+            },
     next: summary?.next_block ? blockView(summary.next_block) : null,
+    dailyFocus,
+    rituals: {
+      morning: Boolean(summary?.rituals?.morning),
+      midday: Boolean(summary?.rituals?.midday),
+      evening: Boolean(summary?.rituals?.evening),
+      nextKey: summary?.rituals?.next_key || "",
+      nextLabel: summary?.rituals?.next_label || "",
+    },
+    waiting,
     systemStatus: summary?.system?.database_status || "unknown",
     schema: summary?.system?.schema || "",
   };

@@ -1,5 +1,8 @@
-use chrono::{NaiveDate, NaiveTime};
-use sfo_core::{Block, BootstrapSummary, BootstrapSystemSummary};
+use chrono::{NaiveDate, NaiveTime, Timelike};
+use sfo_core::{
+    Block, BootstrapDailyFocus, BootstrapRitualSummary, BootstrapSummary, BootstrapSystemSummary,
+    DailyFocus, DailyFocusUpdate,
+};
 
 use crate::ServiceError;
 
@@ -23,6 +26,12 @@ impl BootstrapService {
         let inbox = sfo_db::bootstrap::inbox_summary(&self.db).await?;
         let today_tasks = sfo_db::bootstrap::today_tasks(&self.db, today).await?;
         let today_blocks = sfo_db::bootstrap::today_blocks(&self.db, today).await?;
+        let daily_focus = sfo_db::ritual::daily_focus(&self.db, today).await?;
+        let rituals = ritual_summary(
+            sfo_db::ritual::completed_ritual_types(&self.db, today).await?,
+            current_time,
+        );
+        let waiting = sfo_db::bootstrap::waiting_summary(&self.db, today).await?;
         let current_block = current_time.and_then(|time| current_block(&today_blocks, time));
         let next_block = current_time.and_then(|time| next_block(&today_blocks, time));
         let backup = sfo_db::backup::backup_manifest(&self.db).await?;
@@ -45,8 +54,23 @@ impl BootstrapService {
             today_blocks,
             current_block,
             next_block,
+            daily_focus: BootstrapDailyFocus {
+                one_thing: daily_focus.one_thing,
+                frog: daily_focus.frog,
+            },
+            rituals,
+            waiting,
             system,
         })
+    }
+
+    pub async fn save_daily_focus(
+        &self,
+        today: NaiveDate,
+        payload: DailyFocusUpdate,
+    ) -> Result<DailyFocus, ServiceError> {
+        let date = payload.date.unwrap_or(today);
+        Ok(sfo_db::ritual::save_daily_focus(&self.db, date, payload).await?)
     }
 }
 
@@ -66,6 +90,72 @@ fn next_block(blocks: &[Block], time: NaiveTime) -> Option<Block> {
         .filter(|block| block.start_time.is_some_and(|start| start > time))
         .min_by_key(|block| block.start_time)
         .cloned()
+}
+
+fn ritual_summary(
+    completed: Vec<String>,
+    current_time: Option<NaiveTime>,
+) -> BootstrapRitualSummary {
+    let morning = completed.iter().any(|value| value == "morning");
+    let midday = completed.iter().any(|value| value == "midday");
+    let evening = completed.iter().any(|value| value == "evening");
+    let current_key = current_time.map_or("morning", |time| {
+        if time.hour() < 11 {
+            "morning"
+        } else if time.hour() < 16 {
+            "midday"
+        } else {
+            "evening"
+        }
+    });
+    let next_key = next_ritual_key(current_key, morning, midday, evening);
+    let next_label = next_key.map(ritual_label);
+
+    BootstrapRitualSummary {
+        morning,
+        midday,
+        evening,
+        next_key: next_key.map(str::to_string),
+        next_label: next_label.map(str::to_string),
+    }
+}
+
+fn next_ritual_key(
+    current_key: &str,
+    morning: bool,
+    midday: bool,
+    evening: bool,
+) -> Option<&'static str> {
+    let completed = |key: &str| match key {
+        "morning" => morning,
+        "midday" => midday,
+        "evening" => evening,
+        _ => false,
+    };
+    let order = ["morning", "midday", "evening"];
+    let start_index = order
+        .iter()
+        .position(|key| *key == current_key)
+        .unwrap_or_default();
+
+    if !completed(current_key) {
+        return Some(order[start_index]);
+    }
+
+    order
+        .iter()
+        .skip(start_index + 1)
+        .find(|key| !completed(key))
+        .copied()
+}
+
+fn ritual_label(key: &str) -> &'static str {
+    match key {
+        "morning" => "Morning check-in",
+        "midday" => "Midday reset",
+        "evening" => "Evening check-out",
+        _ => "Ritual",
+    }
 }
 
 #[cfg(test)]

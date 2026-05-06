@@ -63,6 +63,18 @@
           <button class="primary-button" type="submit">Capture</button>
         </form>
 
+        <form class="daily-focus-form" id="daily-focus-form">
+          <label>
+            <span>One Thing</span>
+            <input id="one-thing-input" name="one-thing" placeholder="The one thing that makes today a win" autocomplete="off" />
+          </label>
+          <label>
+            <span>Frog</span>
+            <input id="frog-input" name="frog" placeholder="The uncomfortable thing to face early" autocomplete="off" />
+          </label>
+          <button class="ghost-button" type="submit">Save focus</button>
+        </form>
+
         <div class="dashboard-grid">
           <article class="panel now-panel">
             <div class="panel-kicker">Now</div>
@@ -75,6 +87,20 @@
             <div class="panel-kicker">Inbox</div>
             <div class="big-number" id="inbox-total">0</div>
             <div class="count-grid" id="inbox-counts"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-kicker">Daily Context</div>
+            <div class="context-grid">
+              <div>
+                <span>Rituals</span>
+                <strong id="ritual-status">Not started</strong>
+              </div>
+              <div>
+                <span>Waiting On</span>
+                <strong id="waiting-summary">0 waiting</strong>
+              </div>
+            </div>
           </article>
 
           <article class="panel">

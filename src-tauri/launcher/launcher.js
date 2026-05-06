@@ -20,11 +20,16 @@ const elements = {
   todayLabel: document.getElementById("today-label"),
   quickCaptureForm: document.getElementById("quick-capture-form"),
   quickCaptureInput: document.getElementById("quick-capture-input"),
+  dailyFocusForm: document.getElementById("daily-focus-form"),
+  oneThingInput: document.getElementById("one-thing-input"),
+  frogInput: document.getElementById("frog-input"),
   nowTitle: document.getElementById("now-title"),
   nowMeta: document.getElementById("now-meta"),
   nextBlock: document.getElementById("next-block"),
   inboxTotal: document.getElementById("inbox-total"),
   inboxCounts: document.getElementById("inbox-counts"),
+  ritualStatus: document.getElementById("ritual-status"),
+  waitingSummary: document.getElementById("waiting-summary"),
   todayTasks: document.getElementById("today-tasks"),
   weeklyProjects: document.getElementById("weekly-projects"),
   todayBlocks: document.getElementById("today-blocks"),
@@ -100,9 +105,27 @@ function renderDashboard(model) {
     countPill("Parked", model.inbox.park_let_go),
     countPill("Recycle", model.inbox.recycle_bin),
   );
+  elements.oneThingInput.value = model.dailyFocus.oneThing;
+  elements.frogInput.value = model.dailyFocus.frog;
+  elements.ritualStatus.textContent = ritualStatusText(model.rituals);
+  elements.waitingSummary.textContent = model.waiting.label;
   renderItems(elements.todayTasks, model.todayTasks, "No Today tasks yet.");
   renderItems(elements.weeklyProjects, model.weeklyProjects, "No weekly projects selected.");
   renderBlocks(elements.todayBlocks, model.todayBlocks);
+}
+
+function ritualStatusText(rituals) {
+  const complete = [
+    rituals.morning ? "Morning" : "",
+    rituals.midday ? "Midday" : "",
+    rituals.evening ? "Evening" : "",
+  ].filter(Boolean);
+  if (rituals.nextLabel) {
+    return complete.length
+      ? `${complete.join(", ")} done · next ${rituals.nextLabel}`
+      : `Next ${rituals.nextLabel}`;
+  }
+  return complete.length ? `${complete.join(", ")} done` : "Not started";
 }
 
 function countPill(label, value) {
@@ -203,6 +226,28 @@ elements.quickCaptureForm.addEventListener("submit", async (event) => {
   } finally {
     elements.quickCaptureInput.disabled = false;
     elements.quickCaptureInput.focus();
+  }
+});
+
+elements.dailyFocusForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+
+  elements.oneThingInput.disabled = true;
+  elements.frogInput.disabled = true;
+  try {
+    await requestJson(window.fetch.bind(window), settings, "/api/v1/daily-focus", {
+      method: "PUT",
+      body: {
+        one_thing: elements.oneThingInput.value,
+        frog: elements.frogInput.value,
+      },
+    });
+    await connectAndLoad();
+  } catch (err) {
+    setConnectionState("error", "Daily focus save failed", err.message);
+  } finally {
+    elements.oneThingInput.disabled = false;
+    elements.frogInput.disabled = false;
   }
 });
 

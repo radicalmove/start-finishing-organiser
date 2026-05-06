@@ -1,16 +1,16 @@
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
-use axum::routing::{get, patch, post};
+use axum::routing::{get, patch, post, put};
 use axum::{Json, Router};
 use chrono::{NaiveDate, NaiveTime, Utc};
 use serde::{Deserialize, Serialize};
 use sfo_core::{
-    BackupManifest, Block, BlockCreate, BlockId, BlockUpdate, BootstrapSummary,
-    GuidedCaptureRequest, GuidedCaptureResponse, ImportDryRunReport, ImportDryRunRequest,
-    InboxContainers, InboxRouteRequest, Page, Project, ProjectCreate, ProjectId, ProjectUpdate,
-    PythonSqliteImportReport, PythonSqliteImportRequest, QuickCapture, Task, TaskCreate, TaskId,
-    TaskUpdate, WaitingId, WaitingOn, WaitingOnCreate, WaitingOnUpdate,
+    BackupManifest, Block, BlockCreate, BlockId, BlockUpdate, BootstrapSummary, DailyFocus,
+    DailyFocusUpdate, GuidedCaptureRequest, GuidedCaptureResponse, ImportDryRunReport,
+    ImportDryRunRequest, InboxContainers, InboxRouteRequest, Page, Project, ProjectCreate,
+    ProjectId, ProjectUpdate, PythonSqliteImportReport, PythonSqliteImportRequest, QuickCapture,
+    Task, TaskCreate, TaskId, TaskUpdate, WaitingId, WaitingOn, WaitingOnCreate, WaitingOnUpdate,
 };
 use sfo_services::{
     BootstrapService, CaptureService, InboxService, PlanningService, ScheduleService, ServiceError,
@@ -103,6 +103,7 @@ pub fn router() -> Router<AppState> {
     Router::new()
         .route("/auth/status", get(auth_status))
         .route("/bootstrap", get(bootstrap))
+        .route("/daily-focus", put(save_daily_focus))
         .route("/projects", get(list_projects).post(create_project))
         .route(
             "/projects/{project_id}",
@@ -152,6 +153,15 @@ async fn bootstrap(
     let current_time = Some(query.time.unwrap_or_else(|| now.time()));
     let service = BootstrapService::new(state.db);
     Ok(Json(service.summary(today, current_time).await?))
+}
+
+async fn save_daily_focus(
+    State(state): State<AppState>,
+    Json(payload): Json<DailyFocusUpdate>,
+) -> Result<Json<DailyFocus>, ApiError> {
+    let today = Utc::now().date_naive();
+    let service = BootstrapService::new(state.db);
+    Ok(Json(service.save_daily_focus(today, payload).await?))
 }
 
 async fn list_projects(

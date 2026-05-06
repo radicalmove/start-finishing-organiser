@@ -13,6 +13,9 @@ pub struct BootstrapSummary {
     pub today_blocks: Vec<Block>,
     pub current_block: Option<Block>,
     pub next_block: Option<Block>,
+    pub daily_focus: BootstrapDailyFocus,
+    pub rituals: BootstrapRitualSummary,
+    pub waiting: BootstrapWaitingSummary,
     pub system: BootstrapSystemSummary,
 }
 
@@ -23,6 +26,28 @@ pub struct BootstrapInboxSummary {
     pub enjoy_recover: i64,
     pub park_let_go: i64,
     pub recycle_bin: i64,
+}
+
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+pub struct BootstrapDailyFocus {
+    pub one_thing: Option<String>,
+    pub frog: Option<String>,
+}
+
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+pub struct BootstrapRitualSummary {
+    pub morning: bool,
+    pub midday: bool,
+    pub evening: bool,
+    pub next_key: Option<String>,
+    pub next_label: Option<String>,
+}
+
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+pub struct BootstrapWaitingSummary {
+    pub total: i64,
+    pub due: i64,
+    pub overdue: i64,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -73,5 +98,35 @@ mod tests {
         assert_eq!(json["database_status"], "ok");
         assert_eq!(json["backup_tables"][0]["table"], "blocks");
         assert_eq!(json["import_supported_tables"][0], "projects");
+    }
+
+    #[test]
+    fn bootstrap_daily_context_serializes_focus_rituals_and_waiting() {
+        let focus = BootstrapDailyFocus {
+            one_thing: Some("Ship shell".to_string()),
+            frog: Some("Hard call".to_string()),
+        };
+        let rituals = BootstrapRitualSummary {
+            morning: true,
+            midday: false,
+            evening: false,
+            next_key: Some("midday".to_string()),
+            next_label: Some("Midday reset".to_string()),
+        };
+        let waiting = BootstrapWaitingSummary {
+            total: 2,
+            due: 1,
+            overdue: 0,
+        };
+
+        let json = serde_json::json!({
+            "daily_focus": focus,
+            "rituals": rituals,
+            "waiting": waiting
+        });
+
+        assert_eq!(json["daily_focus"]["one_thing"], "Ship shell");
+        assert_eq!(json["rituals"]["next_key"], "midday");
+        assert_eq!(json["waiting"]["due"], 1);
     }
 }

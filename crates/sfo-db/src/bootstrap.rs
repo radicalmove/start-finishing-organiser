@@ -1,5 +1,5 @@
 use chrono::NaiveDate;
-use sfo_core::{Block, BootstrapInboxSummary, Project, Task};
+use sfo_core::{Block, BootstrapInboxSummary, BootstrapWaitingSummary, Project, Task};
 
 use crate::planning::{ProjectRow, TaskRow};
 use crate::schedule::BlockRow;
@@ -62,6 +62,42 @@ pub async fn inbox_summary(pool: &sqlx::SqlitePool) -> Result<BootstrapInboxSumm
         enjoy_recover: counts.enjoy_recover,
         park_let_go: counts.park_let_go,
         recycle_bin: counts.recycle_bin,
+    })
+}
+
+pub async fn waiting_summary(
+    pool: &sqlx::SqlitePool,
+    today: NaiveDate,
+) -> Result<BootstrapWaitingSummary, DbError> {
+    let total: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM waiting_on")
+        .fetch_one(pool)
+        .await?;
+    let due: i64 = sqlx::query_scalar(
+        r#"
+        SELECT COUNT(*)
+        FROM waiting_on
+        WHERE last_followup IS NULL
+           OR last_followup <= ?
+        "#,
+    )
+    .bind(today.to_string())
+    .fetch_one(pool)
+    .await?;
+    let overdue: i64 = sqlx::query_scalar(
+        r#"
+        SELECT COUNT(*)
+        FROM waiting_on
+        WHERE last_followup < ?
+        "#,
+    )
+    .bind(today.to_string())
+    .fetch_one(pool)
+    .await?;
+
+    Ok(BootstrapWaitingSummary {
+        total,
+        due,
+        overdue,
     })
 }
 

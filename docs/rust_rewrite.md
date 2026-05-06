@@ -15,6 +15,7 @@ The Rust rewrite lives beside the current Python app while feature parity is bui
 - `GET /healthz`
 - `GET /api/v1/auth/status`
 - `GET /api/v1/bootstrap`
+- `PUT /api/v1/daily-focus`
 - `GET /api/v1/projects`
 - `POST /api/v1/projects`
 - `PATCH /api/v1/projects/{project_id}`
@@ -71,7 +72,7 @@ Real import is exposed at `POST /api/v1/import/python-sqlite` with:
 - Legacy SQLite timestamps like `2026-01-02 03:04:05` are normalized to RFC 3339 UTC text.
 - Re-running the same import is idempotent for imported projects, tasks, blocks, and waiting items because upserts key off `legacy_id`.
 
-Unsupported Python tables are still reported as warnings and are not imported in this slice. The backup endpoint returns a JSON manifest over the Rust database with schema metadata and table counts.
+Unsupported Python tables, including Python `ritual_entries`, are still reported as warnings and are not imported in this slice. The backup endpoint returns a JSON manifest over the Rust database with schema metadata and table counts, including Rust `ritual_entries`.
 
 ## Bootstrap Summary
 
@@ -82,9 +83,22 @@ Unsupported Python tables are still reported as warnings and are not imported in
 - Today tasks.
 - Today blocks.
 - Current and next block for the requested time.
+- Daily focus from the latest morning ritual entry (`one_thing` and `frog`).
+- Ritual completion state for morning/midday/evening and the next expected ritual.
+- Waiting On total, due, and overdue counts.
 - Compact system state with database status, schema, backup table counts, and supported import tables.
 
 The endpoint defaults to server date/time and accepts optional `date=YYYY-MM-DD` and `time=HH:MM:SS` query parameters for deterministic clients and tests.
+
+`PUT /api/v1/daily-focus` stores the current day's One Thing/Frog by updating or creating the latest morning ritual entry. It accepts:
+
+```json
+{
+  "date": "2026-05-06",
+  "one_thing": "Ship the Rust client shell",
+  "frog": "Make the first uncomfortable call"
+}
+```
 
 ## Auth And Server Config
 
@@ -105,6 +119,8 @@ Current shell behavior:
 - Server URL and API token form.
 - Public health/auth status checks before loading data.
 - Home/Today summary from `/api/v1/bootstrap`.
+- One Thing/Frog editing through `PUT /api/v1/daily-focus`.
+- Waiting On and ritual status summaries.
 - Quick capture to `POST /api/v1/inbox/quick-capture`.
 - No automatic Python backend spawn unless `SFO_SPAWN_BACKEND=1` is explicitly set.
 - Server CORS preflight support for Tauri production origins.

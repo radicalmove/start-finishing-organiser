@@ -5,8 +5,14 @@ use std::path::{Path, PathBuf};
 
 use crate::{connect, health_check, run_migrations, DbConfig, DbError};
 
-pub const RUST_BACKUP_TABLES: &[&str] =
-    &["app_metadata", "projects", "tasks", "blocks", "waiting_on"];
+pub const RUST_BACKUP_TABLES: &[&str] = &[
+    "app_metadata",
+    "projects",
+    "tasks",
+    "blocks",
+    "waiting_on",
+    "ritual_entries",
+];
 
 pub async fn backup_manifest(pool: &sqlx::SqlitePool) -> Result<BackupManifest, DbError> {
     health_check(pool).await?;
@@ -74,8 +80,14 @@ async fn copy_current_tables(
     let waiting_rows = sqlx::query_as::<_, BackupWaitingOnRow>("SELECT * FROM waiting_on")
         .fetch_all(source_pool)
         .await?;
+    let ritual_rows = sqlx::query_as::<_, BackupRitualEntryRow>("SELECT * FROM ritual_entries")
+        .fetch_all(source_pool)
+        .await?;
 
     let mut transaction = backup_pool.begin().await?;
+    sqlx::query("DELETE FROM ritual_entries")
+        .execute(&mut *transaction)
+        .await?;
     sqlx::query("DELETE FROM waiting_on")
         .execute(&mut *transaction)
         .await?;
@@ -146,6 +158,30 @@ async fn copy_current_tables(
         .bind(row.description)
         .bind(row.person)
         .bind(row.last_followup)
+        .bind(row.created_at)
+        .bind(row.updated_at)
+        .execute(&mut *transaction)
+        .await?;
+    }
+
+    for row in ritual_rows {
+        sqlx::query(
+            r#"
+            INSERT INTO ritual_entries (
+                id, legacy_id, ritual_type, entry_date, one_thing, frog,
+                midday_one_thing, midday_frog, created_at, updated_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            "#,
+        )
+        .bind(row.id)
+        .bind(row.legacy_id)
+        .bind(row.ritual_type)
+        .bind(row.entry_date)
+        .bind(row.one_thing)
+        .bind(row.frog)
+        .bind(row.midday_one_thing)
+        .bind(row.midday_frog)
         .bind(row.created_at)
         .bind(row.updated_at)
         .execute(&mut *transaction)
@@ -301,6 +337,20 @@ struct BackupWaitingOnRow {
 }
 
 #[derive(Debug, FromRow)]
+struct BackupRitualEntryRow {
+    id: String,
+    legacy_id: Option<i64>,
+    ritual_type: String,
+    entry_date: String,
+    one_thing: Option<String>,
+    frog: Option<String>,
+    midday_one_thing: Option<String>,
+    midday_frog: Option<String>,
+    created_at: String,
+    updated_at: Option<String>,
+}
+
+#[derive(Debug, FromRow)]
 struct BackupBlockRow {
     id: String,
     legacy_id: Option<i64>,
@@ -320,11 +370,13 @@ struct BackupBlockRow {
 mod tests {
     use super::*;
     use crate::planning::{create_project, create_task};
+    use crate::ritual::save_daily_focus;
     use crate::schedule::create_block;
     use crate::{connect, run_migrations, DbConfig};
     use chrono::{NaiveDate, NaiveTime};
     use sfo_core::{
-        BlockCreate, BlockType, ProjectCategory, ProjectCreate, TaskCreate, WhenBucket,
+        BlockCreate, BlockType, DailyFocusUpdate, ProjectCategory, ProjectCreate, TaskCreate,
+        WhenBucket,
     };
 
     #[tokio::test]
@@ -385,6 +437,17 @@ mod tests {
         )
         .await
         .expect("create block");
+        save_daily_focus(
+            &pool,
+            NaiveDate::from_ymd_opt(2026, 5, 6).expect("date"),
+            DailyFocusUpdate {
+                date: None,
+                one_thing: Some("Ship shell".to_string()),
+                frog: Some("Hard call".to_string()),
+            },
+        )
+        .await
+        .expect("daily focus");
 
         let manifest = backup_manifest(&pool).await.expect("backup manifest");
 
@@ -393,6 +456,7 @@ mod tests {
         assert_count(&manifest.tables, "projects", 1);
         assert_count(&manifest.tables, "tasks", 1);
         assert_count(&manifest.tables, "blocks", 1);
+        assert_count(&manifest.tables, "ritual_entries", 1);
         assert_count(&manifest.tables, "app_metadata", 1);
     }
 
@@ -433,6 +497,17 @@ mod tests {
         )
         .await
         .expect("create block");
+        save_daily_focus(
+            &pool,
+            NaiveDate::from_ymd_opt(2026, 5, 6).expect("date"),
+            DailyFocusUpdate {
+                date: None,
+                one_thing: Some("Ship shell".to_string()),
+                frog: Some("Hard call".to_string()),
+            },
+        )
+        .await
+        .expect("daily focus");
         let backup_dir = temp_dir_path("backup-file");
         std::fs::create_dir_all(&backup_dir).expect("create backup dir");
 
@@ -455,6 +530,11 @@ mod tests {
             .await
             .expect("count backup blocks");
         assert_eq!(block_count, 1);
+        let ritual_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM ritual_entries")
+            .fetch_one(&backup_pool)
+            .await
+            .expect("count backup rituals");
+        assert_eq!(ritual_count, 1);
         backup_pool.close().await;
 
         let _ = std::fs::remove_dir_all(backup_dir);

@@ -90,6 +90,7 @@ async fn cors_preflight_status(
     app: axum::Router,
     uri: &str,
     origin: &str,
+    request_method: Method,
 ) -> (StatusCode, HeaderMap) {
     let response = app
         .oneshot(
@@ -97,7 +98,10 @@ async fn cors_preflight_status(
                 .method(Method::OPTIONS)
                 .uri(uri)
                 .header(header::ORIGIN, origin)
-                .header(header::ACCESS_CONTROL_REQUEST_METHOD, "GET")
+                .header(
+                    header::ACCESS_CONTROL_REQUEST_METHOD,
+                    request_method.as_str(),
+                )
                 .header(
                     header::ACCESS_CONTROL_REQUEST_HEADERS,
                     "authorization,content-type",
@@ -205,16 +209,36 @@ async fn healthz_and_auth_status_do_not_require_token() {
 async fn cors_preflight_is_public_when_auth_is_configured() {
     let app = build_router(AppState::new(test_pool().await).with_api_token("secret-token"));
 
-    let (status, headers) =
-        cors_preflight_status(app.clone(), "/api/v1/bootstrap", "tauri://localhost").await;
+    let (status, headers) = cors_preflight_status(
+        app.clone(),
+        "/api/v1/bootstrap",
+        "tauri://localhost",
+        Method::GET,
+    )
+    .await;
 
     assert_eq!(status, StatusCode::OK);
     assert!(headers.contains_key(header::ACCESS_CONTROL_ALLOW_ORIGIN));
     assert!(headers.contains_key(header::ACCESS_CONTROL_ALLOW_HEADERS));
 
-    let (https_status, https_headers) =
-        cors_preflight_status(app, "/api/v1/bootstrap", "https://tauri.localhost").await;
+    let (https_status, https_headers) = cors_preflight_status(
+        app.clone(),
+        "/api/v1/bootstrap",
+        "https://tauri.localhost",
+        Method::GET,
+    )
+    .await;
 
     assert_eq!(https_status, StatusCode::OK);
     assert!(https_headers.contains_key(header::ACCESS_CONTROL_ALLOW_ORIGIN));
+
+    let (put_status, put_headers) =
+        cors_preflight_status(app, "/api/v1/daily-focus", "tauri://localhost", Method::PUT).await;
+
+    assert_eq!(put_status, StatusCode::OK);
+    assert!(put_headers.contains_key(header::ACCESS_CONTROL_ALLOW_ORIGIN));
+    assert!(put_headers
+        .get(header::ACCESS_CONTROL_ALLOW_METHODS)
+        .and_then(|value| value.to_str().ok())
+        .is_some_and(|methods| methods.contains("PUT")));
 }

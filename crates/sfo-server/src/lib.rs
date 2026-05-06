@@ -39,6 +39,12 @@ fn cors_layer() -> CorsLayer {
             HeaderValue::from_static("tauri://localhost"),
             HeaderValue::from_static("https://tauri.localhost"),
         ]))
-        .allow_methods([Method::GET, Method::POST, Method::PATCH, Method::DELETE])
+        .allow_methods([
+            Method::GET,
+            Method::POST,
+            Method::PUT,
+            Method::PATCH,
+            Method::DELETE,
+        ])
         .allow_headers([header::AUTHORIZATION, header::CONTENT_TYPE, header::ACCEPT])
 }

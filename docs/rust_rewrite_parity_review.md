@@ -19,6 +19,7 @@ The Rust branch currently has:
 - Waiting On / OPP API with task owner type, create/list/update/resolve, and guided capture integration.
 - API token auth with public auth-status discovery, env-based server config, and Mac mini deployment runbook.
 - First static Tauri client shell with server settings, API token auth, Bootstrap/Home rendering, and quick capture.
+- Home/Today daily context with One Thing/Frog, ritual status, Waiting On counts, and shell editing for daily focus.
 - Python SQLite dry-run import and real import for projects/tasks/blocks/waiting_on.
 - Rust database backup file creation before import writes.
 - Backup manifest endpoint for current Rust tables.
@@ -35,7 +36,7 @@ This is a good foundation and now has a first reviewable client surface. It cove
 | Guided capture | Wizard decides task/project/inbox/OPP and routes source inbox items | Backend task/project/source processing API, including OPP waiting item creation | Very high | Add native client UX after deployment basics. |
 | Inbox containers | Learning, Enjoy, Parked, Recycle bin, undo, metrics | Backend route/recycle/restore/containers API | Very high | Add UI/client review after guided processing exists. |
 | Blocks/calendar | Focus/Admin/Social/Recovery blocks, appointments, week calendar | Core API, import, backup | Very high | Covered enough for a Bootstrap/Home summary slice; UI and external calendars are still pending. |
-| Home/Today | Inbox, Today calendar, Now strip, One Thing/Frog, Today tasks | Read-only Bootstrap summary and first shell rendering | Very high | Next API gap slice; One Thing/Frog, Waiting On summary, and rituals still need Rust data support. |
+| Home/Today | Inbox, Today calendar, Now strip, One Thing/Frog, Today tasks | Bootstrap summary, first shell rendering, daily focus, ritual status, and Waiting On counts | Very high | Covered enough for a hands-on UX pass; fuller ritual flows can follow if useful. |
 | Weekly review | 4+3 focus, resurfacing, block planning, archive completed | Not covered | High | Port after Home primitives; depends on projects, tasks, blocks, resurface. |
 | Resurface | Pull Month/Quarter/Later due items into Week | Partly possible through task fields | Medium-high | Add with weekly review or just before it. |
 | Waiting On / OPP | Captures other-owned priorities and follow-up dates | Backend API and guided capture integration | Medium-high | Add Home/bootstrap summary later if the client needs it. |
@@ -59,22 +60,42 @@ The iPhone client should be reviewed against these same workflows. It should not
 
 ## Recommended Next Slices
 
-### 1. Home/Today API Gaps
+### 1. Native Guided Processing UX
 
-After the first client shell exposes the real interaction shape, fill the missing Home/Today behavior:
-
-- One Thing and Frog data support.
-- Waiting On summary in bootstrap.
-- Ritual/check-in state if it improves the Today workflow.
-- Any missing task/block fields discovered by the UX pass.
-
-### 2. Native Guided Processing UX
-
-Once Home/Today has the required data, build the first real processing flow:
+Build the first real inbox-processing flow:
 
 - Process inbox item into task/project/container/OPP.
 - Preserve the low-friction Learning/Enjoy/Park actions.
 - Keep the phone flow capture-first, not desktop-compressed.
+
+### 2. Hands-On Client UX Review
+
+Use the current shell against seeded or imported data and review the actual daily workflow:
+
+- Does Now/One Thing/Frog make the next action obvious?
+- Are Waiting On and ritual summaries useful or just noise?
+- What must be visible on iPhone versus Mac?
+- Which missing backend fields are proven by real use?
+
+## Completed Slice: Home/Today API Gaps
+
+This slice added the daily-execution context missing from the first Rust client shell.
+
+Minimum scope delivered:
+
+- `ritual_entries` Rust table for daily focus and ritual completion state.
+- `PUT /api/v1/daily-focus` to set One Thing/Frog.
+- `GET /api/v1/bootstrap` daily focus, ritual summary, and Waiting On counts.
+- Backup manifest and backup-file support for Rust `ritual_entries`.
+- Client shell rendering and editing for One Thing/Frog.
+- Client shell Waiting On and ritual status summary.
+
+Out of scope:
+
+- Full ritual form flows.
+- Importing Python `ritual_entries`.
+- Historical ritual analytics.
+- Waiting On detail list in the shell.
 
 ## Completed Slice: Native Client UX Review And Shell
 
@@ -235,4 +256,4 @@ Out of scope for the first Blocks slice:
 
 ## Current Recommendation
 
-The next coding slice should be **Home/Today API Gaps**. The first shell now makes the missing daily-execution primitives visible, so the next backend work should add the smallest data support needed for One Thing/Frog, Waiting On summary, and any ritual state that improves the daily workflow.
+The next coding slice should be **Native Guided Processing UX**. Home/Today now has enough Rust daily context to expose the real next workflow problem: turning inbox items into task/project/container/OPP decisions without falling back to the Python UI.
