@@ -3,6 +3,7 @@ import test from "node:test";
 
 import {
   DEFAULT_SERVER_URL,
+  buildInboxProcessingViewModel,
   buildJsonHeaders,
   buildBootstrapViewModel,
   loadSettings,
@@ -152,4 +153,40 @@ test("bootstrap view model falls back to daily focus when no block is active", (
   assert.equal(model.now.title, "Write proposal");
   assert.equal(model.now.meta, "One Thing");
   assert.equal(model.dailyFocus.frog, "Call the supplier");
+});
+
+test("inbox processing view model exposes actionable unprocessed items", () => {
+  const model = buildInboxProcessingViewModel({
+    counts: {
+      unprocessed: 2,
+      learn_explore: 1,
+      enjoy_recover: 0,
+      park_let_go: 3,
+      recycle_bin: 4,
+    },
+    unprocessed: [
+      {
+        id: "task-1",
+        verb_noun: "Read Rust notes",
+        description: "Extract anything worth testing",
+        created_at: "2026-05-06T09:00:00Z",
+      },
+      {
+        id: "task-2",
+        verb_noun: "",
+        description: null,
+        created_at: null,
+      },
+    ],
+  });
+
+  assert.equal(model.pendingCount, 2);
+  assert.equal(model.recycledCount, 4);
+  assert.deepEqual(model.items[0], {
+    id: "task-1",
+    title: "Read Rust notes",
+    description: "Extract anything worth testing",
+    meta: "Captured 2026-05-06T09:00:00Z",
+  });
+  assert.equal(model.items[1].title, "Untitled inbox item");
 });

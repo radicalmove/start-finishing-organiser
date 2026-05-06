@@ -1,10 +1,17 @@
 import {
+  buildInboxProcessingViewModel,
   buildBootstrapViewModel,
   clearSettings,
   loadSettings,
   requestJson,
   saveSettings,
 } from "./client.js";
+
+const INBOX_ROUTE_ACTIONS = {
+  learn_explore: "Learning",
+  enjoy_recover: "Enjoy",
+  park_let_go: "Park",
+};
 
 const elements = {
   statusDot: document.getElementById("status-dot"),
@@ -28,6 +35,7 @@ const elements = {
   nextBlock: document.getElementById("next-block"),
   inboxTotal: document.getElementById("inbox-total"),
   inboxCounts: document.getElementById("inbox-counts"),
+  inboxItems: document.getElementById("inbox-items"),
   ritualStatus: document.getElementById("ritual-status"),
   waitingSummary: document.getElementById("waiting-summary"),
   todayTasks: document.getElementById("today-tasks"),
@@ -65,8 +73,12 @@ async function connectAndLoad() {
       throw new Error("This server requires an API token.");
     }
 
-    const summary = await requestJson(window.fetch.bind(window), settings, "/api/v1/bootstrap");
+    const [summary, inboxContainers] = await Promise.all([
+      requestJson(window.fetch.bind(window), settings, "/api/v1/bootstrap"),
+      requestJson(window.fetch.bind(window), settings, "/api/v1/inbox/containers"),
+    ]);
     renderDashboard(buildBootstrapViewModel(summary));
+    renderInboxProcessing(buildInboxProcessingViewModel(inboxContainers));
     setConnectionState(
       "ready",
       auth?.auth_required ? "Connected with API token" : "Connected without auth",
@@ -112,6 +124,53 @@ function renderDashboard(model) {
   renderItems(elements.todayTasks, model.todayTasks, "No Today tasks yet.");
   renderItems(elements.weeklyProjects, model.weeklyProjects, "No weekly projects selected.");
   renderBlocks(elements.todayBlocks, model.todayBlocks);
+}
+
+function renderInboxProcessing(model) {
+  elements.inboxItems.replaceChildren();
+  if (!model.items.length) {
+    elements.inboxItems.append(emptyState("Inbox is clear. Capture something when it appears."));
+    return;
+  }
+
+  for (const item of model.items.slice(0, 8)) {
+    const row = document.createElement("div");
+    row.className = "inbox-item";
+
+    const body = document.createElement("div");
+    body.className = "inbox-item-body";
+    const title = document.createElement("strong");
+    title.textContent = item.title;
+    const description = document.createElement("span");
+    description.textContent = item.description;
+    const meta = document.createElement("small");
+    meta.textContent = item.meta;
+    body.append(title, description, meta);
+
+    const actions = document.createElement("div");
+    actions.className = "inbox-actions";
+    for (const [intent, label] of Object.entries(INBOX_ROUTE_ACTIONS)) {
+      const button = document.createElement("button");
+      button.className = "mini-button";
+      button.type = "button";
+      button.dataset.inboxAction = "route";
+      button.dataset.itemId = item.id;
+      button.dataset.intent = intent;
+      button.textContent = label;
+      actions.append(button);
+    }
+
+    const recycle = document.createElement("button");
+    recycle.className = "mini-button quiet";
+    recycle.type = "button";
+    recycle.dataset.inboxAction = "recycle";
+    recycle.dataset.itemId = item.id;
+    recycle.textContent = "Recycle";
+    actions.append(recycle);
+
+    row.append(body, actions);
+    elements.inboxItems.append(row);
+  }
 }
 
 function ritualStatusText(rituals) {
@@ -248,6 +307,41 @@ elements.dailyFocusForm.addEventListener("submit", async (event) => {
   } finally {
     elements.oneThingInput.disabled = false;
     elements.frogInput.disabled = false;
+  }
+});
+
+elements.inboxItems.addEventListener("click", async (event) => {
+  const button = event.target.closest("[data-inbox-action]");
+  if (!button) return;
+
+  const itemId = button.dataset.itemId;
+  if (!itemId) return;
+
+  button.disabled = true;
+  try {
+    if (button.dataset.inboxAction === "route") {
+      await requestJson(
+        window.fetch.bind(window),
+        settings,
+        `/api/v1/inbox/${encodeURIComponent(itemId)}/route`,
+        {
+          method: "POST",
+          body: { intent: button.dataset.intent },
+        },
+      );
+    } else {
+      await requestJson(
+        window.fetch.bind(window),
+        settings,
+        `/api/v1/inbox/${encodeURIComponent(itemId)}/recycle`,
+        { method: "POST" },
+      );
+    }
+    await connectAndLoad();
+  } catch (err) {
+    setConnectionState("error", "Inbox action failed", err.message);
+  } finally {
+    button.disabled = false;
   }
 });
 

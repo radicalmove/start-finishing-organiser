@@ -61,6 +61,17 @@ async fn inbox_route_undo_and_containers_work_under_api_v1() {
     assert_eq!(capture_status, StatusCode::CREATED);
     let task_id = task["id"].as_str().expect("task id");
 
+    let (initial_containers_status, initial_containers) = request_json(
+        app.clone(),
+        Method::GET,
+        "/api/v1/inbox/containers",
+        Value::Null,
+    )
+    .await;
+    assert_eq!(initial_containers_status, StatusCode::OK);
+    assert_eq!(initial_containers["counts"]["unprocessed"], 1);
+    assert_eq!(initial_containers["unprocessed"][0]["id"], task_id);
+
     let (route_status, routed) = request_json(
         app.clone(),
         Method::POST,
@@ -80,6 +91,8 @@ async fn inbox_route_undo_and_containers_work_under_api_v1() {
     )
     .await;
     assert_eq!(containers_status, StatusCode::OK);
+    assert_eq!(containers["counts"]["unprocessed"], 0);
+    assert!(containers["unprocessed"].as_array().unwrap().is_empty());
     assert_eq!(containers["counts"]["learn_explore"], 1);
     assert_eq!(containers["learning"][0]["id"], task_id);
 

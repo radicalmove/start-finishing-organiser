@@ -9,6 +9,7 @@ use crate::DbError;
 pub async fn containers(pool: &sqlx::SqlitePool) -> Result<InboxContainers, DbError> {
     Ok(InboxContainers {
         counts: counts(pool).await?,
+        unprocessed: active_unprocessed_items(pool).await?,
         learning: active_container_items(pool, INBOX_INTENT_LEARN_EXPLORE).await?,
         enjoy: active_container_items(pool, INBOX_INTENT_ENJOY_RECOVER).await?,
         parked: active_container_items(pool, INBOX_INTENT_PARK_LET_GO).await?,
@@ -24,6 +25,21 @@ pub async fn counts(pool: &sqlx::SqlitePool) -> Result<InboxContainerCounts, DbE
         park_let_go: count_active_container(pool, INBOX_INTENT_PARK_LET_GO).await?,
         recycle_bin: count_recycle_bin(pool).await?,
     })
+}
+
+async fn active_unprocessed_items(pool: &sqlx::SqlitePool) -> Result<Vec<Task>, DbError> {
+    let rows = sqlx::query_as::<_, TaskRow>(
+        r#"
+        SELECT * FROM tasks
+        WHERE in_inbox = 1
+          AND status IN ('pending', 'in_progress')
+        ORDER BY created_at DESC
+        "#,
+    )
+    .fetch_all(pool)
+    .await?;
+
+    rows.into_iter().map(Task::try_from).collect()
 }
 
 async fn active_container_items(
@@ -118,7 +134,7 @@ mod tests {
     #[tokio::test]
     async fn containers_return_active_items_and_recycle_bin() {
         let pool = migrated_pool().await;
-        create_task(
+        let unprocessed = create_task(
             &pool,
             TaskCreate {
                 verb_noun: "Inbox item".to_string(),
@@ -195,6 +211,7 @@ mod tests {
         assert_eq!(containers.counts.unprocessed, 1);
         assert_eq!(containers.counts.learn_explore, 1);
         assert_eq!(containers.counts.recycle_bin, 1);
+        assert_eq!(containers.unprocessed[0].id, unprocessed.id);
         assert_eq!(containers.learning[0].id, learning.id);
         assert_eq!(containers.recycle_bin[0].id, recycled.id);
     }

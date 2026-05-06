@@ -14,11 +14,11 @@ The Rust branch currently has:
 - Tasks API with CRUD, pagination, complete, reopen, archive, restore, and quick capture.
 - Blocks API with CRUD and task schedule-date sync when task blocks are created or deleted.
 - Bootstrap/Home Summary API with weekly projects, inbox counts, today tasks, today blocks, current/next block, and compact system state.
-- Inbox container API with quick routing to Learning/Enjoy/Park, undo, recycle, restore, and container item lists.
+- Inbox container API with quick routing to Learning/Enjoy/Park, undo, recycle, restore, and unprocessed/container item lists.
 - Guided capture API with task/project creation, source inbox intent handling, support-project task conversion, and source-to-project archiving.
 - Waiting On / OPP API with task owner type, create/list/update/resolve, and guided capture integration.
 - API token auth with public auth-status discovery, env-based server config, and Mac mini deployment runbook.
-- First static Tauri client shell with server settings, API token auth, Bootstrap/Home rendering, and quick capture.
+- First static Tauri client shell with server settings, API token auth, Bootstrap/Home rendering, quick capture, and direct inbox processing.
 - Home/Today daily context with One Thing/Frog, ritual status, Waiting On counts, and shell editing for daily focus.
 - Python SQLite dry-run import and real import for projects/tasks/blocks/waiting_on.
 - Rust database backup file creation before import writes.
@@ -33,8 +33,8 @@ This is a good foundation and now has a first reviewable client surface. It cove
 | Projects | Weekly focus, long-range planning, success cues, roadmaps | Core CRUD and weekly cap | High | Keep extending through long-range/project success fields after daily workflow primitives exist. |
 | Tasks | Time/project board, lifecycle, inbox flags, completion/archive history | Core CRUD and lifecycle | High | Covered enough for the next client/bootstrap slice. |
 | Quick capture | Modal and capture page can send undecided items to Inbox | API quick capture and first shell form | High | Covered enough for the next UX pass. |
-| Guided capture | Wizard decides task/project/inbox/OPP and routes source inbox items | Backend task/project/source processing API, including OPP waiting item creation | Very high | Add native client UX after deployment basics. |
-| Inbox containers | Learning, Enjoy, Parked, Recycle bin, undo, metrics | Backend route/recycle/restore/containers API | Very high | Add UI/client review after guided processing exists. |
+| Guided capture | Wizard decides task/project/inbox/OPP and routes source inbox items | Backend task/project/source processing API, including OPP waiting item creation | Very high | Add the full native wizard after direct routing is proven in the shell. |
+| Inbox containers | Learning, Enjoy, Parked, Recycle bin, undo, metrics | Backend route/recycle/restore/containers API and first shell processing panel | Very high | Continue with task/project/OPP conversion UI; add undo UI if routing mistakes are common. |
 | Blocks/calendar | Focus/Admin/Social/Recovery blocks, appointments, week calendar | Core API, import, backup | Very high | Covered enough for a Bootstrap/Home summary slice; UI and external calendars are still pending. |
 | Home/Today | Inbox, Today calendar, Now strip, One Thing/Frog, Today tasks | Bootstrap summary, first shell rendering, daily focus, ritual status, and Waiting On counts | Very high | Covered enough for a hands-on UX pass; fuller ritual flows can follow if useful. |
 | Weekly review | 4+3 focus, resurfacing, block planning, archive completed | Not covered | High | Port after Home primitives; depends on projects, tasks, blocks, resurface. |
@@ -60,12 +60,12 @@ The iPhone client should be reviewed against these same workflows. It should not
 
 ## Recommended Next Slices
 
-### 1. Native Guided Processing UX
+### 1. Native Guided Task/Project/OPP Wizard
 
-Build the first real inbox-processing flow:
+Extend the first direct-routing inbox panel into the full decision flow:
 
 - Process inbox item into task/project/container/OPP.
-- Preserve the low-friction Learning/Enjoy/Park actions.
+- Preserve the low-friction Learning/Enjoy/Park actions already in the shell.
 - Keep the phone flow capture-first, not desktop-compressed.
 
 ### 2. Hands-On Client UX Review
@@ -96,6 +96,25 @@ Out of scope:
 - Importing Python `ritual_entries`.
 - Historical ritual analytics.
 - Waiting On detail list in the shell.
+
+## Completed Slice: Native Inbox Processing Shell
+
+This slice made the Rust shell process real inbox rows instead of only showing counts.
+
+Minimum scope delivered:
+
+- `GET /api/v1/inbox/containers` now includes unprocessed item rows.
+- Client shell renders unprocessed inbox items from the Rust API.
+- Shell actions route items to Learning, Enjoy, or Park.
+- Shell action recycles an inbox item.
+- Launcher client tests cover the inbox-processing view model.
+
+Out of scope:
+
+- Full task/project/OPP guided conversion wizard.
+- Undo/restore UI, though the backend endpoints already exist.
+- Multi-step phone-specific processing flow.
+- Rich route confirmation or mistake-recovery affordances.
 
 ## Completed Slice: Native Client UX Review And Shell
 
@@ -175,7 +194,7 @@ Minimum scope delivered:
 - `POST /api/v1/inbox/{task_id}/undo`
 - `POST /api/v1/inbox/{task_id}/recycle`
 - `POST /api/v1/inbox/{task_id}/restore`
-- Learning, Enjoy, Parked, and Recycle bin counts and item lists.
+- Unprocessed, Learning, Enjoy, Parked, and Recycle bin counts and item lists.
 - Python-parity mutation semantics for route, undo, recycle, and restore.
 
 Out of scope:
@@ -256,4 +275,4 @@ Out of scope for the first Blocks slice:
 
 ## Current Recommendation
 
-The next coding slice should be **Native Guided Processing UX**. Home/Today now has enough Rust daily context to expose the real next workflow problem: turning inbox items into task/project/container/OPP decisions without falling back to the Python UI.
+The next coding slice should be **Native Guided Task/Project/OPP Wizard**. The shell can now handle reversible direct routing; the remaining gap is turning an inbox item into a clarified task, project, or Waiting On/OPP item without falling back to the Python UI.

@@ -8,7 +8,7 @@ The Rust rewrite lives beside the current Python app while feature parity is bui
 - `crates/sfo-db`: SQLite connection and migrations.
 - `crates/sfo-server`: Axum server shell.
 - `crates/sfo-services`: use-case rules for projects, tasks, blocks, inbox processing, guided capture, and Waiting On.
-- `src-tauri/launcher`: first static Rust client shell for server connection, auth, Home/Today summary, and quick capture.
+- `src-tauri/launcher`: first static Rust client shell for server connection, auth, Home/Today summary, quick capture, and first-pass inbox processing.
 
 ## Current API
 
@@ -122,6 +122,7 @@ Current shell behavior:
 - One Thing/Frog editing through `PUT /api/v1/daily-focus`.
 - Waiting On and ritual status summaries.
 - Quick capture to `POST /api/v1/inbox/quick-capture`.
+- Inbox processing list from `GET /api/v1/inbox/containers` with Learning, Enjoy, Park, and Recycle actions.
 - No automatic Python backend spawn unless `SFO_SPAWN_BACKEND=1` is explicitly set.
 - Server CORS preflight support for Tauri production origins.
 
@@ -138,7 +139,7 @@ The first Rust inbox-processing slice keeps the approved Python semantics for re
 - `POST /api/v1/inbox/{task_id}/undo` returns a quick-routed item to the unprocessed inbox.
 - `POST /api/v1/inbox/{task_id}/recycle` moves an active inbox item to the inbox recycle bin.
 - `POST /api/v1/inbox/{task_id}/restore` returns a recycled or quick-routed item to the unprocessed inbox.
-- `GET /api/v1/inbox/containers` returns container counts plus Learning, Enjoy, Parked, and Recycle bin item lists.
+- `GET /api/v1/inbox/containers` returns container counts plus Unprocessed, Learning, Enjoy, Parked, and Recycle bin item lists.
 
 ## Guided Capture
 

@@ -38,6 +38,7 @@ pub struct InboxContainerCounts {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct InboxContainers {
     pub counts: InboxContainerCounts,
+    pub unprocessed: Vec<Task>,
     pub learning: Vec<Task>,
     pub enjoy: Vec<Task>,
     pub parked: Vec<Task>,
@@ -69,6 +70,7 @@ mod tests {
                 park_let_go: 4,
                 recycle_bin: 5,
             },
+            unprocessed: vec![],
             learning: vec![],
             enjoy: vec![],
             parked: vec![],
@@ -79,6 +81,7 @@ mod tests {
 
         assert_eq!(json["counts"]["unprocessed"], 1);
         assert_eq!(json["counts"]["learn_explore"], 2);
+        assert!(json["unprocessed"].as_array().unwrap().is_empty());
         assert!(json["learning"].as_array().unwrap().is_empty());
     }
 }

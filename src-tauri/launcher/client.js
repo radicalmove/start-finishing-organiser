@@ -166,6 +166,22 @@ export function buildBootstrapViewModel(summary) {
   };
 }
 
+export function buildInboxProcessingViewModel(containers) {
+  const counts = containers?.counts || {};
+  const items = (containers?.unprocessed || []).map((item) => ({
+    id: item.id,
+    title: item.verb_noun || "Untitled inbox item",
+    description: item.description || "No notes yet.",
+    meta: item.created_at ? `Captured ${item.created_at}` : "",
+  }));
+
+  return {
+    pendingCount: Number(counts.unprocessed || 0),
+    recycledCount: Number(counts.recycle_bin || 0),
+    items,
+  };
+}
+
 function blockView(block) {
   return {
     title: block.title || titleCase(`${block.block_type || "time"} block`),
