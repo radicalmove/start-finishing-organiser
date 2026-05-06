@@ -20,11 +20,12 @@ The Rust branch currently has:
 - API token auth with public auth-status discovery, env-based server config, and Mac mini deployment runbook.
 - First static Tauri client shell with server settings, API token auth, Bootstrap/Home rendering, quick capture, direct inbox processing, and inline guided inbox conversion.
 - Home/Today daily context with One Thing/Frog, ritual status, Waiting On counts, and shell editing for daily focus.
+- Hands-on Tauri shell UX review against seeded Rust data, covering direct inbox routing, OPP conversion, and new-project conversion.
 - Python SQLite dry-run import and real import for projects/tasks/blocks/waiting_on.
 - Rust database backup file creation before import writes.
 - Backup manifest endpoint for current Rust tables.
 
-This is a good foundation and now has a first reviewable client surface. It covers the first reversible inbox-routing workflow, guided processing API, Waiting On/OPP storage, basic private-network server posture, and a thin Home/Today shell, but not the deeper native UX.
+This is a good foundation and now has a first reviewable client surface. It covers the first reversible inbox-routing workflow, guided processing API, Waiting On/OPP storage, basic private-network server posture, and a thin Home/Today shell, but not the deeper native UX or phone-specific interaction model.
 
 ## Product Parity Matrix
 
@@ -33,10 +34,10 @@ This is a good foundation and now has a first reviewable client surface. It cove
 | Projects | Weekly focus, long-range planning, success cues, roadmaps | Core CRUD and weekly cap | High | Keep extending through long-range/project success fields after daily workflow primitives exist. |
 | Tasks | Time/project board, lifecycle, inbox flags, completion/archive history | Core CRUD and lifecycle | High | Covered enough for the next client/bootstrap slice. |
 | Quick capture | Modal and capture page can send undecided items to Inbox | API quick capture and first shell form | High | Covered enough for the next UX pass. |
-| Guided capture | Wizard decides task/project/inbox/OPP and routes source inbox items | Backend task/project/source processing API, including OPP waiting item creation, plus first inline shell form | Very high | Review the workflow in real use before making it a polished Mac/iPhone wizard. |
-| Inbox containers | Learning, Enjoy, Parked, Recycle bin, undo, metrics | Backend route/recycle/restore/containers API and first shell processing panel | Very high | Add undo UI if routing mistakes are common during hands-on review. |
+| Guided capture | Wizard decides task/project/inbox/OPP and routes source inbox items | Backend task/project/source processing API, including OPP waiting item creation, plus first inline shell form | Very high | Polish the inline flow before making it a Mac/iPhone wizard; category defaults and density need product review. |
+| Inbox containers | Learning, Enjoy, Parked, Recycle bin, undo, metrics | Backend route/recycle/restore/containers API and first shell processing panel | Very high | Add confirmation/undo UI before relying on this for real daily use. |
 | Blocks/calendar | Focus/Admin/Social/Recovery blocks, appointments, week calendar | Core API, import, backup | Very high | Covered enough for a Bootstrap/Home summary slice; UI and external calendars are still pending. |
-| Home/Today | Inbox, Today calendar, Now strip, One Thing/Frog, Today tasks | Bootstrap summary, first shell rendering, daily focus, ritual status, and Waiting On counts | Very high | Covered enough for a hands-on UX pass; fuller ritual flows can follow if useful. |
+| Home/Today | Inbox, Today calendar, Now strip, One Thing/Frog, Today tasks | Bootstrap summary, first shell rendering, daily focus, ritual status, and Waiting On counts | Very high | Connected-state layout needs tightening so Home/Today starts closer to the top once the server is connected. |
 | Weekly review | 4+3 focus, resurfacing, block planning, archive completed | Not covered | High | Port after Home primitives; depends on projects, tasks, blocks, resurface. |
 | Resurface | Pull Month/Quarter/Later due items into Week | Partly possible through task fields | Medium-high | Add with weekly review or just before it. |
 | Waiting On / OPP | Captures other-owned priorities and follow-up dates | Backend API and guided capture integration | Medium-high | Add Home/bootstrap summary later if the client needs it. |
@@ -60,15 +61,15 @@ The iPhone client should be reviewed against these same workflows. It should not
 
 ## Recommended Next Slices
 
-### 1. Hands-On Client UX Review
+### 1. Connected-State Layout And Feedback Polish
 
-Use the current shell against seeded or imported data and review the actual daily workflow:
+Use the current shell review findings to make the daily surface easier to trust:
 
-- Does Now/One Thing/Frog make the next action obvious?
-- Does inline inbox processing feel clear or too dense?
-- Are Waiting On and ritual summaries useful or just noise?
-- What must be visible on iPhone versus Mac?
-- Which missing backend fields are proven by real use?
+- Collapse or reduce the server connection chrome after a successful connection.
+- Keep Home/Today and Process Inbox visible sooner on launch.
+- Add route/conversion feedback with undo where the backend already supports it.
+- Make timestamps human-readable throughout the shell.
+- Keep the shell static until the daily workflow proves it needs a richer frontend stack.
 
 ### 2. Native Guided Processing Polish
 
@@ -77,6 +78,41 @@ Refine the inbox decision flow based on hands-on review:
 - Turn the inline form into a clearer stepped flow if needed.
 - Keep the low-friction Learning/Enjoy/Park actions.
 - Add mistake recovery in the UI if undo/restore proves necessary.
+- Review whether project category should default from context instead of always Work.
+
+### 3. Dev Shell Launch Hardening
+
+Make repeated review sessions less brittle:
+
+- Avoid the current macOS LaunchServices collision between the installed/release app and the worktree debug app.
+- Prefer a distinct development bundle identity or a documented `cargo tauri dev --config ...` path.
+- Keep the production identifier stable for eventual Mac/iPhone clients.
+
+## Completed Slice: Hands-On Client UX Review
+
+This slice used the Tauri shell against a disposable seeded Rust database and turned the first review findings into small fixes.
+
+Minimum scope delivered:
+
+- Verified server connection, Home/Today rendering, direct Learning route, OPP/Waiting On conversion, and new-project conversion in the Tauri shell.
+- Fixed noisy fractional-second dashboard timestamps by trimming server times to `HH:MM`.
+- Fixed new-project conversion from the shell by defaulting the project target date from the server's Today value.
+- Added launcher utility tests for fractional time trimming and default guided project dates.
+
+Review findings to carry forward:
+
+- The connected shell spends too much vertical space on the hero and server connection card.
+- Route and conversion actions update the page, but they need explicit success feedback and undo.
+- The inline guided form is functional, but dense enough that a stepped Mac/iPhone flow may be better.
+- New projects currently default to Work, which is wrong for some personal captures.
+- Developer review can accidentally launch a stale app bundle because the debug and installed apps share the same macOS identity.
+
+Out of scope:
+
+- Full layout redesign.
+- Undo/restore controls.
+- Category suggestion heuristics.
+- iPhone-specific interaction model.
 
 ## Completed Slice: Home/Today API Gaps
 

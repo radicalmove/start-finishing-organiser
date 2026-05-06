@@ -4,6 +4,7 @@ import {
   buildProjectOptions,
   buildBootstrapViewModel,
   clearSettings,
+  defaultGuidedProjectTargetDate,
   loadSettings,
   requestJson,
   saveSettings,
@@ -97,10 +98,12 @@ async function connectAndLoad() {
       requestJson(window.fetch.bind(window), settings, "/api/v1/inbox/containers"),
       requestJson(window.fetch.bind(window), settings, "/api/v1/projects?page=1&page_size=100"),
     ]);
-    renderDashboard(buildBootstrapViewModel(summary));
+    const dashboardModel = buildBootstrapViewModel(summary);
+    renderDashboard(dashboardModel);
     renderInboxProcessing(
       buildInboxProcessingViewModel(inboxContainers),
       buildProjectOptions(projectsPage),
+      defaultGuidedProjectTargetDate(dashboardModel.todayLabel),
     );
     setConnectionState(
       "ready",
@@ -149,7 +152,7 @@ function renderDashboard(model) {
   renderBlocks(elements.todayBlocks, model.todayBlocks);
 }
 
-function renderInboxProcessing(model, projectOptions = []) {
+function renderInboxProcessing(model, projectOptions = [], projectTargetDate = "") {
   elements.inboxItems.replaceChildren();
   if (!model.items.length) {
     elements.inboxItems.append(emptyState("Inbox is clear. Capture something when it appears."));
@@ -191,12 +194,12 @@ function renderInboxProcessing(model, projectOptions = []) {
     recycle.textContent = "Recycle";
     actions.append(recycle);
 
-    row.append(body, actions, guidedCaptureDetails(item, projectOptions));
+    row.append(body, actions, guidedCaptureDetails(item, projectOptions, projectTargetDate));
     elements.inboxItems.append(row);
   }
 }
 
-function guidedCaptureDetails(item, projectOptions) {
+function guidedCaptureDetails(item, projectOptions, projectTargetDate) {
   const details = document.createElement("details");
   details.className = "guided-details";
 
@@ -242,7 +245,11 @@ function guidedCaptureDetails(item, projectOptions) {
       ]),
       "project-only",
     ),
-    formField("Target date", textInput("target_date", "", "YYYY-MM-DD", "date"), "project-only"),
+    formField(
+      "Target date",
+      textInput("target_date", projectTargetDate, "YYYY-MM-DD", "date"),
+      "project-only",
+    ),
     checkboxField("Include this project this week", "include_this_week", true, "project-only"),
     checkboxField("Allow non-action project title", "verb_check_ack", false, "project-only"),
     formField(

@@ -234,6 +234,14 @@ export function buildGuidedCapturePayload(decision, sourceTaskId, values) {
   return payload;
 }
 
+export function defaultGuidedProjectTargetDate(todayLabel, fallbackDate = new Date()) {
+  const value = String(todayLabel || "").trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return value;
+  }
+  return fallbackDate.toISOString().slice(0, 10);
+}
+
 function blockView(block) {
   return {
     title: block.title || titleCase(`${block.block_type || "time"} block`),
@@ -267,7 +275,7 @@ function positiveInteger(value) {
 }
 
 function trimSeconds(value) {
-  return String(value || "").replace(/:00$/, "");
+  return String(value || "").replace(/^(\d{2}:\d{2})(?::\d{2}(?:\.\d+)?)?$/, "$1");
 }
 
 function titleCase(value) {

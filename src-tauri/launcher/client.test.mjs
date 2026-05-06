@@ -8,6 +8,7 @@ import {
   buildJsonHeaders,
   buildProjectOptions,
   buildBootstrapViewModel,
+  defaultGuidedProjectTargetDate,
   loadSettings,
   normalizeServerUrl,
   saveSettings,
@@ -69,7 +70,7 @@ test("settings round-trip through storage", () => {
 test("bootstrap view model favors current work and bounded counts", () => {
   const model = buildBootstrapViewModel({
     today: "2026-05-06",
-    current_time: "09:30:00",
+    current_time: "09:30:45.123456",
     weekly_projects: [{ title: "Ship client shell", category: "work" }],
     inbox: {
       unprocessed: 2,
@@ -122,6 +123,7 @@ test("bootstrap view model favors current work and bounded counts", () => {
   });
 
   assert.equal(model.todayLabel, "2026-05-06");
+  assert.equal(model.currentTime, "09:30");
   assert.equal(model.now.title, "Deep work");
   assert.equal(model.now.time, "09:00-10:30");
   assert.equal(model.inboxTotal, 15);
@@ -281,4 +283,12 @@ test("guided capture payload converts an inbox item into an opp waiting item", (
     waiting_person: "Sam",
     displacement_ack: true,
   });
+});
+
+test("guided project target date defaults to the server today value", () => {
+  assert.equal(defaultGuidedProjectTargetDate("2026-05-06"), "2026-05-06");
+  assert.equal(
+    defaultGuidedProjectTargetDate("Today", new Date("2026-05-07T02:00:00Z")),
+    "2026-05-07",
+  );
 });

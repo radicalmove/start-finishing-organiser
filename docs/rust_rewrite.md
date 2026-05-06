@@ -118,18 +118,21 @@ Current shell behavior:
 
 - Server URL and API token form.
 - Public health/auth status checks before loading data.
-- Home/Today summary from `/api/v1/bootstrap`.
+- Home/Today summary from `/api/v1/bootstrap`, with server times displayed as `HH:MM`.
 - One Thing/Frog editing through `PUT /api/v1/daily-focus`.
 - Waiting On and ritual status summaries.
 - Quick capture to `POST /api/v1/inbox/quick-capture`.
 - Inbox processing list from `GET /api/v1/inbox/containers` with Learning, Enjoy, Park, and Recycle actions.
 - Inline guided conversion from inbox item to task, project, or OPP/Waiting On item through `POST /api/v1/capture/guided`.
+- New-project conversion defaults the target date from the server's Today value so native date inputs submit a real value.
 - No automatic Python backend spawn unless `SFO_SPAWN_BACKEND=1` is explicitly set.
 - Server CORS preflight support for Tauri production origins.
 
 Token storage is a temporary client-shell compromise. Before using this as a polished production Mac/iPhone client, move token storage to Keychain or platform-secure storage.
 
 For iPhone, note that some production webview origins are HTTPS. If the webview blocks plain HTTP as mixed content, the Mac mini server will need HTTPS through a local certificate, Caddy/nginx, VPN hostname, or a Tauri-native HTTP path.
+
+Hands-on review found that the current Mac shell is functional but still too chrome-heavy after connection: the hero and server card push Home/Today below the first viewport. The next UX pass should reduce connected-state chrome and add clear success/undo feedback for inbox route and conversion actions.
 
 ## Inbox Containers
 
@@ -200,6 +203,8 @@ Check the Tauri shell:
 ```bash
 cargo check --manifest-path src-tauri/Cargo.toml
 ```
+
+For hands-on shell review, be careful with macOS LaunchServices if an installed/release build already exists with the same `com.rcd58.sfo` identifier. If the visible app is stale, stop existing SFO app processes, rebuild the Tauri binary, and reopen the worktree debug bundle explicitly before reviewing UI changes.
 
 See `docs/rust_mac_mini_deployment.md` for the private Mac mini runbook.
 
