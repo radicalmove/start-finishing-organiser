@@ -134,7 +134,7 @@ Token storage is a temporary client-shell compromise. Before using this as a pol
 
 For iPhone, note that some production webview origins are HTTPS. If the webview blocks plain HTTP as mixed content, the Mac mini server will need HTTPS through a local certificate, Caddy/nginx, VPN hostname, or a Tauri-native HTTP path.
 
-Hands-on review found that the current Mac shell is functional but the future iPhone client still needs its own workflow shape. The next UX pass should decide which parts of Today, capture, inbox processing, and weekly context belong on phone.
+The first iPhone client should be a fast capture and daily-review client, not a compressed Mac dashboard. See `docs/rust_iphone_workflow.md` for the phone workflow shape and first build sequence.
 
 ## Inbox Containers
 
@@ -215,6 +215,7 @@ scripts/run_tauri_dev_shell.sh
 This builds and opens a debug app bundle named `Start Finishing Organiser Dev.app` with the development-only `com.rcd58.sfo.dev` bundle identifier. Keep production builds on `com.rcd58.sfo`; the dev identity exists only to avoid macOS LaunchServices collisions with an installed/release app while reviewing worktree changes.
 
 See `docs/rust_mac_mini_deployment.md` for the private Mac mini runbook.
+See `docs/rust_iphone_workflow.md` for the first iPhone client workflow shape.
 
 ## Notes
 

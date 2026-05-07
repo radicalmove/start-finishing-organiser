@@ -24,6 +24,7 @@ The Rust branch currently has:
 - Connected-state shell polish with reduced chrome and success/undo feedback for reversible inbox actions.
 - Guided processing polish with decision-card copy and personal category defaults for obvious personal captures.
 - Dev shell launch hardening with a distinct macOS bundle identity for worktree review builds.
+- iPhone workflow shape for Today, Capture, Process, and Settings against the shared Rust server.
 - Python SQLite dry-run import and real import for projects/tasks/blocks/waiting_on.
 - Rust database backup file creation before import writes.
 - Backup manifest endpoint for current Rust tables.
@@ -64,15 +65,43 @@ The iPhone client should be reviewed against these same workflows. It should not
 
 ## Recommended Next Slices
 
-### 1. iPhone Workflow Shape
+### 1. Mobile Connection Shell
 
-Start defining the future phone client around workflows instead of screen parity:
+Start implementing the smallest phone-shaped client surface:
 
-- Fast capture.
-- Today/Now review.
-- One-step inbox routing.
-- A compact guided decision flow for task/project/OPP.
-- Read-only weekly context unless real use proves editing is needed on phone.
+- Server URL and API token settings.
+- Health/auth status against the Mac mini Rust server.
+- Platform-secure credential storage before real use.
+- Clear LAN/VPN/HTTPS assumptions.
+
+### 2. Mobile Today Read-Only
+
+Use the existing bootstrap contract before adding phone-specific writes:
+
+- Now card.
+- Next block.
+- Short Today task list.
+- Waiting On due/overdue count.
+- Refresh and connection-state feedback.
+
+## Completed Slice: iPhone Workflow Shape
+
+This slice defined the first phone client around short workflows rather than desktop parity.
+
+Minimum scope delivered:
+
+- Added `docs/rust_iphone_workflow.md`.
+- Defined first iPhone tabs: Today, Capture, Process, and Settings.
+- Mapped the phone workflows to the current Rust APIs.
+- Set the first offline position: no full offline sync, possible capture queue later.
+- Defined the first build sequence for mobile work.
+
+Out of scope:
+
+- Creating an iOS project or Tauri mobile scaffold.
+- Choosing final native/webview packaging details.
+- Implementing platform-secure token storage.
+- Designing offline conflict resolution.
 
 ## Completed Slice: Dev Shell Launch Hardening
 
