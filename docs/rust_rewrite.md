@@ -119,11 +119,12 @@ Current shell behavior:
 - Server URL and API token form.
 - Public health/auth status checks before loading data.
 - Home/Today summary from `/api/v1/bootstrap`, with server times displayed as `HH:MM`.
+- Compact connected-state chrome so Home/Today starts closer to the first viewport after a successful connection.
 - One Thing/Frog editing through `PUT /api/v1/daily-focus`.
 - Waiting On and ritual status summaries.
 - Quick capture to `POST /api/v1/inbox/quick-capture`.
-- Inbox processing list from `GET /api/v1/inbox/containers` with Learning, Enjoy, Park, and Recycle actions.
-- Inline guided conversion from inbox item to task, project, or OPP/Waiting On item through `POST /api/v1/capture/guided`.
+- Inbox processing list from `GET /api/v1/inbox/containers` with Learning, Enjoy, Park, Recycle, and an undo/restore feedback banner for reversible actions.
+- Inline guided conversion from inbox item to task, project, or OPP/Waiting On item through `POST /api/v1/capture/guided`, with success feedback after conversion.
 - New-project conversion defaults the target date from the server's Today value so native date inputs submit a real value.
 - No automatic Python backend spawn unless `SFO_SPAWN_BACKEND=1` is explicitly set.
 - Server CORS preflight support for Tauri production origins.
@@ -132,7 +133,7 @@ Token storage is a temporary client-shell compromise. Before using this as a pol
 
 For iPhone, note that some production webview origins are HTTPS. If the webview blocks plain HTTP as mixed content, the Mac mini server will need HTTPS through a local certificate, Caddy/nginx, VPN hostname, or a Tauri-native HTTP path.
 
-Hands-on review found that the current Mac shell is functional but still too chrome-heavy after connection: the hero and server card push Home/Today below the first viewport. The next UX pass should reduce connected-state chrome and add clear success/undo feedback for inbox route and conversion actions.
+Hands-on review found that the current Mac shell is functional but the inline guided form is dense. The next UX pass should decide whether that flow stays inline on Mac or becomes a stepped flow shared with the future iPhone client.
 
 ## Inbox Containers
 

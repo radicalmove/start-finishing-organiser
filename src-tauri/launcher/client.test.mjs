@@ -4,6 +4,8 @@ import test from "node:test";
 import {
   DEFAULT_SERVER_URL,
   buildGuidedCapturePayload,
+  buildGuidedCaptureFeedback,
+  buildInboxActionFeedback,
   buildInboxProcessingViewModel,
   buildJsonHeaders,
   buildProjectOptions,
@@ -290,5 +292,49 @@ test("guided project target date defaults to the server today value", () => {
   assert.equal(
     defaultGuidedProjectTargetDate("Today", new Date("2026-05-07T02:00:00Z")),
     "2026-05-07",
+  );
+});
+
+test("inbox action feedback exposes undo paths for reversible actions", () => {
+  assert.deepEqual(
+    buildInboxActionFeedback({
+      action: "route",
+      itemId: "task-1",
+      itemTitle: "Read Rust notes",
+      intentLabel: "Learning",
+    }),
+    {
+      message: 'Moved "Read Rust notes" to Learning.',
+      undoPath: "/api/v1/inbox/task-1/undo",
+      undoLabel: "Undo",
+      restoredMessage: 'Restored "Read Rust notes" to Inbox.',
+    },
+  );
+
+  assert.deepEqual(
+    buildInboxActionFeedback({
+      action: "recycle",
+      itemId: "task-2",
+      itemTitle: "",
+    }),
+    {
+      message: 'Moved "this item" to Recycle.',
+      undoPath: "/api/v1/inbox/task-2/restore",
+      undoLabel: "Restore",
+      restoredMessage: 'Restored "this item" to Inbox.',
+    },
+  );
+});
+
+test("guided capture feedback describes non-reversible conversions", () => {
+  assert.deepEqual(buildGuidedCaptureFeedback("opp", "Ask Sam"), {
+    message: 'Converted "Ask Sam" into a Waiting On item.',
+    undoPath: "",
+    undoLabel: "",
+    restoredMessage: "",
+  });
+  assert.equal(
+    buildGuidedCaptureFeedback("project", "").message,
+    'Converted "this item" into a project.',
   );
 });

@@ -1,5 +1,7 @@
 import {
+  buildGuidedCaptureFeedback,
   buildGuidedCapturePayload,
+  buildInboxActionFeedback,
   buildInboxProcessingViewModel,
   buildProjectOptions,
   buildBootstrapViewModel,
@@ -43,6 +45,7 @@ const elements = {
   apiToken: document.getElementById("api-token"),
   resetSettings: document.getElementById("reset-settings"),
   dashboard: document.getElementById("dashboard"),
+  actionFeedback: document.getElementById("action-feedback"),
   refreshDashboard: document.getElementById("refresh-dashboard"),
   todayLabel: document.getElementById("today-label"),
   quickCaptureForm: document.getElementById("quick-capture-form"),
@@ -66,6 +69,7 @@ const elements = {
 let settings = loadSettings(window.localStorage);
 
 function setConnectionState(state, message, detail = "") {
+  document.body.dataset.connectionState = state;
   elements.statusDot.dataset.state = state;
   elements.status.textContent = message;
   elements.detail.textContent = detail;
@@ -181,7 +185,9 @@ function renderInboxProcessing(model, projectOptions = [], projectTargetDate = "
       button.type = "button";
       button.dataset.inboxAction = "route";
       button.dataset.itemId = item.id;
+      button.dataset.itemTitle = item.title;
       button.dataset.intent = intent;
+      button.dataset.intentLabel = label;
       button.textContent = label;
       actions.append(button);
     }
@@ -191,6 +197,7 @@ function renderInboxProcessing(model, projectOptions = [], projectTargetDate = "
     recycle.type = "button";
     recycle.dataset.inboxAction = "recycle";
     recycle.dataset.itemId = item.id;
+    recycle.dataset.itemTitle = item.title;
     recycle.textContent = "Recycle";
     actions.append(recycle);
 
@@ -446,6 +453,31 @@ function emptyState(text) {
   return empty;
 }
 
+function showActionFeedback(feedback) {
+  elements.actionFeedback.replaceChildren();
+  if (!feedback?.message) {
+    elements.actionFeedback.classList.add("hidden");
+    return;
+  }
+
+  const message = document.createElement("span");
+  message.textContent = feedback.message;
+  elements.actionFeedback.append(message);
+
+  if (feedback.undoPath) {
+    const undo = document.createElement("button");
+    undo.className = "mini-button quiet";
+    undo.type = "button";
+    undo.dataset.feedbackAction = "undo";
+    undo.dataset.undoPath = feedback.undoPath;
+    undo.dataset.restoredMessage = feedback.restoredMessage;
+    undo.textContent = feedback.undoLabel || "Undo";
+    elements.actionFeedback.append(undo);
+  }
+
+  elements.actionFeedback.classList.remove("hidden");
+}
+
 elements.connectionForm.addEventListener("submit", (event) => {
   event.preventDefault();
   try {
@@ -485,6 +517,12 @@ elements.quickCaptureForm.addEventListener("submit", async (event) => {
     });
     elements.quickCaptureInput.value = "";
     await connectAndLoad();
+    showActionFeedback({
+      message: `Captured "${verbNoun}" to Inbox.`,
+      undoPath: "",
+      undoLabel: "",
+      restoredMessage: "",
+    });
   } catch (err) {
     setConnectionState("error", "Quick capture failed", err.message);
   } finally {
@@ -507,6 +545,12 @@ elements.dailyFocusForm.addEventListener("submit", async (event) => {
       },
     });
     await connectAndLoad();
+    showActionFeedback({
+      message: "Saved today's focus.",
+      undoPath: "",
+      undoLabel: "",
+      restoredMessage: "",
+    });
   } catch (err) {
     setConnectionState("error", "Daily focus save failed", err.message);
   } finally {
@@ -524,6 +568,12 @@ elements.inboxItems.addEventListener("click", async (event) => {
 
   button.disabled = true;
   try {
+    const feedback = buildInboxActionFeedback({
+      action: button.dataset.inboxAction,
+      itemId,
+      itemTitle: button.dataset.itemTitle,
+      intentLabel: button.dataset.intentLabel,
+    });
     if (button.dataset.inboxAction === "route") {
       await requestJson(
         window.fetch.bind(window),
@@ -543,6 +593,7 @@ elements.inboxItems.addEventListener("click", async (event) => {
       );
     }
     await connectAndLoad();
+    showActionFeedback(feedback);
   } catch (err) {
     setConnectionState("error", "Inbox action failed", err.message);
   } finally {
@@ -574,11 +625,37 @@ elements.inboxItems.addEventListener("submit", async (event) => {
       method: "POST",
       body: payload,
     });
+    const feedback = buildGuidedCaptureFeedback(values.decision, values.capture_text);
     await connectAndLoad();
+    showActionFeedback(feedback);
   } catch (err) {
     setConnectionState("error", "Guided capture failed", err.message);
   } finally {
     submit.disabled = false;
+  }
+});
+
+elements.actionFeedback.addEventListener("click", async (event) => {
+  const button = event.target.closest('[data-feedback-action="undo"]');
+  if (!button) return;
+
+  const undoPath = button.dataset.undoPath;
+  if (!undoPath) return;
+
+  button.disabled = true;
+  try {
+    await requestJson(window.fetch.bind(window), settings, undoPath, { method: "POST" });
+    await connectAndLoad();
+    showActionFeedback({
+      message: button.dataset.restoredMessage || "Restored item to Inbox.",
+      undoPath: "",
+      undoLabel: "",
+      restoredMessage: "",
+    });
+  } catch (err) {
+    setConnectionState("error", "Undo failed", err.message);
+  } finally {
+    button.disabled = false;
   }
 });
 

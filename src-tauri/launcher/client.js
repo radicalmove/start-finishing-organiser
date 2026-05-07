@@ -234,6 +234,42 @@ export function buildGuidedCapturePayload(decision, sourceTaskId, values) {
   return payload;
 }
 
+export function buildInboxActionFeedback({ action, itemId, itemTitle, intentLabel = "" }) {
+  const title = displayItemTitle(itemTitle);
+  const encodedItemId = encodeURIComponent(String(itemId || ""));
+  if (action === "route") {
+    return {
+      message: `Moved "${title}" to ${intentLabel || "its container"}.`,
+      undoPath: encodedItemId ? `/api/v1/inbox/${encodedItemId}/undo` : "",
+      undoLabel: "Undo",
+      restoredMessage: `Restored "${title}" to Inbox.`,
+    };
+  }
+
+  return {
+    message: `Moved "${title}" to Recycle.`,
+    undoPath: encodedItemId ? `/api/v1/inbox/${encodedItemId}/restore` : "",
+    undoLabel: "Restore",
+    restoredMessage: `Restored "${title}" to Inbox.`,
+  };
+}
+
+export function buildGuidedCaptureFeedback(decision, itemTitle) {
+  const title = displayItemTitle(itemTitle);
+  const noun =
+    decision === "project"
+      ? "a project"
+      : decision === "opp"
+        ? "a Waiting On item"
+        : "a project task";
+  return {
+    message: `Converted "${title}" into ${noun}.`,
+    undoPath: "",
+    undoLabel: "",
+    restoredMessage: "",
+  };
+}
+
 export function defaultGuidedProjectTargetDate(todayLabel, fallbackDate = new Date()) {
   const value = String(todayLabel || "").trim();
   if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
@@ -260,6 +296,10 @@ function compactJoin(values, separator = " · ") {
 function optionalText(value) {
   const text = String(value || "").trim();
   return text || null;
+}
+
+function displayItemTitle(value) {
+  return optionalText(value) || "this item";
 }
 
 function setOptional(target, key, value) {
