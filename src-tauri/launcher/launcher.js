@@ -7,6 +7,8 @@ import {
   buildBootstrapViewModel,
   clearSettings,
   defaultGuidedProjectTargetDate,
+  guidedDecisionCopy,
+  inferGuidedProjectCategory,
   loadSettings,
   requestJson,
   saveSettings,
@@ -25,6 +27,24 @@ const HORIZON_OPTIONS = [
   ["quarter", "This quarter"],
   ["year", "This year"],
   ["later", "Later"],
+];
+
+const DECISION_OPTIONS = [
+  [
+    "task",
+    "Task",
+    "A concrete next action that belongs inside an existing project.",
+  ],
+  [
+    "project",
+    "Project",
+    "A multi-step outcome that deserves a target date and weekly attention.",
+  ],
+  [
+    "opp",
+    "Waiting On",
+    "Something where another person owns the next move.",
+  ],
 ];
 
 const BLOCK_TYPE_OPTIONS = [
@@ -216,16 +236,11 @@ function guidedCaptureDetails(item, projectOptions, projectTargetDate) {
   const form = document.createElement("form");
   form.className = "guided-form";
   form.dataset.sourceTaskId = item.id;
+  const inferredCategory = inferGuidedProjectCategory(item.title, item.description);
 
   form.append(
-    formField(
-      "Decision",
-      selectInput("decision", [
-        ["task", "Task in a project"],
-        ["project", "New project"],
-        ["opp", "OPP / Waiting On"],
-      ]),
-    ),
+    decisionChoiceField(),
+    decisionCopyPanel(),
     formField("Title", textInput("capture_text", item.title, "Action title")),
     formField(
       "Notes",
@@ -249,7 +264,7 @@ function guidedCaptureDetails(item, projectOptions, projectTargetDate) {
       selectInput("category", [
         ["work", "Work"],
         ["personal", "Personal"],
-      ]),
+      ], inferredCategory),
       "project-only",
     ),
     formField(
@@ -279,6 +294,52 @@ function guidedCaptureDetails(item, projectOptions, projectTargetDate) {
   details.append(summary, form);
   syncGuidedForm(form);
   return details;
+}
+
+function decisionChoiceField() {
+  const fieldset = document.createElement("fieldset");
+  fieldset.className = "decision-step";
+  const legend = document.createElement("legend");
+  legend.textContent = "Step 1 · choose the right kind of follow-up";
+  const grid = document.createElement("div");
+  grid.className = "decision-card-grid";
+
+  for (const [value, labelText, descriptionText] of DECISION_OPTIONS) {
+    const label = document.createElement("label");
+    label.className = "decision-card";
+    const input = document.createElement("input");
+    input.type = "radio";
+    input.name = "decision";
+    input.value = value;
+    input.checked = value === "task";
+
+    const body = document.createElement("span");
+    body.className = "decision-card-body";
+    const title = document.createElement("strong");
+    title.textContent = labelText;
+    const description = document.createElement("small");
+    description.textContent = descriptionText;
+    body.append(title, description);
+    label.append(input, body);
+    grid.append(label);
+  }
+
+  fieldset.append(legend, grid);
+  return fieldset;
+}
+
+function decisionCopyPanel(decision = "task") {
+  const copy = guidedDecisionCopy(decision);
+  const panel = document.createElement("div");
+  panel.className = "decision-copy";
+  const heading = document.createElement("strong");
+  heading.dataset.decisionCopyHeading = "true";
+  heading.textContent = copy.heading;
+  const description = document.createElement("span");
+  description.dataset.decisionCopyDescription = "true";
+  description.textContent = copy.description;
+  panel.append(heading, description);
+  return panel;
 }
 
 function formField(labelText, control, className = "") {
@@ -326,13 +387,14 @@ function textAreaInput(name, value, placeholder) {
   return textarea;
 }
 
-function selectInput(name, options) {
+function selectInput(name, options, selectedValue = "") {
   const select = document.createElement("select");
   select.name = name;
   for (const [value, label] of options) {
     const option = document.createElement("option");
     option.value = value;
     option.textContent = label;
+    option.selected = value === selectedValue;
     select.append(option);
   }
   return select;
@@ -359,7 +421,22 @@ function projectSelect(projectOptions) {
 }
 
 function syncGuidedForm(form) {
-  const decision = form.elements.decision.value;
+  const decision = form.elements.decision.value || "task";
+  const copy = guidedDecisionCopy(decision);
+  form.dataset.decision = decision;
+  const copyHeading = form.querySelector("[data-decision-copy-heading]");
+  const copyDescription = form.querySelector("[data-decision-copy-description]");
+  const submit = form.querySelector('button[type="submit"]');
+  if (copyHeading) {
+    copyHeading.textContent = copy.heading;
+  }
+  if (copyDescription) {
+    copyDescription.textContent = copy.description;
+  }
+  if (submit) {
+    submit.textContent = copy.submitLabel;
+  }
+
   setSectionState(form, "project-only", decision === "project");
   setSectionState(form, "support-project-only", decision === "task" || decision === "opp");
   setSectionState(form, "task-only", decision === "task");
@@ -602,7 +679,7 @@ elements.inboxItems.addEventListener("click", async (event) => {
 });
 
 elements.inboxItems.addEventListener("change", (event) => {
-  if (!event.target.matches('select[name="decision"]')) return;
+  if (!event.target.matches('[name="decision"]')) return;
   syncGuidedForm(event.target.closest("form"));
 });
 

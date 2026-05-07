@@ -124,8 +124,9 @@ Current shell behavior:
 - Waiting On and ritual status summaries.
 - Quick capture to `POST /api/v1/inbox/quick-capture`.
 - Inbox processing list from `GET /api/v1/inbox/containers` with Learning, Enjoy, Park, Recycle, and an undo/restore feedback banner for reversible actions.
-- Inline guided conversion from inbox item to task, project, or OPP/Waiting On item through `POST /api/v1/capture/guided`, with success feedback after conversion.
+- Inline guided conversion from inbox item to task, project, or OPP/Waiting On item through `POST /api/v1/capture/guided`, with decision-card copy and success feedback after conversion.
 - New-project conversion defaults the target date from the server's Today value so native date inputs submit a real value.
+- New-project conversion infers Personal for obvious personal captures such as appointments, family, home, and health items.
 - No automatic Python backend spawn unless `SFO_SPAWN_BACKEND=1` is explicitly set.
 - Server CORS preflight support for Tauri production origins.
 
@@ -133,7 +134,7 @@ Token storage is a temporary client-shell compromise. Before using this as a pol
 
 For iPhone, note that some production webview origins are HTTPS. If the webview blocks plain HTTP as mixed content, the Mac mini server will need HTTPS through a local certificate, Caddy/nginx, VPN hostname, or a Tauri-native HTTP path.
 
-Hands-on review found that the current Mac shell is functional but the inline guided form is dense. The next UX pass should decide whether that flow stays inline on Mac or becomes a stepped flow shared with the future iPhone client.
+Hands-on review found that the current Mac shell is functional but the future iPhone client still needs its own workflow shape. The next UX pass should decide which parts of Today, capture, inbox processing, and weekly context belong on phone.
 
 ## Inbox Containers
 

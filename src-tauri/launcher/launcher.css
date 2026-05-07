@@ -507,6 +507,93 @@ textarea:focus {
   min-width: 0;
 }
 
+.decision-step {
+  display: grid;
+  grid-column: 1 / -1;
+  gap: 10px;
+  margin: 0;
+  border: 0;
+  padding: 0;
+}
+
+.decision-step legend {
+  color: var(--clay);
+  font-size: 12px;
+  font-weight: 850;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.decision-card-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.decision-card {
+  display: block;
+  min-width: 0;
+  cursor: pointer;
+}
+
+.decision-card input {
+  position: absolute;
+  width: 1px;
+  min-height: 1px;
+  opacity: 0;
+}
+
+.decision-card-body {
+  display: grid;
+  gap: 5px;
+  min-height: 116px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.48);
+  transition:
+    border-color 160ms ease,
+    background 160ms ease,
+    transform 160ms ease;
+}
+
+.decision-card-body strong {
+  color: var(--ink);
+  font-size: 17px;
+}
+
+.decision-card-body small {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.decision-card input:checked + .decision-card-body {
+  border-color: rgba(53, 93, 68, 0.42);
+  background: rgba(224, 237, 229, 0.8);
+  transform: translateY(-1px);
+}
+
+.decision-card input:focus + .decision-card-body {
+  box-shadow: 0 0 0 4px rgba(53, 93, 68, 0.13);
+}
+
+.decision-copy {
+  display: grid;
+  grid-column: 1 / -1;
+  gap: 4px;
+  padding: 14px;
+  border: 1px solid rgba(53, 93, 68, 0.16);
+  border-radius: 18px;
+  color: var(--muted);
+  background: rgba(247, 241, 230, 0.78);
+}
+
+.decision-copy strong {
+  color: var(--moss-dark);
+}
+
 .checkbox-field {
   display: flex;
   gap: 10px;
@@ -667,6 +754,10 @@ textarea:focus {
   }
 
   .guided-form {
+    grid-template-columns: 1fr;
+  }
+
+  .decision-card-grid {
     grid-template-columns: 1fr;
   }
 

@@ -22,6 +22,7 @@ The Rust branch currently has:
 - Home/Today daily context with One Thing/Frog, ritual status, Waiting On counts, and shell editing for daily focus.
 - Hands-on Tauri shell UX review against seeded Rust data, covering direct inbox routing, OPP conversion, and new-project conversion.
 - Connected-state shell polish with reduced chrome and success/undo feedback for reversible inbox actions.
+- Guided processing polish with decision-card copy and personal category defaults for obvious personal captures.
 - Python SQLite dry-run import and real import for projects/tasks/blocks/waiting_on.
 - Rust database backup file creation before import writes.
 - Backup manifest endpoint for current Rust tables.
@@ -35,7 +36,7 @@ This is a good foundation and now has a first reviewable client surface. It cove
 | Projects | Weekly focus, long-range planning, success cues, roadmaps | Core CRUD and weekly cap | High | Keep extending through long-range/project success fields after daily workflow primitives exist. |
 | Tasks | Time/project board, lifecycle, inbox flags, completion/archive history | Core CRUD and lifecycle | High | Covered enough for the next client/bootstrap slice. |
 | Quick capture | Modal and capture page can send undecided items to Inbox | API quick capture and first shell form | High | Covered enough for the next UX pass. |
-| Guided capture | Wizard decides task/project/inbox/OPP and routes source inbox items | Backend task/project/source processing API, including OPP waiting item creation, plus first inline shell form | Very high | Polish the inline flow before making it a Mac/iPhone wizard; category defaults and density need product review. |
+| Guided capture | Wizard decides task/project/inbox/OPP and routes source inbox items | Backend task/project/source processing API, including OPP waiting item creation, plus decision-card shell form | Very high | Covered enough for Mac real-use review; iPhone still needs a compact workflow. |
 | Inbox containers | Learning, Enjoy, Parked, Recycle bin, undo, metrics | Backend route/recycle/restore/containers API and shell processing panel with undo/restore feedback | Very high | Covered enough for real-use review; richer history can wait. |
 | Blocks/calendar | Focus/Admin/Social/Recovery blocks, appointments, week calendar | Core API, import, backup | Very high | Covered enough for a Bootstrap/Home summary slice; UI and external calendars are still pending. |
 | Home/Today | Inbox, Today calendar, Now strip, One Thing/Frog, Today tasks | Bootstrap summary, first shell rendering, daily focus, ritual status, Waiting On counts, and compact connected chrome | Very high | Covered enough for real-use review; next focus is guided flow quality. |
@@ -62,16 +63,7 @@ The iPhone client should be reviewed against these same workflows. It should not
 
 ## Recommended Next Slices
 
-### 1. Native Guided Processing Polish
-
-Refine the inbox decision flow based on hands-on review:
-
-- Turn the inline form into a clearer stepped flow if needed.
-- Keep the low-friction Learning/Enjoy/Park actions.
-- Add mistake recovery in the UI if undo/restore proves necessary.
-- Review whether project category should default from context instead of always Work.
-
-### 2. Dev Shell Launch Hardening
+### 1. Dev Shell Launch Hardening
 
 Make repeated review sessions less brittle:
 
@@ -79,7 +71,7 @@ Make repeated review sessions less brittle:
 - Prefer a distinct development bundle identity or a documented `cargo tauri dev --config ...` path.
 - Keep the production identifier stable for eventual Mac/iPhone clients.
 
-### 3. iPhone Workflow Shape
+### 2. iPhone Workflow Shape
 
 Start defining the future phone client around workflows instead of screen parity:
 
@@ -88,6 +80,24 @@ Start defining the future phone client around workflows instead of screen parity
 - One-step inbox routing.
 - A compact guided decision flow for task/project/OPP.
 - Read-only weekly context unless real use proves editing is needed on phone.
+
+## Completed Slice: Native Guided Processing Polish
+
+This slice made the inline inbox clarification form less like a database form while keeping the static shell architecture.
+
+Minimum scope delivered:
+
+- Replaced the Decision select with three decision cards: Task, Project, and Waiting On.
+- Added decision-specific guidance copy and submit button labels.
+- Kept irrelevant form sections hidden and disabled for the active decision.
+- Defaulted obvious personal project captures to Personal instead of Work.
+- Added launcher utility tests for decision copy and project category inference.
+
+Out of scope:
+
+- A full modal or multi-screen wizard.
+- Suggestion scoring beyond simple personal/work category inference.
+- iPhone-specific layout.
 
 ## Completed Slice: Connected-State Layout And Feedback Polish
 

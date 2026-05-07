@@ -2,6 +2,8 @@ export const DEFAULT_SERVER_URL = "http://127.0.0.1:8088";
 
 const SERVER_URL_KEY = "sfo.rust.serverUrl";
 const API_TOKEN_KEY = "sfo.rust.apiToken";
+const PERSONAL_PROJECT_PATTERN =
+  /\b(appointment|optometrist|doctor|dentist|health|family|home|house|kid|kids|school|holiday|trip|birthday|personal|exercise|training|winter family)\b/i;
 
 export function normalizeServerUrl(value) {
   const raw = String(value || "").trim();
@@ -232,6 +234,33 @@ export function buildGuidedCapturePayload(decision, sourceTaskId, values) {
   }
 
   return payload;
+}
+
+export function guidedDecisionCopy(decision) {
+  if (decision === "project") {
+    return {
+      heading: "Start a project",
+      description: "Use this when the item needs more than one step or deserves weekly attention.",
+      submitLabel: "Create project",
+    };
+  }
+  if (decision === "opp") {
+    return {
+      heading: "Track a Waiting On",
+      description: "Use this when somebody else owns the next move and you need a follow-up.",
+      submitLabel: "Create Waiting On",
+    };
+  }
+  return {
+    heading: "Make it a task",
+    description: "Attach it to an existing project so it becomes planned work, not loose backlog.",
+    submitLabel: "Create task",
+  };
+}
+
+export function inferGuidedProjectCategory(itemTitle, itemDescription = "") {
+  const text = `${itemTitle || ""} ${itemDescription || ""}`;
+  return PERSONAL_PROJECT_PATTERN.test(text) ? "personal" : "work";
 }
 
 export function buildInboxActionFeedback({ action, itemId, itemTitle, intentLabel = "" }) {

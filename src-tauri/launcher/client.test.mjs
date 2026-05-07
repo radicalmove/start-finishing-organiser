@@ -11,6 +11,8 @@ import {
   buildProjectOptions,
   buildBootstrapViewModel,
   defaultGuidedProjectTargetDate,
+  guidedDecisionCopy,
+  inferGuidedProjectCategory,
   loadSettings,
   normalizeServerUrl,
   saveSettings,
@@ -336,5 +338,34 @@ test("guided capture feedback describes non-reversible conversions", () => {
   assert.equal(
     buildGuidedCaptureFeedback("project", "").message,
     'Converted "this item" into a project.',
+  );
+});
+
+test("guided decision copy explains the active choice", () => {
+  assert.deepEqual(guidedDecisionCopy("task"), {
+    heading: "Make it a task",
+    description: "Attach it to an existing project so it becomes planned work, not loose backlog.",
+    submitLabel: "Create task",
+  });
+  assert.deepEqual(guidedDecisionCopy("project"), {
+    heading: "Start a project",
+    description: "Use this when the item needs more than one step or deserves weekly attention.",
+    submitLabel: "Create project",
+  });
+  assert.equal(guidedDecisionCopy("opp").submitLabel, "Create Waiting On");
+});
+
+test("guided project category defaults personal for obvious personal captures", () => {
+  assert.equal(
+    inferGuidedProjectCategory("Book optometrist appointment", "This is probably personal."),
+    "personal",
+  );
+  assert.equal(
+    inferGuidedProjectCategory("Plan winter family rhythm", ""),
+    "personal",
+  );
+  assert.equal(
+    inferGuidedProjectCategory("Ship Rust client review", "Use existing shell."),
+    "work",
   );
 });
