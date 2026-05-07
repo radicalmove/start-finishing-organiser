@@ -25,6 +25,7 @@ The Rust branch currently has:
 - Guided processing polish with decision-card copy and personal category defaults for obvious personal captures.
 - Dev shell launch hardening with a distinct macOS bundle identity for worktree review builds.
 - iPhone workflow shape for Today, Capture, Process, and Settings against the shared Rust server.
+- Mobile connection-shell guidance for loopback vs LAN/VPN vs HTTPS server URLs, auth status, and temporary token-storage limits.
 - Python SQLite dry-run import and real import for projects/tasks/blocks/waiting_on.
 - Rust database backup file creation before import writes.
 - Backup manifest endpoint for current Rust tables.
@@ -65,14 +66,14 @@ The iPhone client should be reviewed against these same workflows. It should not
 
 ## Recommended Next Slices
 
-### 1. Mobile Connection Shell
+### 1. Mobile iOS Scaffold And Secure Storage
 
-Start implementing the smallest phone-shaped client surface:
+Generate the iOS target only after local tooling is ready:
 
-- Server URL and API token settings.
-- Health/auth status against the Mac mini Rust server.
-- Platform-secure credential storage before real use.
-- Clear LAN/VPN/HTTPS assumptions.
+- Select a full Xcode install rather than Command Line Tools.
+- Install CocoaPods and the required Rust iOS targets.
+- Run `cargo tauri ios init` after the toolchain check is clean.
+- Replace desktop local-storage token persistence with platform-secure storage before real phone use.
 
 ### 2. Mobile Today Read-Only
 
@@ -83,6 +84,25 @@ Use the existing bootstrap contract before adding phone-specific writes:
 - Short Today task list.
 - Waiting On due/overdue count.
 - Refresh and connection-state feedback.
+
+## Completed Slice: Mobile Connection Guidance
+
+This slice started the mobile Settings/connection shell inside the shared static client before generating the iOS project.
+
+Minimum scope delivered:
+
+- Added tested connection guidance for `This Mac only`, `LAN / VPN`, and `Remote / routed` server URLs.
+- Added visible transport guidance for private HTTP vs HTTPS.
+- Added auth guidance that starts unknown and updates after `/api/v1/auth/status`.
+- Kept the local-storage API token compromise visible as a blocker for real iPhone use.
+- Recorded the current iOS toolchain blockers in `docs/rust_mobile_connection_shell.md`.
+
+Out of scope:
+
+- Generating the Tauri iOS project.
+- Adding native secure credential storage.
+- Testing against a real iPhone simulator/device.
+- Building the phone-specific Today tab.
 
 ## Completed Slice: iPhone Workflow Shape
 

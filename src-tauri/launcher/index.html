@@ -45,6 +45,26 @@
           </label>
           <button class="primary-button" type="submit">Connect</button>
         </form>
+        <div class="connection-guidance" id="connection-guidance" aria-live="polite">
+          <div class="guidance-chip">
+            <span>Phone reach</span>
+            <strong id="connection-reachability">This Mac only</strong>
+            <small id="connection-reachability-detail">Use a Mac mini hostname or LAN IP for iPhone.</small>
+          </div>
+          <div class="guidance-chip">
+            <span>Transport</span>
+            <strong id="connection-transport">Private HTTP</strong>
+            <small id="connection-transport-detail">HTTP is for trusted LAN/VPN prototype use only.</small>
+          </div>
+          <div class="guidance-chip">
+            <span>Auth</span>
+            <strong id="connection-auth">Auth unknown</strong>
+            <small id="connection-auth-detail">Connect to confirm whether a token is required.</small>
+          </div>
+          <p class="storage-note" id="connection-storage">
+            This desktop shell stores the token in local storage; the iPhone build must move it to platform-secure storage before real use.
+          </p>
+        </div>
       </section>
 
       <section class="dashboard hidden" id="dashboard">

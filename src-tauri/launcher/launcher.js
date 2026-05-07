@@ -1,4 +1,5 @@
 import {
+  buildConnectionGuidance,
   buildGuidedCaptureFeedback,
   buildGuidedCapturePayload,
   buildInboxActionFeedback,
@@ -64,6 +65,13 @@ const elements = {
   serverUrl: document.getElementById("server-url"),
   apiToken: document.getElementById("api-token"),
   resetSettings: document.getElementById("reset-settings"),
+  connectionReachability: document.getElementById("connection-reachability"),
+  connectionReachabilityDetail: document.getElementById("connection-reachability-detail"),
+  connectionTransport: document.getElementById("connection-transport"),
+  connectionTransportDetail: document.getElementById("connection-transport-detail"),
+  connectionAuth: document.getElementById("connection-auth"),
+  connectionAuthDetail: document.getElementById("connection-auth-detail"),
+  connectionStorage: document.getElementById("connection-storage"),
   dashboard: document.getElementById("dashboard"),
   actionFeedback: document.getElementById("action-feedback"),
   refreshDashboard: document.getElementById("refresh-dashboard"),
@@ -87,6 +95,7 @@ const elements = {
 };
 
 let settings = loadSettings(window.localStorage);
+let lastAuthRequired = null;
 
 function setConnectionState(state, message, detail = "") {
   document.body.dataset.connectionState = state;
@@ -98,10 +107,64 @@ function setConnectionState(state, message, detail = "") {
 function applySettingsToForm() {
   elements.serverUrl.value = settings.serverUrl;
   elements.apiToken.value = settings.apiToken;
+  renderConnectionGuidance();
+}
+
+function renderConnectionGuidance(authRequired = lastAuthRequired) {
+  try {
+    const guidance = buildConnectionGuidance(elements.serverUrl.value || settings.serverUrl, {
+      authRequired,
+      apiToken: elements.apiToken.value,
+    });
+    setGuidance(
+      elements.connectionReachability,
+      elements.connectionReachabilityDetail,
+      guidance.reachabilityLabel,
+      guidance.reachabilityDetail,
+    );
+    setGuidance(
+      elements.connectionTransport,
+      elements.connectionTransportDetail,
+      guidance.transportLabel,
+      guidance.transportDetail,
+    );
+    setGuidance(
+      elements.connectionAuth,
+      elements.connectionAuthDetail,
+      guidance.authLabel,
+      guidance.authDetail,
+    );
+    elements.connectionStorage.textContent = guidance.storageDetail;
+  } catch (err) {
+    setGuidance(
+      elements.connectionReachability,
+      elements.connectionReachabilityDetail,
+      "Invalid URL",
+      err instanceof Error ? err.message : String(err),
+    );
+    setGuidance(
+      elements.connectionTransport,
+      elements.connectionTransportDetail,
+      "Unknown",
+      "Enter a valid http or https URL to check the connection shape.",
+    );
+    setGuidance(
+      elements.connectionAuth,
+      elements.connectionAuthDetail,
+      "Auth unknown",
+      "Connect to the server to confirm whether an API token is required.",
+    );
+  }
+}
+
+function setGuidance(labelElement, detailElement, label, detail) {
+  labelElement.textContent = label;
+  detailElement.textContent = detail;
 }
 
 async function connectAndLoad() {
   saveSettings(window.localStorage, settings);
+  lastAuthRequired = null;
   applySettingsToForm();
   setConnectionState("loading", "Checking Rust server...", settings.serverUrl);
 
@@ -112,6 +175,8 @@ async function connectAndLoad() {
     }
 
     const auth = await requestJson(window.fetch.bind(window), settings, "/api/v1/auth/status");
+    lastAuthRequired = Boolean(auth?.auth_required);
+    renderConnectionGuidance(lastAuthRequired);
     if (auth?.auth_required && !settings.apiToken) {
       elements.dashboard.classList.add("hidden");
       throw new Error("This server requires an API token.");
@@ -570,9 +635,15 @@ elements.connectionForm.addEventListener("submit", (event) => {
   }
 });
 
+elements.connectionForm.addEventListener("input", () => {
+  lastAuthRequired = null;
+  renderConnectionGuidance(null);
+});
+
 elements.resetSettings.addEventListener("click", () => {
   clearSettings(window.localStorage);
   settings = loadSettings(window.localStorage);
+  lastAuthRequired = null;
   applySettingsToForm();
   connectAndLoad();
 });

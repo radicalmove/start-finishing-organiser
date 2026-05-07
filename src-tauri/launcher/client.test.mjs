@@ -3,6 +3,7 @@ import test from "node:test";
 
 import {
   DEFAULT_SERVER_URL,
+  buildConnectionGuidance,
   buildGuidedCapturePayload,
   buildGuidedCaptureFeedback,
   buildInboxActionFeedback,
@@ -69,6 +70,69 @@ test("settings round-trip through storage", () => {
     serverUrl: "http://mac-mini.local:8088",
     apiToken: "token",
   });
+});
+
+test("connection guidance treats loopback servers as desktop-only", () => {
+  const guidance = buildConnectionGuidance("http://127.0.0.1:8088", {
+    authRequired: false,
+    apiToken: "",
+  });
+
+  assert.deepEqual(guidance, {
+    reachabilityLabel: "This Mac only",
+    reachabilityDetail:
+      "127.0.0.1 is loopback, so an iPhone will not reach this server. Use the Mac mini hostname or LAN IP when testing on phone.",
+    transportLabel: "Private HTTP",
+    transportDetail:
+      "HTTP is acceptable only on a trusted LAN or VPN while the prototype is private.",
+    authLabel: "No token required",
+    authDetail: "The server currently reports that bearer-token auth is off.",
+    storageDetail:
+      "This desktop shell stores the token in local storage; the iPhone build must move it to platform-secure storage before real use.",
+    canPhoneReach: false,
+  });
+});
+
+test("connection guidance reports auth as unknown before the server answers", () => {
+  const guidance = buildConnectionGuidance("http://mac-mini.local:8088");
+
+  assert.equal(guidance.authLabel, "Auth unknown");
+  assert.equal(
+    guidance.authDetail,
+    "Connect to the server to confirm whether an API token is required.",
+  );
+});
+
+test("connection guidance describes Mac mini LAN servers", () => {
+  const guidance = buildConnectionGuidance("http://mac-mini.local:8088", {
+    authRequired: true,
+    apiToken: "secret",
+  });
+
+  assert.equal(guidance.reachabilityLabel, "LAN / VPN");
+  assert.equal(
+    guidance.reachabilityDetail,
+    "Use this from iPhone only when the phone can reach the same private network name or VPN route.",
+  );
+  assert.equal(guidance.transportLabel, "Private HTTP");
+  assert.equal(guidance.authLabel, "Token ready");
+  assert.equal(guidance.canPhoneReach, true);
+});
+
+test("connection guidance distinguishes missing tokens and HTTPS endpoints", () => {
+  const guidance = buildConnectionGuidance("https://sfo.example.com", {
+    authRequired: true,
+    apiToken: "",
+  });
+
+  assert.equal(guidance.reachabilityLabel, "Remote / routed");
+  assert.equal(guidance.transportLabel, "HTTPS");
+  assert.equal(
+    guidance.transportDetail,
+    "HTTPS is the right default if this server is reachable outside a trusted LAN.",
+  );
+  assert.equal(guidance.authLabel, "Token required");
+  assert.equal(guidance.canPhoneReach, true);
 });
 
 test("bootstrap view model favors current work and bounded counts", () => {

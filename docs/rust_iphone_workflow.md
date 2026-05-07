@@ -150,6 +150,16 @@ Do not port the Mac dashboard layout directly.
 5. Guided Process screen for Task/Project/Waiting On.
 6. Optional Today task complete/reopen.
 
+## Connection Shell Progress
+
+The shared Rust shell now includes the first connection guidance needed by the mobile Settings screen:
+
+- It distinguishes loopback desktop-only URLs from Mac mini LAN/VPN URLs and routed HTTPS URLs.
+- It updates auth guidance after `/api/v1/auth/status`.
+- It keeps the secure-storage requirement visible instead of treating local storage as acceptable for iPhone use.
+
+See `docs/rust_mobile_connection_shell.md` for the current iOS toolchain readiness check and the remaining mobile connection work.
+
 ## Review Questions
 
 Use these when testing the first phone build:

@@ -62,6 +62,63 @@ export function clearSettings(storage) {
   storage?.removeItem(API_TOKEN_KEY);
 }
 
+export function buildConnectionGuidance(serverUrl, options = {}) {
+  const normalized = normalizeServerUrl(serverUrl);
+  const url = new URL(normalized);
+  const host = url.hostname.toLowerCase().replace(/^\[(.*)\]$/, "$1");
+  const loopback = isLoopbackHost(host);
+  const privateNetwork = isPrivateNetworkHost(host);
+  const localName = host.endsWith(".local") || (!host.includes(".") && !loopback);
+
+  let reachabilityLabel = "Remote / routed";
+  let reachabilityDetail =
+    "Use this from iPhone only if routing, firewall, and server binding are deliberately configured.";
+  let canPhoneReach = true;
+
+  if (loopback) {
+    reachabilityLabel = "This Mac only";
+    reachabilityDetail =
+      "127.0.0.1 is loopback, so an iPhone will not reach this server. Use the Mac mini hostname or LAN IP when testing on phone.";
+    canPhoneReach = false;
+  } else if (privateNetwork || localName) {
+    reachabilityLabel = "LAN / VPN";
+    reachabilityDetail =
+      "Use this from iPhone only when the phone can reach the same private network name or VPN route.";
+  }
+
+  const transportIsHttps = url.protocol === "https:";
+  const authKnown =
+    Object.prototype.hasOwnProperty.call(options, "authRequired") && options.authRequired !== null;
+  const authRequired = options.authRequired === true;
+  const tokenPresent = Boolean(String(options.apiToken || "").trim());
+
+  return {
+    reachabilityLabel,
+    reachabilityDetail,
+    transportLabel: transportIsHttps ? "HTTPS" : "Private HTTP",
+    transportDetail: transportIsHttps
+      ? "HTTPS is the right default if this server is reachable outside a trusted LAN."
+      : "HTTP is acceptable only on a trusted LAN or VPN while the prototype is private.",
+    authLabel: authKnown
+      ? authRequired
+        ? tokenPresent
+          ? "Token ready"
+          : "Token required"
+        : "No token required"
+      : "Auth unknown",
+    authDetail: authKnown
+      ? authRequired
+        ? tokenPresent
+          ? "The server requires bearer-token auth and this shell has a token to send."
+          : "The server requires bearer-token auth. Add the API token before loading private data."
+        : "The server currently reports that bearer-token auth is off."
+      : "Connect to the server to confirm whether an API token is required.",
+    storageDetail:
+      "This desktop shell stores the token in local storage; the iPhone build must move it to platform-secure storage before real use.",
+    canPhoneReach,
+  };
+}
+
 export async function requestJson(fetchImpl, settings, path, options = {}) {
   const method = options.method || "GET";
   const body = options.body === undefined ? undefined : JSON.stringify(options.body);
@@ -351,4 +408,22 @@ function titleCase(value) {
   return String(value || "")
     .replace(/_/g, " ")
     .replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function isLoopbackHost(host) {
+  return host === "localhost" || host === "::1" || host.startsWith("127.");
+}
+
+function isPrivateNetworkHost(host) {
+  const parts = host.split(".").map((part) => Number.parseInt(part, 10));
+  if (parts.length !== 4 || parts.some((part) => !Number.isInteger(part))) {
+    return false;
+  }
+  const [first, second] = parts;
+  return (
+    first === 10 ||
+    (first === 172 && second >= 16 && second <= 31) ||
+    (first === 192 && second === 168) ||
+    (first === 169 && second === 254)
+  );
 }
