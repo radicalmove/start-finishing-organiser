@@ -206,7 +206,13 @@ Check the Tauri shell:
 cargo check --manifest-path src-tauri/Cargo.toml
 ```
 
-For hands-on shell review, be careful with macOS LaunchServices if an installed/release build already exists with the same `com.rcd58.sfo` identifier. If the visible app is stale, stop existing SFO app processes, rebuild the Tauri binary, and reopen the worktree debug bundle explicitly before reviewing UI changes.
+Run the hands-on development shell:
+
+```bash
+scripts/run_tauri_dev_shell.sh
+```
+
+This builds and opens a debug app bundle named `Start Finishing Organiser Dev.app` with the development-only `com.rcd58.sfo.dev` bundle identifier. Keep production builds on `com.rcd58.sfo`; the dev identity exists only to avoid macOS LaunchServices collisions with an installed/release app while reviewing worktree changes.
 
 See `docs/rust_mac_mini_deployment.md` for the private Mac mini runbook.
 

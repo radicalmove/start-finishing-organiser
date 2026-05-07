@@ -23,6 +23,7 @@ The Rust branch currently has:
 - Hands-on Tauri shell UX review against seeded Rust data, covering direct inbox routing, OPP conversion, and new-project conversion.
 - Connected-state shell polish with reduced chrome and success/undo feedback for reversible inbox actions.
 - Guided processing polish with decision-card copy and personal category defaults for obvious personal captures.
+- Dev shell launch hardening with a distinct macOS bundle identity for worktree review builds.
 - Python SQLite dry-run import and real import for projects/tasks/blocks/waiting_on.
 - Rust database backup file creation before import writes.
 - Backup manifest endpoint for current Rust tables.
@@ -63,15 +64,7 @@ The iPhone client should be reviewed against these same workflows. It should not
 
 ## Recommended Next Slices
 
-### 1. Dev Shell Launch Hardening
-
-Make repeated review sessions less brittle:
-
-- Avoid the current macOS LaunchServices collision between the installed/release app and the worktree debug app.
-- Prefer a distinct development bundle identity or a documented `cargo tauri dev --config ...` path.
-- Keep the production identifier stable for eventual Mac/iPhone clients.
-
-### 2. iPhone Workflow Shape
+### 1. iPhone Workflow Shape
 
 Start defining the future phone client around workflows instead of screen parity:
 
@@ -80,6 +73,23 @@ Start defining the future phone client around workflows instead of screen parity
 - One-step inbox routing.
 - A compact guided decision flow for task/project/OPP.
 - Read-only weekly context unless real use proves editing is needed on phone.
+
+## Completed Slice: Dev Shell Launch Hardening
+
+This slice made repeated Tauri review sessions use a separate macOS identity from production builds.
+
+Minimum scope delivered:
+
+- Added `src-tauri/tauri.dev.conf.json` with product name `Start Finishing Organiser Dev` and bundle identifier `com.rcd58.sfo.dev`.
+- Added `scripts/run_tauri_dev_shell.sh` to build only the debug `.app` bundle and open it directly.
+- Kept production builds on `com.rcd58.sfo`.
+- Added launcher utility tests that assert the dev config and script keep the distinct identity.
+
+Out of scope:
+
+- Changing production signing or notarization.
+- iPhone bundle identity planning.
+- Replacing the static shell with a dev server.
 
 ## Completed Slice: Native Guided Processing Polish
 

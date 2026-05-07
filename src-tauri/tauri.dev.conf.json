@@ -1,0 +1,22 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Start Finishing Organiser Dev",
+  "identifier": "com.rcd58.sfo.dev",
+  "app": {
+    "windows": [
+      {
+        "title": "Start Finishing Organiser Dev",
+        "width": 1440,
+        "height": 900,
+        "minWidth": 1200,
+        "minHeight": 720,
+        "resizable": true,
+        "fullscreen": false
+      }
+    ]
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["app"]
+  }
+}
