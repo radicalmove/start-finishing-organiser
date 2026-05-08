@@ -5,6 +5,13 @@ const API_TOKEN_KEY = "sfo.rust.apiToken";
 const PERSONAL_PROJECT_PATTERN =
   /\b(appointment|optometrist|doctor|dentist|health|family|home|house|kid|kids|school|holiday|trip|birthday|personal|exercise|training|winter family)\b/i;
 
+export const WORKFLOWS = [
+  { id: "today", label: "Today" },
+  { id: "capture", label: "Capture" },
+  { id: "process", label: "Process" },
+  { id: "settings", label: "Settings" },
+];
+
 export function normalizeServerUrl(value) {
   const raw = String(value || "").trim();
   if (!raw) return DEFAULT_SERVER_URL;
@@ -268,6 +275,29 @@ export function buildInboxProcessingViewModel(containers) {
     pendingCount: Number(counts.unprocessed || 0),
     recycledCount: Number(counts.recycle_bin || 0),
     items,
+  };
+}
+
+export function buildCaptureWorkflowViewModel() {
+  return {
+    title: "Capture to Inbox",
+    description: "Get the thought out of your head. Decide what it means later in Process.",
+    placeholder: "Type the thing you are capturing...",
+    primaryAction: "Save to Inbox",
+  };
+}
+
+export function buildProcessWorkflowViewModel(containers, activeIndex = 0) {
+  const base = buildInboxProcessingViewModel(containers);
+  const safeIndex = Math.max(0, Math.min(Number(activeIndex) || 0, base.items.length - 1));
+  const activeItem = base.items[safeIndex] || null;
+
+  return {
+    ...base,
+    activeItem,
+    activeIndex: activeItem ? safeIndex : -1,
+    queue: base.items.slice(0, 6),
+    positionLabel: activeItem ? `${safeIndex + 1} of ${base.items.length}` : "Inbox clear",
   };
 }
 

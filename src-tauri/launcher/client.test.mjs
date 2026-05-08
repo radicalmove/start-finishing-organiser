@@ -3,11 +3,14 @@ import test from "node:test";
 
 import {
   DEFAULT_SERVER_URL,
+  WORKFLOWS,
   buildConnectionGuidance,
+  buildCaptureWorkflowViewModel,
   buildGuidedCapturePayload,
   buildGuidedCaptureFeedback,
   buildInboxActionFeedback,
   buildInboxProcessingViewModel,
+  buildProcessWorkflowViewModel,
   buildJsonHeaders,
   buildProjectOptions,
   buildBootstrapViewModel,
@@ -129,6 +132,49 @@ test("getTauriInvoke finds the global Tauri core invoke function", () => {
 
   assert.equal(getTauriInvoke({ __TAURI__: { core: { invoke } } }), invoke);
   assert.equal(getTauriInvoke({}), null);
+});
+
+test("workflow metadata exposes the intended app paths", () => {
+  assert.deepEqual(
+    WORKFLOWS.map((workflow) => workflow.id),
+    ["today", "capture", "process", "settings"],
+  );
+  assert.equal(WORKFLOWS[0].label, "Today");
+});
+
+test("capture workflow keeps quick capture focused", () => {
+  assert.deepEqual(buildCaptureWorkflowViewModel(), {
+    title: "Capture to Inbox",
+    description: "Get the thought out of your head. Decide what it means later in Process.",
+    placeholder: "Type the thing you are capturing...",
+    primaryAction: "Save to Inbox",
+  });
+});
+
+test("process workflow chooses one primary inbox item and a bounded queue", () => {
+  const model = buildProcessWorkflowViewModel({
+    counts: { unprocessed: 3 },
+    unprocessed: [
+      { id: "task-1", verb_noun: "First", description: "", created_at: null },
+      { id: "task-2", verb_noun: "Second", description: "", created_at: null },
+      { id: "task-3", verb_noun: "Third", description: "", created_at: null },
+    ],
+  });
+
+  assert.equal(model.activeItem.id, "task-1");
+  assert.equal(model.positionLabel, "1 of 3");
+  assert.deepEqual(
+    model.queue.map((item) => item.id),
+    ["task-1", "task-2", "task-3"],
+  );
+});
+
+test("process workflow handles an empty inbox", () => {
+  const model = buildProcessWorkflowViewModel({ counts: {}, unprocessed: [] });
+
+  assert.equal(model.activeItem, null);
+  assert.equal(model.positionLabel, "Inbox clear");
+  assert.deepEqual(model.queue, []);
 });
 
 test("connection guidance treats loopback servers as simulator or Mac only", () => {
