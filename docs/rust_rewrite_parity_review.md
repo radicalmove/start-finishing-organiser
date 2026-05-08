@@ -26,7 +26,7 @@ The Rust branch currently has:
 - Dev shell launch hardening with a distinct macOS bundle identity for worktree review builds.
 - iPhone workflow shape for Today, Capture, Process, and Settings against the shared Rust server.
 - Mobile connection-shell guidance for loopback vs LAN/VPN vs HTTPS server URLs, auth status, and temporary token-storage limits.
-- Tauri iOS scaffold under `src-tauri/gen/apple`, including a verified debug simulator build and rustup toolchain pinning for Xcode's Rust prebuild phase.
+- Tauri iOS scaffold under `src-tauri/gen/apple`, including a verified debug simulator build, simulator launch, local server connection, and rustup toolchain pinning for Xcode's Rust prebuild phase.
 - Python SQLite dry-run import and real import for projects/tasks/blocks/waiting_on.
 - Rust database backup file creation before import writes.
 - Backup manifest endpoint for current Rust tables.
@@ -67,13 +67,11 @@ The iPhone client should be reviewed against these same workflows. It should not
 
 ## Recommended Next Slices
 
-### 1. Mobile Secure Storage And First Simulator Run
+### 1. Mobile Secure Storage
 
 Move the generated iOS target toward real phone use:
 
 - Replace desktop local-storage token persistence with platform-secure storage before real phone use.
-- Run the generated app in an iPhone simulator against the local Rust server.
-- Verify the Settings connection guidance from the phone-shaped viewport.
 - Add Apple development-team signing only when moving from simulator to a physical device.
 
 ### 2. Mobile Today Read-Only
@@ -86,6 +84,24 @@ Use the existing bootstrap contract before adding phone-specific writes:
 - Waiting On due/overdue count.
 - Refresh and connection-state feedback.
 
+## Completed Slice: iOS Simulator Smoke Review
+
+This slice moved the generated iOS target from build-only to an interactive simulator smoke run against the shared Rust server.
+
+Minimum scope delivered:
+
+- Installed and launched the generated simulator bundle on an iPhone 17 Pro simulator.
+- Verified the shell connects to the local Rust server at `http://127.0.0.1:8088`.
+- Verified quick capture writes through to the Rust inbox API.
+- Updated loopback guidance to distinguish the iOS Simulator from a physical iPhone.
+- Added iOS safe-area layout coverage and a top safe-area scrim for the webview shell.
+
+Out of scope:
+
+- Physical iPhone signing and install.
+- Secure native token storage.
+- A phone-native Today/Process redesign.
+
 ## Completed Slice: Tauri iOS Scaffold
 
 This slice generated the first iOS wrapper for the shared Tauri client and proved it can build locally for the iOS simulator.
@@ -97,6 +113,7 @@ Minimum scope delivered:
 - Pinned Xcode's Rust prebuild phase to rustup `cargo` and `rustc` so it can see the installed iOS std targets even when Homebrew Rust is earlier on `PATH`.
 - Added a regression test for the iOS prebuild script's rustup toolchain pin.
 - Verified `cargo tauri ios build --debug --target aarch64-sim --ci`.
+- Added `scripts/build_tauri_ios_simulator.sh` to clear stale ignored simulator app outputs before repeat builds.
 
 Out of scope:
 

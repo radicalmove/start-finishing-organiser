@@ -6,8 +6,8 @@ This note tracks the first connection slice for the future iPhone client. The go
 
 ## Implemented In The Shared Shell
 
-- The connection card now classifies the configured server as `This Mac only`, `LAN / VPN`, or `Remote / routed`.
-- Loopback addresses such as `127.0.0.1` are called out as desktop-only because an iPhone cannot reach the Mac process through its own loopback address.
+- The connection card now classifies the configured server as `Simulator / this Mac`, `LAN / VPN`, or `Remote / routed`.
+- Loopback addresses such as `127.0.0.1` are called out as simulator/Mac-only: the iOS Simulator on the Mac can reach the Mac process, but a physical iPhone cannot reach it through its own loopback address.
 - Private HTTP is described as acceptable only on a trusted LAN or VPN during prototype use.
 - HTTPS is called out as the right default for anything reachable outside a trusted LAN.
 - Auth status starts as unknown, then updates after `/api/v1/auth/status` reports whether bearer-token auth is required.
@@ -25,7 +25,10 @@ Available:
 - CocoaPods is installed.
 - Rust iOS targets are installed for device and simulator builds.
 - The Tauri iOS scaffold has been generated under `src-tauri/gen/apple`.
-- `cargo tauri ios build --debug --target aarch64-sim --ci` builds a simulator bundle at `src-tauri/gen/apple/build/arm64-sim/Start Finishing Organiser.app`.
+- `scripts/build_tauri_ios_simulator.sh` builds a simulator bundle at `src-tauri/gen/apple/build/arm64-sim/Start Finishing Organiser.app`.
+- The wrapper clears the two ignored generated `.app` outputs first because repeat `cargo tauri ios build --debug --target aarch64-sim --ci` runs can fail when Tauri renames over a non-empty generated bundle directory.
+- The simulator bundle installs and launches on the iPhone 17 Pro simulator against the local Rust server at `http://127.0.0.1:8088`.
+- The simulator smoke run verified connection status, `/api/v1/bootstrap`, quick capture into the inbox, and the phone-reach copy.
 - The generated Xcode prebuild script pins `CARGO` and `RUSTC` to rustup's `$HOME/.cargo/bin` tools, because Homebrew Rust is earlier on this machine's default `PATH` and does not have the iOS std targets.
 
 Still blocked locally:
@@ -42,4 +45,4 @@ Tauri's mobile prerequisites and CLI reference remain the authoritative referenc
 - Add platform-secure credential storage for the API token before real use.
 - Decide whether Mac mini access is LAN-only, VPN-only, or exposed through an HTTPS reverse proxy.
 - Add a phone-shaped Settings screen around the same connection guidance rather than copying the full Mac dashboard.
-- Verify connection against a Mac mini server URL from an actual iPhone simulator or device.
+- Verify connection against a Mac mini server URL from a physical iPhone on the intended LAN/VPN path.

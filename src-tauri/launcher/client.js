@@ -76,9 +76,9 @@ export function buildConnectionGuidance(serverUrl, options = {}) {
   let canPhoneReach = true;
 
   if (loopback) {
-    reachabilityLabel = "This Mac only";
+    reachabilityLabel = "Simulator / this Mac";
     reachabilityDetail =
-      "127.0.0.1 is loopback, so an iPhone will not reach this server. Use the Mac mini hostname or LAN IP when testing on phone.";
+      "127.0.0.1 works from the iOS Simulator on this Mac, but a physical iPhone will not reach it. Use the Mac mini hostname or LAN IP on a real phone.";
     canPhoneReach = false;
   } else if (privateNetwork || localName) {
     reachabilityLabel = "LAN / VPN";

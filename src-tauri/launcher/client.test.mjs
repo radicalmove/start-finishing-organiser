@@ -72,16 +72,16 @@ test("settings round-trip through storage", () => {
   });
 });
 
-test("connection guidance treats loopback servers as desktop-only", () => {
+test("connection guidance treats loopback servers as simulator or Mac only", () => {
   const guidance = buildConnectionGuidance("http://127.0.0.1:8088", {
     authRequired: false,
     apiToken: "",
   });
 
   assert.deepEqual(guidance, {
-    reachabilityLabel: "This Mac only",
+    reachabilityLabel: "Simulator / this Mac",
     reachabilityDetail:
-      "127.0.0.1 is loopback, so an iPhone will not reach this server. Use the Mac mini hostname or LAN IP when testing on phone.",
+      "127.0.0.1 works from the iOS Simulator on this Mac, but a physical iPhone will not reach it. Use the Mac mini hostname or LAN IP on a real phone.",
     transportLabel: "Private HTTP",
     transportDetail:
       "HTTP is acceptable only on a trusted LAN or VPN while the prototype is private.",

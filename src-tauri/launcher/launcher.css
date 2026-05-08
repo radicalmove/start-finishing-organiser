@@ -1,5 +1,7 @@
 :root {
   color-scheme: light;
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
   --ink: #17201b;
   --muted: #68736a;
   --paper: #f7f1e6;
@@ -40,6 +42,21 @@ body::before {
   background-size: 34px 34px;
 }
 
+body::after {
+  position: fixed;
+  z-index: 20;
+  top: 0;
+  right: 0;
+  left: 0;
+  height: var(--safe-top);
+  pointer-events: none;
+  content: "";
+  background:
+    linear-gradient(rgba(247, 241, 230, 0.94), rgba(247, 241, 230, 0.72)),
+    radial-gradient(circle at 15% 10%, rgba(216, 155, 67, 0.22), transparent 20rem);
+  backdrop-filter: blur(18px);
+}
+
 button,
 input,
 select,
@@ -51,7 +68,7 @@ textarea {
   position: relative;
   width: min(1180px, calc(100vw - 32px));
   margin: 0 auto;
-  padding: 42px 0;
+  padding: calc(42px + var(--safe-top)) 0 calc(42px + var(--safe-bottom));
 }
 
 .hero-card,
@@ -164,7 +181,7 @@ h3 {
 }
 
 body[data-connection-state="ready"] .app-shell {
-  padding-top: 24px;
+  padding-top: calc(24px + var(--safe-top));
 }
 
 body[data-connection-state="ready"] .hero-card {
@@ -762,7 +779,7 @@ textarea:focus {
 @media (max-width: 820px) {
   .app-shell {
     width: min(100vw - 20px, 680px);
-    padding: 18px 0;
+    padding: calc(18px + var(--safe-top)) 0 calc(18px + var(--safe-bottom));
   }
 
   .hero-card,
