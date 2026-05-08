@@ -26,131 +26,166 @@
         </div>
       </section>
 
-      <section class="connection-card" id="connection-card">
-        <div class="section-heading">
-          <div>
-            <h2>Server Connection</h2>
-            <p>Use your local Rust server now, or the Mac mini address once it is running.</p>
-          </div>
-          <button class="ghost-button" id="reset-settings" type="button">Reset</button>
-        </div>
-        <form class="connection-form" id="connection-form">
-          <label>
-            <span>Server URL</span>
-            <input id="server-url" name="server-url" autocomplete="url" placeholder="http://127.0.0.1:8088" />
-          </label>
-          <label>
-            <span>API token</span>
-            <input id="api-token" name="api-token" autocomplete="current-password" placeholder="Only needed when auth is enabled" type="password" />
-          </label>
-          <button class="primary-button" type="submit">Connect</button>
-        </form>
-        <div class="connection-guidance" id="connection-guidance" aria-live="polite">
-          <div class="guidance-chip">
-            <span>Phone reach</span>
-            <strong id="connection-reachability">Simulator / this Mac</strong>
-            <small id="connection-reachability-detail">Use a Mac mini hostname or LAN IP for a physical iPhone.</small>
-          </div>
-          <div class="guidance-chip">
-            <span>Transport</span>
-            <strong id="connection-transport">Private HTTP</strong>
-            <small id="connection-transport-detail">HTTP is for trusted LAN/VPN prototype use only.</small>
-          </div>
-          <div class="guidance-chip">
-            <span>Auth</span>
-            <strong id="connection-auth">Auth unknown</strong>
-            <small id="connection-auth-detail">Connect to confirm whether a token is required.</small>
-          </div>
-          <p class="storage-note" id="connection-storage">
-            This desktop shell stores the token in local storage; the iPhone build must move it to platform-secure storage before real use.
-          </p>
-        </div>
-      </section>
+      <nav class="workflow-nav" aria-label="Primary workflows">
+        <button class="workflow-tab is-active" type="button" data-workflow-tab="today" aria-selected="true">Today</button>
+        <button class="workflow-tab" type="button" data-workflow-tab="capture" aria-selected="false">Capture</button>
+        <button class="workflow-tab" type="button" data-workflow-tab="process" aria-selected="false">Process</button>
+        <button class="workflow-tab" type="button" data-workflow-tab="settings" aria-selected="false">Settings</button>
+      </nav>
 
       <section class="dashboard hidden" id="dashboard">
-        <div class="dashboard-topline">
-          <div>
-            <div class="eyebrow" id="today-label">Today</div>
-            <h2>Home / Today</h2>
-          </div>
-          <div class="topline-actions">
-            <button class="ghost-button" id="refresh-dashboard" type="button">Refresh</button>
-          </div>
-        </div>
-
-        <form class="quick-capture" id="quick-capture-form">
-          <input id="quick-capture-input" name="quick-capture" placeholder="Quick capture to Inbox..." autocomplete="off" />
-          <button class="primary-button" type="submit">Capture</button>
-        </form>
-
         <div class="action-feedback hidden" id="action-feedback" role="status" aria-live="polite"></div>
 
-        <form class="daily-focus-form" id="daily-focus-form">
-          <label>
-            <span>One Thing</span>
-            <input id="one-thing-input" name="one-thing" placeholder="The one thing that makes today a win" autocomplete="off" />
-          </label>
-          <label>
-            <span>Frog</span>
-            <input id="frog-input" name="frog" placeholder="The uncomfortable thing to face early" autocomplete="off" />
-          </label>
-          <button class="ghost-button" type="submit">Save focus</button>
-        </form>
-
-        <div class="dashboard-grid">
-          <article class="panel now-panel">
-            <div class="panel-kicker">Now</div>
-            <h3 id="now-title">No block active</h3>
-            <p id="now-meta">Choose the next protected block.</p>
-            <div class="next-block hidden" id="next-block"></div>
-          </article>
-
-          <article class="panel inbox-panel">
-            <div class="panel-kicker">Inbox</div>
-            <div class="big-number" id="inbox-total">0</div>
-            <div class="count-grid" id="inbox-counts"></div>
-          </article>
-
-          <article class="panel wide-panel inbox-processing-panel">
-            <div class="section-heading compact-heading">
-              <div>
-                <div class="panel-kicker">Process Inbox</div>
-                <h3>Route the next loose ends.</h3>
-              </div>
-              <p>Quick-route loose items, or clarify them into a task, project, or OPP item.</p>
+        <section class="workflow-panel" data-workflow-panel="today" id="workflow-today">
+          <div class="dashboard-topline">
+            <div>
+              <div class="eyebrow" id="today-label">Today</div>
+              <h2>Home / Today</h2>
             </div>
-            <div class="inbox-list" id="inbox-items"></div>
-          </article>
-
-          <article class="panel">
-            <div class="panel-kicker">Daily Context</div>
-            <div class="context-grid">
-              <div>
-                <span>Rituals</span>
-                <strong id="ritual-status">Not started</strong>
-              </div>
-              <div>
-                <span>Waiting On</span>
-                <strong id="waiting-summary">0 waiting</strong>
-              </div>
+            <div class="topline-actions">
+              <button class="ghost-button" id="refresh-dashboard" type="button">Refresh</button>
             </div>
-          </article>
+          </div>
 
-          <article class="panel">
-            <div class="panel-kicker">Today Tasks</div>
-            <div class="item-list" id="today-tasks"></div>
-          </article>
+          <form class="daily-focus-form" id="daily-focus-form">
+            <label>
+              <span>One Thing</span>
+              <input id="one-thing-input" name="one-thing" placeholder="The one thing that makes today a win" autocomplete="off" />
+            </label>
+            <label>
+              <span>Frog</span>
+              <input id="frog-input" name="frog" placeholder="The uncomfortable thing to face early" autocomplete="off" />
+            </label>
+            <button class="ghost-button" type="submit">Save focus</button>
+          </form>
 
-          <article class="panel">
-            <div class="panel-kicker">Weekly Projects</div>
-            <div class="item-list" id="weekly-projects"></div>
-          </article>
+          <div class="dashboard-grid workflow-grid">
+            <article class="panel now-panel">
+              <div class="panel-kicker">Now</div>
+              <h3 id="now-title">No block active</h3>
+              <p id="now-meta">Choose the next protected block.</p>
+              <div class="next-block hidden" id="next-block"></div>
+            </article>
 
-          <article class="panel wide-panel">
-            <div class="panel-kicker">Today Blocks</div>
-            <div class="block-strip" id="today-blocks"></div>
-          </article>
-        </div>
+            <article class="panel">
+              <div class="panel-kicker">Daily Context</div>
+              <div class="context-grid">
+                <div>
+                  <span>Rituals</span>
+                  <strong id="ritual-status">Not started</strong>
+                </div>
+                <div>
+                  <span>Waiting On</span>
+                  <strong id="waiting-summary">0 waiting</strong>
+                </div>
+              </div>
+            </article>
+
+            <article class="panel">
+              <div class="panel-kicker">Today Tasks</div>
+              <div class="item-list" id="today-tasks"></div>
+            </article>
+
+            <article class="panel">
+              <div class="panel-kicker">Weekly Projects</div>
+              <div class="item-list" id="weekly-projects"></div>
+            </article>
+
+            <article class="panel wide-panel">
+              <div class="panel-kicker">Today Blocks</div>
+              <div class="block-strip" id="today-blocks"></div>
+            </article>
+          </div>
+        </section>
+
+        <section class="workflow-panel hidden" data-workflow-panel="capture" id="workflow-capture">
+          <div class="section-heading">
+            <div>
+              <div class="eyebrow">Capture</div>
+              <h2 id="capture-title">Capture to Inbox</h2>
+              <p class="workflow-lede" id="capture-description">
+                Get the thought out of your head. Decide what it means later in Process.
+              </p>
+            </div>
+          </div>
+          <form class="quick-capture" id="quick-capture-form">
+            <input id="quick-capture-input" name="quick-capture" placeholder="Type the thing you are capturing..." autocomplete="off" />
+            <button class="primary-button" type="submit">Save to Inbox</button>
+          </form>
+        </section>
+
+        <section class="workflow-panel hidden" data-workflow-panel="process" id="workflow-process">
+          <div class="section-heading">
+            <div>
+              <div class="eyebrow">Process</div>
+              <h2>Process Inbox</h2>
+              <p class="workflow-lede">Route the next loose end, or clarify it into a task, project, or Waiting On item.</p>
+            </div>
+            <strong class="process-position" id="process-position">Inbox clear</strong>
+          </div>
+          <div class="process-layout">
+            <article class="panel inbox-panel">
+              <div class="panel-kicker">Inbox</div>
+              <div class="big-number" id="inbox-total">0</div>
+              <div class="count-grid" id="inbox-counts"></div>
+            </article>
+
+            <article class="panel wide-panel inbox-processing-panel">
+              <div class="section-heading compact-heading">
+                <div>
+                  <div class="panel-kicker">Decision Queue</div>
+                  <h3>One item at a time.</h3>
+                </div>
+                <p>Quick-route loose items, or clarify them into a task, project, or OPP item.</p>
+              </div>
+              <div class="inbox-list" id="inbox-items"></div>
+            </article>
+          </div>
+        </section>
+
+        <section class="workflow-panel hidden settings-panel" data-workflow-panel="settings" id="workflow-settings">
+          <section class="connection-card" id="connection-card">
+            <div class="section-heading">
+              <div>
+                <div class="eyebrow">Settings</div>
+                <h2>Server Connection</h2>
+                <p>Use your local Rust server now, or the Mac mini address once it is running.</p>
+              </div>
+              <button class="ghost-button" id="reset-settings" type="button">Reset</button>
+            </div>
+            <form class="connection-form" id="connection-form">
+              <label>
+                <span>Server URL</span>
+                <input id="server-url" name="server-url" autocomplete="url" placeholder="http://127.0.0.1:8088" />
+              </label>
+              <label>
+                <span>API token</span>
+                <input id="api-token" name="api-token" autocomplete="current-password" placeholder="Only needed when auth is enabled" type="password" />
+              </label>
+              <button class="primary-button" type="submit">Connect</button>
+            </form>
+            <div class="connection-guidance" id="connection-guidance" aria-live="polite">
+              <div class="guidance-chip">
+                <span>Phone reach</span>
+                <strong id="connection-reachability">Simulator / this Mac</strong>
+                <small id="connection-reachability-detail">Use a Mac mini hostname or LAN IP for a physical iPhone.</small>
+              </div>
+              <div class="guidance-chip">
+                <span>Transport</span>
+                <strong id="connection-transport">Private HTTP</strong>
+                <small id="connection-transport-detail">HTTP is for trusted LAN/VPN prototype use only.</small>
+              </div>
+              <div class="guidance-chip">
+                <span>Auth</span>
+                <strong id="connection-auth">Auth unknown</strong>
+                <small id="connection-auth-detail">Connect to confirm whether a token is required.</small>
+              </div>
+              <p class="storage-note" id="connection-storage">
+                This desktop shell stores the token in local storage; the iPhone build must move it to platform-secure storage before real use.
+              </p>
+            </div>
+          </section>
+        </section>
       </section>
     </main>
     <script type="module" src="launcher.js"></script>
