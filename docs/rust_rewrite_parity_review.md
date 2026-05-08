@@ -26,6 +26,7 @@ The Rust branch currently has:
 - Dev shell launch hardening with a distinct macOS bundle identity for worktree review builds.
 - iPhone workflow shape for Today, Capture, Process, and Settings against the shared Rust server.
 - Mobile connection-shell guidance for loopback vs LAN/VPN vs HTTPS server URLs, auth status, and temporary token-storage limits.
+- Tauri iOS scaffold under `src-tauri/gen/apple`, including a verified debug simulator build and rustup toolchain pinning for Xcode's Rust prebuild phase.
 - Python SQLite dry-run import and real import for projects/tasks/blocks/waiting_on.
 - Rust database backup file creation before import writes.
 - Backup manifest endpoint for current Rust tables.
@@ -66,14 +67,14 @@ The iPhone client should be reviewed against these same workflows. It should not
 
 ## Recommended Next Slices
 
-### 1. Mobile iOS Scaffold And Secure Storage
+### 1. Mobile Secure Storage And First Simulator Run
 
-Generate the iOS target only after local tooling is ready:
+Move the generated iOS target toward real phone use:
 
-- Select a full Xcode install rather than Command Line Tools.
-- Install CocoaPods and the required Rust iOS targets.
-- Run `cargo tauri ios init` after the toolchain check is clean.
 - Replace desktop local-storage token persistence with platform-secure storage before real phone use.
+- Run the generated app in an iPhone simulator against the local Rust server.
+- Verify the Settings connection guidance from the phone-shaped viewport.
+- Add Apple development-team signing only when moving from simulator to a physical device.
 
 ### 2. Mobile Today Read-Only
 
@@ -84,6 +85,25 @@ Use the existing bootstrap contract before adding phone-specific writes:
 - Short Today task list.
 - Waiting On due/overdue count.
 - Refresh and connection-state feedback.
+
+## Completed Slice: Tauri iOS Scaffold
+
+This slice generated the first iOS wrapper for the shared Tauri client and proved it can build locally for the iOS simulator.
+
+Minimum scope delivered:
+
+- Generated the Tauri Apple scaffold under `src-tauri/gen/apple`.
+- Kept generated build products and Rust static libraries ignored through the generated Apple `.gitignore`.
+- Pinned Xcode's Rust prebuild phase to rustup `cargo` and `rustc` so it can see the installed iOS std targets even when Homebrew Rust is earlier on `PATH`.
+- Added a regression test for the iOS prebuild script's rustup toolchain pin.
+- Verified `cargo tauri ios build --debug --target aarch64-sim --ci`.
+
+Out of scope:
+
+- Running the app interactively in the simulator.
+- Adding platform-secure token storage.
+- Signing for a physical iPhone or release archive.
+- Building phone-specific Today/Capture/Process screens.
 
 ## Completed Slice: Mobile Connection Guidance
 

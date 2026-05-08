@@ -21,21 +21,24 @@ Available:
 
 - `cargo tauri ios` is available through `tauri-cli 2.9.6`.
 - The CLI exposes `init`, `dev`, `build`, and `run` commands for iOS.
+- Full Xcode is selected at `/Applications/Xcode.app/Contents/Developer`.
+- CocoaPods is installed.
+- Rust iOS targets are installed for device and simulator builds.
+- The Tauri iOS scaffold has been generated under `src-tauri/gen/apple`.
+- `cargo tauri ios build --debug --target aarch64-sim --ci` builds a simulator bundle at `src-tauri/gen/apple/build/arm64-sim/Start Finishing Organiser.app`.
+- The generated Xcode prebuild script pins `CARGO` and `RUSTC` to rustup's `$HOME/.cargo/bin` tools, because Homebrew Rust is earlier on this machine's default `PATH` and does not have the iOS std targets.
 
-Blocked locally:
+Still blocked locally:
 
-- `xcodebuild -version` fails because `xcode-select` points at Command Line Tools, not full Xcode.
-- `pod` is not installed, so CocoaPods is unavailable.
-- `rustup target list --installed` only shows `aarch64-apple-darwin`; iOS device and simulator targets are not installed yet.
+- Physical-device and release/archive signing need an Apple Development certificate and development team ID through `bundle > iOS > developmentTeam` or the `APPLE_DEVELOPMENT_TEAM` environment variable.
 
-Do not run `cargo tauri ios init` as the next automated step until the full Xcode install is selected and CocoaPods/Rust target setup is ready. Tauri's mobile prerequisites and CLI reference are the authoritative references for that setup:
+Tauri's mobile prerequisites and CLI reference remain the authoritative references for setup:
 
 - [Tauri prerequisites](https://v2.tauri.app/start/prerequisites/)
 - [Tauri CLI reference](https://v2.tauri.app/reference/cli/)
 
 ## Remaining Mobile Connection Work
 
-- Generate the iOS project once the local toolchain is ready.
 - Add platform-secure credential storage for the API token before real use.
 - Decide whether Mac mini access is LAN-only, VPN-only, or exposed through an HTTPS reverse proxy.
 - Add a phone-shaped Settings screen around the same connection guidance rather than copying the full Mac dashboard.
