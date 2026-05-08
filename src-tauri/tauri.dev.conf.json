@@ -3,6 +3,7 @@
   "productName": "Start Finishing Organiser Dev",
   "identifier": "com.rcd58.sfo.dev",
   "app": {
+    "withGlobalTauri": true,
     "windows": [
       {
         "title": "Start Finishing Organiser Dev",

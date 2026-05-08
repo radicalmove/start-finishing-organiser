@@ -11,7 +11,8 @@ This note tracks the first connection slice for the future iPhone client. The go
 - Private HTTP is described as acceptable only on a trusted LAN or VPN during prototype use.
 - HTTPS is called out as the right default for anything reachable outside a trusted LAN.
 - Auth status starts as unknown, then updates after `/api/v1/auth/status` reports whether bearer-token auth is required.
-- The shell states that desktop token storage is temporary local storage and that the iPhone build must use platform-secure storage before real use.
+- The Tauri shell stores the API token in Apple Keychain on macOS/iOS through native commands.
+- Browser-only development still falls back to local storage for the token because there is no native Tauri bridge in that context.
 
 ## Current Local iOS Readiness
 
@@ -30,6 +31,7 @@ Available:
 - The simulator bundle installs and launches on the iPhone 17 Pro simulator against the local Rust server at `http://127.0.0.1:8088`.
 - The simulator smoke run verified connection status, `/api/v1/bootstrap`, quick capture into the inbox, and the phone-reach copy.
 - The generated Xcode prebuild script pins `CARGO` and `RUSTC` to rustup's `$HOME/.cargo/bin` tools, because Homebrew Rust is earlier on this machine's default `PATH` and does not have the iOS std targets.
+- API token persistence now uses Tauri commands backed by Apple Keychain on macOS/iOS. Legacy local-storage tokens are migrated into Keychain the first time the Tauri shell loads with native storage available.
 
 Still blocked locally:
 
@@ -42,7 +44,6 @@ Tauri's mobile prerequisites and CLI reference remain the authoritative referenc
 
 ## Remaining Mobile Connection Work
 
-- Add platform-secure credential storage for the API token before real use.
 - Decide whether Mac mini access is LAN-only, VPN-only, or exposed through an HTTPS reverse proxy.
 - Add a phone-shaped Settings screen around the same connection guidance rather than copying the full Mac dashboard.
 - Verify connection against a Mac mini server URL from a physical iPhone on the intended LAN/VPN path.

@@ -7,6 +7,8 @@ use std::{
 
 use tauri::Manager;
 
+mod credential_store;
+
 struct BackendState(Mutex<Option<Child>>);
 
 fn should_spawn_backend() -> bool {
@@ -176,6 +178,21 @@ fn shutdown_backend(app: &tauri::AppHandle) {
     }
 }
 
+#[tauri::command]
+fn get_api_token() -> Result<Option<String>, String> {
+    credential_store::get_api_token()
+}
+
+#[tauri::command]
+fn set_api_token(token: String) -> Result<(), String> {
+    credential_store::set_api_token(&token)
+}
+
+#[tauri::command]
+fn clear_api_token() -> Result<(), String> {
+    credential_store::clear_api_token()
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let mut builder = tauri::Builder::default();
@@ -189,6 +206,11 @@ pub fn run() {
     }
 
     let app = builder
+        .invoke_handler(tauri::generate_handler![
+            get_api_token,
+            set_api_token,
+            clear_api_token,
+        ])
         .setup(|app| {
             let child = spawn_backend(&app.handle());
             app.manage(BackendState(Mutex::new(child)));

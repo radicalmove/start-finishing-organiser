@@ -26,6 +26,7 @@ The Rust branch currently has:
 - Dev shell launch hardening with a distinct macOS bundle identity for worktree review builds.
 - iPhone workflow shape for Today, Capture, Process, and Settings against the shared Rust server.
 - Mobile connection-shell guidance for loopback vs LAN/VPN vs HTTPS server URLs, auth status, and temporary token-storage limits.
+- Apple Keychain-backed API token storage for the Tauri macOS/iOS shell, with browser-only local-storage fallback for non-Tauri development.
 - Tauri iOS scaffold under `src-tauri/gen/apple`, including a verified debug simulator build, simulator launch, local server connection, and rustup toolchain pinning for Xcode's Rust prebuild phase.
 - Python SQLite dry-run import and real import for projects/tasks/blocks/waiting_on.
 - Rust database backup file creation before import writes.
@@ -67,12 +68,12 @@ The iPhone client should be reviewed against these same workflows. It should not
 
 ## Recommended Next Slices
 
-### 1. Mobile Secure Storage
+### 1. Physical iPhone Signing And LAN Connection
 
-Move the generated iOS target toward real phone use:
+Move the generated iOS target from simulator-only toward real phone use:
 
-- Replace desktop local-storage token persistence with platform-secure storage before real phone use.
-- Add Apple development-team signing only when moving from simulator to a physical device.
+- Add Apple development-team signing when moving from simulator to a physical device.
+- Verify a physical iPhone can reach the Mac mini server URL on the intended LAN/VPN path.
 
 ### 2. Mobile Today Read-Only
 
@@ -83,6 +84,24 @@ Use the existing bootstrap contract before adding phone-specific writes:
 - Short Today task list.
 - Waiting On due/overdue count.
 - Refresh and connection-state feedback.
+
+## Completed Slice: Mobile Secure Storage
+
+This slice moved the API token out of browser local storage for real Tauri app runs.
+
+Minimum scope delivered:
+
+- Added async launcher settings helpers that use Tauri `invoke` when available.
+- Added native commands: `get_api_token`, `set_api_token`, and `clear_api_token`.
+- Backed those commands with Apple Keychain on macOS/iOS via the Rust `security-framework` crate.
+- Enabled `app.withGlobalTauri` so the static launcher can access `window.__TAURI__.core.invoke`.
+- Migrated any legacy local-storage token into Keychain on first Tauri launch.
+
+Out of scope:
+
+- Physical iPhone signing.
+- Sharing Keychain items across multiple apps or app groups.
+- Replacing browser-only development fallback storage.
 
 ## Completed Slice: iOS Simulator Smoke Review
 

@@ -14,6 +14,7 @@ import {
   defaultGuidedProjectTargetDate,
   guidedDecisionCopy,
   inferGuidedProjectCategory,
+  getTauriInvoke,
   loadSettings,
   normalizeServerUrl,
   saveSettings,
@@ -58,18 +59,76 @@ test("buildJsonHeaders includes bearer token only when provided", () => {
   });
 });
 
-test("settings round-trip through storage", () => {
+test("settings round-trip through storage", async () => {
   const storage = memoryStorage();
 
-  saveSettings(storage, {
+  await saveSettings(storage, {
     serverUrl: " http://mac-mini.local:8088/ ",
     apiToken: " token ",
   });
 
-  assert.deepEqual(loadSettings(storage), {
+  assert.deepEqual(await loadSettings(storage), {
     serverUrl: "http://mac-mini.local:8088",
     apiToken: "token",
   });
+});
+
+test("settings use native credential storage when Tauri invoke is available", async () => {
+  const storage = memoryStorage({
+    "sfo.rust.apiToken": " legacy-token ",
+  });
+  const calls = [];
+  const invoke = async (command, payload) => {
+    calls.push([command, payload]);
+    return command === "get_api_token" ? "" : null;
+  };
+
+  const settings = await loadSettings(storage, invoke);
+
+  assert.deepEqual(settings, {
+    serverUrl: DEFAULT_SERVER_URL,
+    apiToken: "legacy-token",
+  });
+  assert.deepEqual(calls, [
+    ["get_api_token", undefined],
+    ["set_api_token", { token: "legacy-token" }],
+  ]);
+  assert.equal(storage.getItem("sfo.rust.apiToken"), null);
+});
+
+test("saving settings writes tokens through native credential storage", async () => {
+  const storage = memoryStorage({
+    "sfo.rust.apiToken": "old-local-token",
+  });
+  const calls = [];
+  const invoke = async (command, payload) => {
+    calls.push([command, payload]);
+    return null;
+  };
+
+  await saveSettings(
+    storage,
+    {
+      serverUrl: "http://mac-mini.local:8088",
+      apiToken: " secret-token ",
+    },
+    invoke,
+  );
+
+  assert.equal(storage.getItem("sfo.rust.serverUrl"), "http://mac-mini.local:8088");
+  assert.equal(storage.getItem("sfo.rust.apiToken"), null);
+  assert.deepEqual(calls, [["set_api_token", { token: "secret-token" }]]);
+
+  await saveSettings(storage, { serverUrl: DEFAULT_SERVER_URL, apiToken: "" }, invoke);
+
+  assert.deepEqual(calls.at(-1), ["clear_api_token", undefined]);
+});
+
+test("getTauriInvoke finds the global Tauri core invoke function", () => {
+  const invoke = () => {};
+
+  assert.equal(getTauriInvoke({ __TAURI__: { core: { invoke } } }), invoke);
+  assert.equal(getTauriInvoke({}), null);
 });
 
 test("connection guidance treats loopback servers as simulator or Mac only", () => {
@@ -88,9 +147,20 @@ test("connection guidance treats loopback servers as simulator or Mac only", () 
     authLabel: "No token required",
     authDetail: "The server currently reports that bearer-token auth is off.",
     storageDetail:
-      "This desktop shell stores the token in local storage; the iPhone build must move it to platform-secure storage before real use.",
+      "This browser-only shell stores the token in local storage. The Tauri app stores it in Apple Keychain on macOS/iOS.",
     canPhoneReach: false,
   });
+});
+
+test("connection guidance reports native Apple Keychain storage when available", () => {
+  const guidance = buildConnectionGuidance("http://mac-mini.local:8088", {
+    nativeCredentialStorage: true,
+  });
+
+  assert.equal(
+    guidance.storageDetail,
+    "API tokens are stored in Apple Keychain on macOS/iOS through the Tauri app.",
+  );
 });
 
 test("connection guidance reports auth as unknown before the server answers", () => {

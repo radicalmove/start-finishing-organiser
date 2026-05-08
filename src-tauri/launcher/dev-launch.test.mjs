@@ -10,6 +10,7 @@ test("dev Tauri config uses a distinct macOS identity", () => {
 
   assert.equal(config.identifier, "com.rcd58.sfo.dev");
   assert.equal(config.productName, "Start Finishing Organiser Dev");
+  assert.equal(config.app.withGlobalTauri, true);
   assert.equal(config.app.windows[0].title, "Start Finishing Organiser Dev");
   assert.notEqual(config.identifier, "com.rcd58.sfo");
   assert.notEqual(config.productName, "Start Finishing Organiser");

@@ -8,6 +8,7 @@ import {
   buildBootstrapViewModel,
   clearSettings,
   defaultGuidedProjectTargetDate,
+  getTauriInvoke,
   guidedDecisionCopy,
   inferGuidedProjectCategory,
   loadSettings,
@@ -94,7 +95,11 @@ const elements = {
   todayBlocks: document.getElementById("today-blocks"),
 };
 
-let settings = loadSettings(window.localStorage);
+const tauriInvoke = getTauriInvoke(window);
+let settings = {
+  serverUrl: elements.serverUrl.value,
+  apiToken: "",
+};
 let lastAuthRequired = null;
 
 function setConnectionState(state, message, detail = "") {
@@ -115,6 +120,7 @@ function renderConnectionGuidance(authRequired = lastAuthRequired) {
     const guidance = buildConnectionGuidance(elements.serverUrl.value || settings.serverUrl, {
       authRequired,
       apiToken: elements.apiToken.value,
+      nativeCredentialStorage: Boolean(tauriInvoke),
     });
     setGuidance(
       elements.connectionReachability,
@@ -163,7 +169,7 @@ function setGuidance(labelElement, detailElement, label, detail) {
 }
 
 async function connectAndLoad() {
-  saveSettings(window.localStorage, settings);
+  await saveSettings(window.localStorage, settings, tauriInvoke);
   lastAuthRequired = null;
   applySettingsToForm();
   setConnectionState("loading", "Checking Rust server...", settings.serverUrl);
@@ -620,15 +626,15 @@ function showActionFeedback(feedback) {
   elements.actionFeedback.classList.remove("hidden");
 }
 
-elements.connectionForm.addEventListener("submit", (event) => {
+elements.connectionForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   try {
     settings = {
       serverUrl: elements.serverUrl.value,
       apiToken: elements.apiToken.value,
     };
-    saveSettings(window.localStorage, settings);
-    settings = loadSettings(window.localStorage);
+    await saveSettings(window.localStorage, settings, tauriInvoke);
+    settings = await loadSettings(window.localStorage, tauriInvoke);
     connectAndLoad();
   } catch (err) {
     setConnectionState("error", "Invalid connection settings", err.message);
@@ -640,9 +646,9 @@ elements.connectionForm.addEventListener("input", () => {
   renderConnectionGuidance(null);
 });
 
-elements.resetSettings.addEventListener("click", () => {
-  clearSettings(window.localStorage);
-  settings = loadSettings(window.localStorage);
+elements.resetSettings.addEventListener("click", async () => {
+  await clearSettings(window.localStorage, tauriInvoke);
+  settings = await loadSettings(window.localStorage, tauriInvoke);
   lastAuthRequired = null;
   applySettingsToForm();
   connectAndLoad();
@@ -807,5 +813,18 @@ elements.actionFeedback.addEventListener("click", async (event) => {
   }
 });
 
-applySettingsToForm();
-connectAndLoad();
+async function initialize() {
+  try {
+    settings = await loadSettings(window.localStorage, tauriInvoke);
+    applySettingsToForm();
+    await connectAndLoad();
+  } catch (err) {
+    setConnectionState(
+      "error",
+      "Secure token storage unavailable",
+      err instanceof Error ? err.message : String(err),
+    );
+  }
+}
+
+initialize();

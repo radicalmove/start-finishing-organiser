@@ -40,16 +40,42 @@ export function buildJsonHeaders(apiToken) {
   return headers;
 }
 
-export function loadSettings(storage) {
+export function getTauriInvoke(globalObject = globalThis) {
+  return globalObject?.__TAURI__?.core?.invoke || null;
+}
+
+export async function loadSettings(storage, invoke = null) {
+  const legacyToken = String(storage?.getItem(API_TOKEN_KEY) || "").trim();
+  let apiToken = legacyToken;
+
+  if (invoke) {
+    apiToken = String((await invoke("get_api_token")) || "").trim();
+    if (!apiToken && legacyToken) {
+      await invoke("set_api_token", { token: legacyToken });
+      apiToken = legacyToken;
+    }
+    storage?.removeItem(API_TOKEN_KEY);
+  }
+
   return {
     serverUrl: normalizeServerUrl(storage?.getItem(SERVER_URL_KEY) || DEFAULT_SERVER_URL),
-    apiToken: String(storage?.getItem(API_TOKEN_KEY) || "").trim(),
+    apiToken,
   };
 }
 
-export function saveSettings(storage, settings) {
+export async function saveSettings(storage, settings, invoke = null) {
   storage?.setItem(SERVER_URL_KEY, normalizeServerUrl(settings.serverUrl));
   const token = String(settings.apiToken || "").trim();
+  if (invoke) {
+    if (token) {
+      await invoke("set_api_token", { token });
+    } else {
+      await invoke("clear_api_token");
+    }
+    storage?.removeItem(API_TOKEN_KEY);
+    return;
+  }
+
   if (token) {
     storage?.setItem(API_TOKEN_KEY, token);
   } else {
@@ -57,9 +83,12 @@ export function saveSettings(storage, settings) {
   }
 }
 
-export function clearSettings(storage) {
+export async function clearSettings(storage, invoke = null) {
   storage?.removeItem(SERVER_URL_KEY);
   storage?.removeItem(API_TOKEN_KEY);
+  if (invoke) {
+    await invoke("clear_api_token");
+  }
 }
 
 export function buildConnectionGuidance(serverUrl, options = {}) {
@@ -113,8 +142,9 @@ export function buildConnectionGuidance(serverUrl, options = {}) {
           : "The server requires bearer-token auth. Add the API token before loading private data."
         : "The server currently reports that bearer-token auth is off."
       : "Connect to the server to confirm whether an API token is required.",
-    storageDetail:
-      "This desktop shell stores the token in local storage; the iPhone build must move it to platform-secure storage before real use.",
+    storageDetail: options.nativeCredentialStorage
+      ? "API tokens are stored in Apple Keychain on macOS/iOS through the Tauri app."
+      : "This browser-only shell stores the token in local storage. The Tauri app stores it in Apple Keychain on macOS/iOS.",
     canPhoneReach,
   };
 }
