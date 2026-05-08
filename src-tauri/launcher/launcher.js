@@ -1,9 +1,11 @@
 import {
+  WORKFLOWS,
+  buildCaptureWorkflowViewModel,
   buildConnectionGuidance,
   buildGuidedCaptureFeedback,
   buildGuidedCapturePayload,
   buildInboxActionFeedback,
-  buildInboxProcessingViewModel,
+  buildProcessWorkflowViewModel,
   buildProjectOptions,
   buildBootstrapViewModel,
   clearSettings,
@@ -74,9 +76,13 @@ const elements = {
   connectionAuthDetail: document.getElementById("connection-auth-detail"),
   connectionStorage: document.getElementById("connection-storage"),
   dashboard: document.getElementById("dashboard"),
+  workflowTabs: [...document.querySelectorAll("[data-workflow-tab]")],
+  workflowPanels: [...document.querySelectorAll("[data-workflow-panel]")],
   actionFeedback: document.getElementById("action-feedback"),
   refreshDashboard: document.getElementById("refresh-dashboard"),
   todayLabel: document.getElementById("today-label"),
+  captureTitle: document.getElementById("capture-title"),
+  captureDescription: document.getElementById("capture-description"),
   quickCaptureForm: document.getElementById("quick-capture-form"),
   quickCaptureInput: document.getElementById("quick-capture-input"),
   dailyFocusForm: document.getElementById("daily-focus-form"),
@@ -88,6 +94,7 @@ const elements = {
   inboxTotal: document.getElementById("inbox-total"),
   inboxCounts: document.getElementById("inbox-counts"),
   inboxItems: document.getElementById("inbox-items"),
+  processPosition: document.getElementById("process-position"),
   ritualStatus: document.getElementById("ritual-status"),
   waitingSummary: document.getElementById("waiting-summary"),
   todayTasks: document.getElementById("today-tasks"),
@@ -101,6 +108,24 @@ let settings = {
   apiToken: "",
 };
 let lastAuthRequired = null;
+let activeWorkflow = "today";
+
+function setWorkflow(workflow) {
+  const nextWorkflow = WORKFLOWS.some((item) => item.id === workflow) ? workflow : "today";
+  activeWorkflow = nextWorkflow;
+  document.body.dataset.workflow = nextWorkflow;
+  elements.dashboard.classList.remove("hidden");
+
+  for (const tab of elements.workflowTabs) {
+    const selected = tab.dataset.workflowTab === nextWorkflow;
+    tab.classList.toggle("is-active", selected);
+    tab.setAttribute("aria-selected", String(selected));
+  }
+
+  for (const panel of elements.workflowPanels) {
+    panel.classList.toggle("hidden", panel.dataset.workflowPanel !== nextWorkflow);
+  }
+}
 
 function setConnectionState(state, message, detail = "") {
   document.body.dataset.connectionState = state;
@@ -184,7 +209,6 @@ async function connectAndLoad() {
     lastAuthRequired = Boolean(auth?.auth_required);
     renderConnectionGuidance(lastAuthRequired);
     if (auth?.auth_required && !settings.apiToken) {
-      elements.dashboard.classList.add("hidden");
       throw new Error("This server requires an API token.");
     }
 
@@ -195,8 +219,8 @@ async function connectAndLoad() {
     ]);
     const dashboardModel = buildBootstrapViewModel(summary);
     renderDashboard(dashboardModel);
-    renderInboxProcessing(
-      buildInboxProcessingViewModel(inboxContainers),
+    renderProcessWorkflow(
+      buildProcessWorkflowViewModel(inboxContainers),
       buildProjectOptions(projectsPage),
       defaultGuidedProjectTargetDate(dashboardModel.todayLabel),
     );
@@ -206,12 +230,12 @@ async function connectAndLoad() {
       `${settings.serverUrl} · database ${summary?.system?.database_status || "unknown"}`,
     );
   } catch (err) {
-    elements.dashboard.classList.add("hidden");
     setConnectionState(
       "error",
       "Connection needs attention",
       err instanceof Error ? err.message : String(err),
     );
+    setWorkflow("settings");
   }
 }
 
@@ -247,16 +271,28 @@ function renderDashboard(model) {
   renderBlocks(elements.todayBlocks, model.todayBlocks);
 }
 
-function renderInboxProcessing(model, projectOptions = [], projectTargetDate = "") {
+function renderCaptureWorkflow() {
+  const model = buildCaptureWorkflowViewModel();
+  elements.captureTitle.textContent = model.title;
+  elements.captureDescription.textContent = model.description;
+  elements.quickCaptureInput.placeholder = model.placeholder;
+  elements.quickCaptureForm.querySelector('button[type="submit"]').textContent =
+    model.primaryAction;
+}
+
+function renderProcessWorkflow(model, projectOptions = [], projectTargetDate = "") {
+  elements.processPosition.textContent = model.positionLabel;
   elements.inboxItems.replaceChildren();
-  if (!model.items.length) {
+  if (!model.queue.length) {
     elements.inboxItems.append(emptyState("Inbox is clear. Capture something when it appears."));
     return;
   }
 
-  for (const item of model.items.slice(0, 8)) {
+  for (const item of model.queue) {
     const row = document.createElement("div");
     row.className = "inbox-item";
+    row.classList.toggle("process-primary", item.id === model.activeItem?.id);
+    row.classList.toggle("process-queue", item.id !== model.activeItem?.id);
 
     const body = document.createElement("div");
     body.className = "inbox-item-body";
@@ -626,6 +662,12 @@ function showActionFeedback(feedback) {
   elements.actionFeedback.classList.remove("hidden");
 }
 
+for (const tab of elements.workflowTabs) {
+  tab.addEventListener("click", () => {
+    setWorkflow(tab.dataset.workflowTab);
+  });
+}
+
 elements.connectionForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   try {
@@ -638,6 +680,7 @@ elements.connectionForm.addEventListener("submit", async (event) => {
     connectAndLoad();
   } catch (err) {
     setConnectionState("error", "Invalid connection settings", err.message);
+    setWorkflow("settings");
   }
 });
 
@@ -816,6 +859,7 @@ elements.actionFeedback.addEventListener("click", async (event) => {
 async function initialize() {
   try {
     settings = await loadSettings(window.localStorage, tauriInvoke);
+    renderCaptureWorkflow();
     applySettingsToForm();
     await connectAndLoad();
   } catch (err) {
@@ -824,6 +868,7 @@ async function initialize() {
       "Secure token storage unavailable",
       err instanceof Error ? err.message : String(err),
     );
+    setWorkflow("settings");
   }
 }
 
