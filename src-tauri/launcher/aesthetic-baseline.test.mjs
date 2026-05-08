@@ -32,4 +32,19 @@ test("launcher keeps corner radii restrained", () => {
   assert.doesNotMatch(launcherCss, /\.primary-button,[\s\S]*?border-radius:\s*999px/);
   assert.doesNotMatch(launcherCss, /\.mini-button\s*\{[\s\S]*?border-radius:\s*999px/);
   assert.doesNotMatch(launcherCss, /\.ghost-button[\s\S]*?border-radius:\s*999px/);
+  assert.doesNotMatch(launcherCss, /\.workflow-tab[\s\S]*?border-radius:\s*999px/);
+});
+
+test("workflow shell has styled navigation and one-panel mobile layout", () => {
+  const launcherCss = readFileSync(launcherCssPath, "utf8");
+
+  assert.match(launcherCss, /\.workflow-nav\s*\{/);
+  assert.match(launcherCss, /\.workflow-tab\s*\{/);
+  assert.match(launcherCss, /\.workflow-tab\.is-active\s*\{/);
+  assert.match(launcherCss, /\.workflow-panel\s*\{/);
+  assert.match(launcherCss, /\.workflow-lede\s*\{/);
+  assert.match(launcherCss, /\.process-primary\s*\{/);
+  assert.match(launcherCss, /\.process-queue\s*\{/);
+  assert.match(launcherCss, /\.settings-panel\s*\{/);
+  assert.match(launcherCss, /@media \(max-width: 820px\)[\s\S]*\.workflow-nav/);
 });
