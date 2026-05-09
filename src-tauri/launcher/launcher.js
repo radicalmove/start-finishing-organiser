@@ -194,6 +194,7 @@ function setGuidance(labelElement, detailElement, label, detail) {
 }
 
 async function connectAndLoad() {
+  clearActionFeedback();
   await saveSettings(window.localStorage, settings, tauriInvoke);
   lastAuthRequired = null;
   applySettingsToForm();
@@ -637,10 +638,14 @@ function emptyState(text) {
   return empty;
 }
 
-function showActionFeedback(feedback) {
+function clearActionFeedback() {
   elements.actionFeedback.replaceChildren();
+  elements.actionFeedback.classList.add("hidden");
+}
+
+function showActionFeedback(feedback) {
+  clearActionFeedback();
   if (!feedback?.message) {
-    elements.actionFeedback.classList.add("hidden");
     return;
   }
 

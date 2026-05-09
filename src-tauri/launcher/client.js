@@ -296,7 +296,7 @@ export function buildProcessWorkflowViewModel(containers, activeIndex = 0) {
     ...base,
     activeItem,
     activeIndex: activeItem ? safeIndex : -1,
-    queue: base.items.slice(0, 6),
+    queue: activeItem ? [activeItem] : [],
     positionLabel: activeItem ? `${safeIndex + 1} of ${base.items.length}` : "Inbox clear",
   };
 }

@@ -25,6 +25,7 @@ The Rust branch currently has:
 - Guided processing polish with decision-card copy and personal category defaults for obvious personal captures.
 - Dev shell launch hardening with a distinct macOS bundle identity for worktree review builds.
 - iPhone workflow shape for Today, Capture, Process, and Settings against the shared Rust server.
+- Workflow shell UX review against seeded Rust data, including one-item Process refinement and stale feedback cleanup.
 - Mobile connection-shell guidance for loopback vs LAN/VPN vs HTTPS server URLs, auth status, and temporary token-storage limits.
 - Apple Keychain-backed API token storage for the Tauri macOS/iOS shell, with browser-only local-storage fallback for non-Tauri development.
 - Tauri iOS scaffold under `src-tauri/gen/apple`, including a verified debug simulator build, simulator launch, local server connection, and rustup toolchain pinning for Xcode's Rust prebuild phase.
@@ -104,6 +105,25 @@ Out of scope:
 - Weekly review.
 - Offline sync.
 - Physical iPhone signing.
+
+## Completed Slice: Workflow Shell UX Review
+
+This slice reviewed the shared Tauri shell against a disposable Rust database with realistic Today, Capture, Process, and Settings data.
+
+Minimum scope delivered:
+
+- Verified Today, Capture, Process, and Settings in the running macOS Tauri app.
+- Confirmed quick route and undo behavior against the Rust inbox API.
+- Fixed reconnect behavior so stale action feedback does not carry across servers or databases.
+- Refined Process so only the active inbox item is actionable, matching the one-item-at-a-time product rule.
+- Recorded the remaining UX risks in `docs/workflow_shell_ux_review.md`.
+
+Out of scope:
+
+- Physical iPhone signing.
+- Phone-native guided Process form steps.
+- Today task complete/reopen controls.
+- Weekly review and long-range planning.
 
 ## Completed Slice: Mobile Secure Storage
 

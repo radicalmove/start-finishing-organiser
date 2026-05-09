@@ -47,3 +47,10 @@ test("launcher uses workflow-specific capture and process models", () => {
   assert.match(launcherJs, /processPosition/);
   assert.match(launcherJs, /setWorkflow\("settings"\)/);
 });
+
+test("launcher clears stale action feedback before reconnecting", () => {
+  const launcherJs = readFileSync(launcherJsPath, "utf8");
+
+  assert.match(launcherJs, /function clearActionFeedback\(\)/);
+  assert.match(launcherJs, /async function connectAndLoad\(\) \{\n\s+clearActionFeedback\(\);/);
+});

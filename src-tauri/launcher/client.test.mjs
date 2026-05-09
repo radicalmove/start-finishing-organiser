@@ -151,7 +151,7 @@ test("capture workflow keeps quick capture focused", () => {
   });
 });
 
-test("process workflow chooses one primary inbox item and a bounded queue", () => {
+test("process workflow exposes only the active inbox item as actionable", () => {
   const model = buildProcessWorkflowViewModel({
     counts: { unprocessed: 3 },
     unprocessed: [
@@ -165,7 +165,7 @@ test("process workflow chooses one primary inbox item and a bounded queue", () =
   assert.equal(model.positionLabel, "1 of 3");
   assert.deepEqual(
     model.queue.map((item) => item.id),
-    ["task-1", "task-2", "task-3"],
+    ["task-1"],
   );
 });
 
