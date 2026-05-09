@@ -85,6 +85,26 @@ Use the existing bootstrap contract before adding phone-specific writes:
 - Waiting On due/overdue count.
 - Refresh and connection-state feedback.
 
+## Completed Slice: Workflow Shell
+
+This slice split the first Rust client into Today, Capture, Process, and Settings workflows so the Mac and iPhone clients do not inherit a single overloaded dashboard.
+
+Minimum scope delivered:
+
+- Top-level workflow navigation.
+- Settings-scoped server connection and auth guidance.
+- Dedicated quick-capture workflow.
+- Today workflow using the existing bootstrap summary.
+- Process workflow using existing inbox routing and guided capture APIs.
+
+Out of scope:
+
+- New backend APIs.
+- Full calendar editing.
+- Weekly review.
+- Offline sync.
+- Physical iPhone signing.
+
 ## Completed Slice: Mobile Secure Storage
 
 This slice moved the API token out of browser local storage for real Tauri app runs.

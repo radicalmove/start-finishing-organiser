@@ -160,6 +160,17 @@ The shared Rust shell now includes the first connection guidance needed by the m
 
 See `docs/rust_mobile_connection_shell.md` for the current iOS toolchain readiness check and the remaining mobile connection work.
 
+## Shared Workflow Shell Progress
+
+The shared Rust shell now implements the first navigation shape for Today, Capture, Process, and Settings. That gives the Mac and iPhone work a common product rhythm before either client receives deeper native polish.
+
+Still needed for iPhone:
+
+- Phone-specific spacing, thumb reach, and bottom-navigation review.
+- Physical-device signing and LAN/VPN connection testing.
+- A one-item-at-a-time Process refinement that avoids dense desktop-style forms.
+- Real-device secure-token storage verification through Apple Keychain.
+
 ## Review Questions
 
 Use these when testing the first phone build:
