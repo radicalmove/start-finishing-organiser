@@ -287,7 +287,6 @@ h3 {
   background:
     radial-gradient(circle at top right, rgba(45, 160, 255, 0.12), transparent 18rem),
     rgba(5, 3, 15, 0.34);
-  animation: rise-in 320ms ease both;
 }
 
 #workflow-today {
