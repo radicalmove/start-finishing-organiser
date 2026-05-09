@@ -26,6 +26,7 @@ The Rust branch currently has:
 - Dev shell launch hardening with a distinct macOS bundle identity for worktree review builds.
 - iPhone workflow shape for Today, Capture, Process, and Settings against the shared Rust server.
 - Workflow shell UX review against seeded Rust data, including one-item Process refinement and stale feedback cleanup.
+- Progressive guided Process form for Task, Project, and Waiting On decisions.
 - Mobile connection-shell guidance for loopback vs LAN/VPN vs HTTPS server URLs, auth status, and temporary token-storage limits.
 - Apple Keychain-backed API token storage for the Tauri macOS/iOS shell, with browser-only local-storage fallback for non-Tauri development.
 - Tauri iOS scaffold under `src-tauri/gen/apple`, including a verified debug simulator build, simulator launch, local server connection, and rustup toolchain pinning for Xcode's Rust prebuild phase.
@@ -124,6 +125,25 @@ Out of scope:
 - Phone-native guided Process form steps.
 - Today task complete/reopen controls.
 - Weekly review and long-range planning.
+
+## Completed Slice: Progressive Process Guidance
+
+This slice turned the dense guided Process form into a smaller step-by-step flow suitable for iPhone review.
+
+Minimum scope delivered:
+
+- Added a tested step plan for guided Process decisions.
+- Split the form into Type, Describe, and decision-specific Details/Save steps.
+- Kept the existing guided capture payload and backend API unchanged.
+- Preserved quick route/recycle/undo behavior around the guided flow.
+- Added responsive styling for the stepper and step sections.
+
+Out of scope:
+
+- iOS simulator review of the progressive flow.
+- A skip/defer action.
+- Native iOS controls.
+- New backend endpoints.
 
 ## Completed Slice: Mobile Secure Storage
 

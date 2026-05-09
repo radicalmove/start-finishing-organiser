@@ -375,6 +375,46 @@ export function guidedDecisionCopy(decision) {
   };
 }
 
+export function guidedProcessStepPlan(decision) {
+  const detailsStep =
+    decision === "project"
+      ? {
+          id: "details",
+          label: "Shape",
+          heading: "Shape the project",
+          description: "Set category, target date, and whether this belongs in the current week.",
+        }
+      : decision === "opp"
+        ? {
+            id: "details",
+            label: "Owner",
+            heading: "Name the owner",
+            description: "Choose the related project, who owns the next move, and save.",
+          }
+        : {
+            id: "details",
+            label: "Plan",
+            heading: "Plan the task",
+            description: "Choose project and time details, then save the decision.",
+          };
+
+  return [
+    {
+      id: "type",
+      label: "Type",
+      heading: "Choose the right shape",
+      description: "Decide whether this is your task, a project, or something you are waiting on.",
+    },
+    {
+      id: "describe",
+      label: "Describe",
+      heading: "Confirm title and notes",
+      description: "Keep only the context needed to make the next decision clear.",
+    },
+    detailsStep,
+  ];
+}
+
 export function inferGuidedProjectCategory(itemTitle, itemDescription = "") {
   const text = `${itemTitle || ""} ${itemDescription || ""}`;
   return PERSONAL_PROJECT_PATTERN.test(text) ? "personal" : "work";

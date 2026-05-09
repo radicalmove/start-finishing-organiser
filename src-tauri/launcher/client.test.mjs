@@ -16,6 +16,7 @@ import {
   buildBootstrapViewModel,
   defaultGuidedProjectTargetDate,
   guidedDecisionCopy,
+  guidedProcessStepPlan,
   inferGuidedProjectCategory,
   getTauriInvoke,
   loadSettings,
@@ -533,6 +534,28 @@ test("guided decision copy explains the active choice", () => {
     submitLabel: "Create project",
   });
   assert.equal(guidedDecisionCopy("opp").submitLabel, "Create Waiting On");
+});
+
+test("guided process step plan keeps clarification progressive", () => {
+  const taskPlan = guidedProcessStepPlan("task");
+
+  assert.deepEqual(
+    taskPlan.map((step) => step.id),
+    ["type", "describe", "details"],
+  );
+  assert.deepEqual(
+    taskPlan.map((step) => step.label),
+    ["Type", "Describe", "Plan"],
+  );
+  assert.match(taskPlan[2].description, /project and time/i);
+});
+
+test("guided process step plan tailors the final step by decision", () => {
+  assert.equal(guidedProcessStepPlan("project")[2].label, "Shape");
+  assert.match(guidedProcessStepPlan("project")[2].description, /category/i);
+
+  assert.equal(guidedProcessStepPlan("opp")[2].label, "Owner");
+  assert.match(guidedProcessStepPlan("opp")[2].description, /who owns/i);
 });
 
 test("guided project category defaults personal for obvious personal captures", () => {

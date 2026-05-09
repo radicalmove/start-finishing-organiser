@@ -12,6 +12,7 @@ import {
   defaultGuidedProjectTargetDate,
   getTauriInvoke,
   guidedDecisionCopy,
+  guidedProcessStepPlan,
   inferGuidedProjectCategory,
   loadSettings,
   requestJson,
@@ -344,64 +345,114 @@ function guidedCaptureDetails(item, projectOptions, projectTargetDate) {
   const form = document.createElement("form");
   form.className = "guided-form";
   form.dataset.sourceTaskId = item.id;
+  form.dataset.guidedStep = "type";
   const inferredCategory = inferGuidedProjectCategory(item.title, item.description);
 
   form.append(
-    decisionChoiceField(),
-    decisionCopyPanel(),
-    formField("Title", textInput("capture_text", item.title, "Action title")),
-    formField(
-      "Notes",
-      textAreaInput(
-        "description",
-        item.description === "No notes yet." ? "" : item.description,
-        "Useful context, constraints, or first thoughts",
+    guidedStepHeader(),
+    guidedStepSection(
+      "type",
+      decisionChoiceField(),
+      decisionCopyPanel(),
+    ),
+    guidedStepSection(
+      "describe",
+      formField("Title", textInput("capture_text", item.title, "Action title")),
+      formField(
+        "Notes",
+        textAreaInput(
+          "description",
+          item.description === "No notes yet." ? "" : item.description,
+          "Useful context, constraints, or first thoughts",
+        ),
       ),
     ),
-    formField("Existing project", projectSelect(projectOptions), "support-project-only"),
-    formField("Horizon", selectInput("horizon", HORIZON_OPTIONS)),
-    formField("Block type", selectInput("block_type", BLOCK_TYPE_OPTIONS), "task-only"),
-    formField(
-      "Minutes",
-      textInput("duration_minutes", "", "Optional", "number"),
-      "task-only",
+    guidedStepSection(
+      "details",
+      formField("Existing project", projectSelect(projectOptions), "support-project-only"),
+      formField("Horizon", selectInput("horizon", HORIZON_OPTIONS)),
+      formField("Block type", selectInput("block_type", BLOCK_TYPE_OPTIONS), "task-only"),
+      formField(
+        "Minutes",
+        textInput("duration_minutes", "", "Optional", "number"),
+        "task-only",
+      ),
+      checkboxField("Mark as frog", "frog", false, "task-only"),
+      formField(
+        "Project category",
+        selectInput("category", [
+          ["work", "Work"],
+          ["personal", "Personal"],
+        ], inferredCategory),
+        "project-only",
+      ),
+      formField(
+        "Target date",
+        textInput("target_date", projectTargetDate, "YYYY-MM-DD", "date"),
+        "project-only",
+      ),
+      checkboxField("Include this project this week", "include_this_week", true, "project-only"),
+      checkboxField("Allow non-action project title", "verb_check_ack", false, "project-only"),
+      formField(
+        "Waiting person",
+        textInput("waiting_person", "", "Who owns the next move?"),
+        "opp-only",
+      ),
+      checkboxField("I have checked this deserves time or attention", "displacement_ack", true),
     ),
-    checkboxField("Mark as frog", "frog", false, "task-only"),
-    formField(
-      "Project category",
-      selectInput("category", [
-        ["work", "Work"],
-        ["personal", "Personal"],
-      ], inferredCategory),
-      "project-only",
-    ),
-    formField(
-      "Target date",
-      textInput("target_date", projectTargetDate, "YYYY-MM-DD", "date"),
-      "project-only",
-    ),
-    checkboxField("Include this project this week", "include_this_week", true, "project-only"),
-    checkboxField("Allow non-action project title", "verb_check_ack", false, "project-only"),
-    formField(
-      "Waiting person",
-      textInput("waiting_person", "", "Who owns the next move?"),
-      "opp-only",
-    ),
-    checkboxField("I have checked this deserves time or attention", "displacement_ack", true),
   );
 
-  const actions = document.createElement("div");
-  actions.className = "guided-actions";
-  const submit = document.createElement("button");
-  submit.className = "primary-button";
-  submit.type = "submit";
-  submit.textContent = "Save decision";
-  actions.append(submit);
-  form.append(actions);
+  form.append(guidedStepActions());
 
   details.append(summary, form);
   syncGuidedForm(form);
   return details;
+}
+
+function guidedStepHeader() {
+  const header = document.createElement("div");
+  header.className = "guided-stepper";
+  return header;
+}
+
+function guidedStepSection(stepId, ...children) {
+  const section = document.createElement("section");
+  section.className = "guided-step";
+  section.dataset.guidedStep = stepId;
+  const heading = document.createElement("div");
+  heading.className = "guided-step-heading";
+  const title = document.createElement("strong");
+  title.dataset.guidedStepHeading = "true";
+  const description = document.createElement("span");
+  description.dataset.guidedStepDescription = "true";
+  heading.append(title, description);
+  section.append(heading, ...children);
+  return section;
+}
+
+function guidedStepActions() {
+  const actions = document.createElement("div");
+  actions.className = "guided-actions";
+
+  const back = document.createElement("button");
+  back.className = "mini-button quiet";
+  back.type = "button";
+  back.dataset.guidedAction = "back";
+  back.textContent = "Back";
+
+  const next = document.createElement("button");
+  next.className = "mini-button";
+  next.type = "button";
+  next.dataset.guidedAction = "next";
+  next.textContent = "Continue";
+
+  const submit = document.createElement("button");
+  submit.className = "primary-button";
+  submit.type = "submit";
+  submit.textContent = "Save decision";
+
+  actions.append(back, next, submit);
+  return actions;
 }
 
 function decisionChoiceField() {
@@ -531,6 +582,12 @@ function projectSelect(projectOptions) {
 function syncGuidedForm(form) {
   const decision = form.elements.decision.value || "task";
   const copy = guidedDecisionCopy(decision);
+  const plan = guidedProcessStepPlan(decision);
+  const stepIds = plan.map((step) => step.id);
+  if (!stepIds.includes(form.dataset.guidedStep)) {
+    form.dataset.guidedStep = stepIds[0];
+  }
+
   form.dataset.decision = decision;
   const copyHeading = form.querySelector("[data-decision-copy-heading]");
   const copyDescription = form.querySelector("[data-decision-copy-description]");
@@ -544,6 +601,9 @@ function syncGuidedForm(form) {
   if (submit) {
     submit.textContent = copy.submitLabel;
   }
+  syncGuidedStepper(form, plan);
+  syncGuidedSections(form, plan);
+  syncGuidedActions(form, plan);
 
   setSectionState(form, "project-only", decision === "project");
   setSectionState(form, "support-project-only", decision === "task" || decision === "opp");
@@ -559,6 +619,87 @@ function syncGuidedForm(form) {
   if (form.elements.waiting_person) {
     form.elements.waiting_person.required = decision === "opp";
   }
+}
+
+function syncGuidedStepper(form, plan) {
+  const stepper = form.querySelector(".guided-stepper");
+  if (!stepper) return;
+
+  stepper.replaceChildren();
+  const currentIndex = guidedStepIndex(form, plan);
+  for (const [index, step] of plan.entries()) {
+    const pill = document.createElement("button");
+    pill.className = "guided-step-pill";
+    pill.type = "button";
+    pill.dataset.guidedAction = "jump";
+    pill.dataset.guidedStepTarget = step.id;
+    pill.classList.toggle("is-active", step.id === form.dataset.guidedStep);
+    pill.classList.toggle("is-complete", index < currentIndex);
+    pill.disabled = index > currentIndex + 1;
+    pill.textContent = `${index + 1}. ${step.label}`;
+    stepper.append(pill);
+  }
+}
+
+function syncGuidedSections(form, plan) {
+  for (const section of form.querySelectorAll(".guided-step")) {
+    const step = plan.find((item) => item.id === section.dataset.guidedStep);
+    const active = section.dataset.guidedStep === form.dataset.guidedStep;
+    section.classList.toggle("hidden", !active);
+    const heading = section.querySelector("[data-guided-step-heading]");
+    const description = section.querySelector("[data-guided-step-description]");
+    if (heading) {
+      heading.textContent = step?.heading || "";
+    }
+    if (description) {
+      description.textContent = step?.description || "";
+    }
+  }
+}
+
+function syncGuidedActions(form, plan) {
+  const index = guidedStepIndex(form, plan);
+  const lastIndex = plan.length - 1;
+  const back = form.querySelector('[data-guided-action="back"]');
+  const next = form.querySelector('[data-guided-action="next"]');
+  const submit = form.querySelector('button[type="submit"]');
+
+  if (back) {
+    back.classList.toggle("hidden", index === 0);
+  }
+  if (next) {
+    next.classList.toggle("hidden", index === lastIndex);
+  }
+  if (submit) {
+    submit.classList.toggle("hidden", index !== lastIndex);
+  }
+}
+
+function guidedStepIndex(form, plan) {
+  return Math.max(0, plan.findIndex((step) => step.id === form.dataset.guidedStep));
+}
+
+function setGuidedStep(form, nextStepId) {
+  const plan = guidedProcessStepPlan(form.elements.decision.value || "task");
+  const step = plan.find((item) => item.id === nextStepId);
+  form.dataset.guidedStep = step ? step.id : plan[0].id;
+  syncGuidedForm(form);
+}
+
+function validateGuidedStep(form) {
+  const section = currentGuidedStepSection(form);
+  if (!section) return true;
+  for (const control of section.querySelectorAll("input, select, textarea")) {
+    if (!control.disabled && !control.checkValidity()) {
+      control.reportValidity();
+      return false;
+    }
+  }
+  return true;
+}
+
+function currentGuidedStepSection(form) {
+  return form.querySelector(`.guided-step[data-guided-step="${form.dataset.guidedStep}"]`);
 }
 
 function setSectionState(form, className, enabled) {
@@ -762,6 +903,37 @@ elements.dailyFocusForm.addEventListener("submit", async (event) => {
 });
 
 elements.inboxItems.addEventListener("click", async (event) => {
+  const guidedButton = event.target.closest("[data-guided-action]");
+  if (guidedButton) {
+    const form = guidedButton.closest(".guided-form");
+    if (!form) return;
+    const plan = guidedProcessStepPlan(form.elements.decision.value || "task");
+    const index = guidedStepIndex(form, plan);
+
+    if (guidedButton.dataset.guidedAction === "back") {
+      setGuidedStep(form, plan[Math.max(0, index - 1)].id);
+      return;
+    }
+    if (guidedButton.dataset.guidedAction === "next") {
+      if (validateGuidedStep(form)) {
+        setGuidedStep(form, plan[Math.min(plan.length - 1, index + 1)].id);
+      }
+      return;
+    }
+    if (guidedButton.dataset.guidedAction === "jump") {
+      if (guidedButton.dataset.guidedStepTarget === form.dataset.guidedStep) return;
+      const targetIndex = plan.findIndex(
+        (step) => step.id === guidedButton.dataset.guidedStepTarget,
+      );
+      const canMoveBack = targetIndex >= 0 && targetIndex < index;
+      const canMoveForward = targetIndex === index + 1 && validateGuidedStep(form);
+      if (canMoveBack || canMoveForward) {
+        setGuidedStep(form, guidedButton.dataset.guidedStepTarget);
+      }
+      return;
+    }
+  }
+
   const button = event.target.closest("[data-inbox-action]");
   if (!button) return;
 

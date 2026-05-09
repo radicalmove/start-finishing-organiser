@@ -168,7 +168,7 @@ Still needed for iPhone:
 
 - Phone-specific spacing, thumb reach, and bottom-navigation review.
 - Physical-device signing and LAN/VPN connection testing.
-- A one-item-at-a-time Process refinement that avoids dense desktop-style forms.
+- iOS simulator review of the progressive Process flow against realistic inbox items.
 - Real-device secure-token storage verification through Apple Keychain.
 
 ## Review Questions
