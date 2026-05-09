@@ -46,7 +46,7 @@ test("workflow shell has styled navigation and one-panel mobile layout", () => {
   assert.match(launcherCss, /\.process-primary\s*\{/);
   assert.match(launcherCss, /\.process-queue\s*\{/);
   assert.match(launcherCss, /\.settings-panel\s*\{/);
-  assert.match(launcherCss, /@media \(max-width: 820px\)[\s\S]*\.workflow-nav/);
+  assert.match(launcherCss, /@media \(max-width: 1024px\)[\s\S]*\.workflow-nav/);
 });
 
 test("workflow panels avoid display-toggle animations in the Tauri webview", () => {

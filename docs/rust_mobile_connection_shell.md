@@ -30,6 +30,8 @@ Available:
 - The wrapper clears the two ignored generated `.app` outputs first because repeat `cargo tauri ios build --debug --target aarch64-sim --ci` runs can fail when Tauri renames over a non-empty generated bundle directory.
 - The simulator bundle installs and launches on the iPhone 17 Pro simulator against the local Rust server at `http://127.0.0.1:8088`.
 - The simulator smoke run verified connection status, `/api/v1/bootstrap`, quick capture into the inbox, and the phone-reach copy.
+- A follow-up simulator run on 2026-05-10 verified the Process workflow against disposable Rust data, including Type -> Describe -> Plan guided conversion and queue advancement after task creation.
+- The shared shell now accounts for the wider Tauri iOS WebView layout viewport, prevents horizontal overflow, and shows the actionable Process queue before inbox stats on phone-sized layouts.
 - The generated Xcode prebuild script pins `CARGO` and `RUSTC` to rustup's `$HOME/.cargo/bin` tools, because Homebrew Rust is earlier on this machine's default `PATH` and does not have the iOS std targets.
 - API token persistence now uses Tauri commands backed by Apple Keychain on macOS/iOS. Legacy local-storage tokens are migrated into Keychain the first time the Tauri shell loads with native storage available.
 

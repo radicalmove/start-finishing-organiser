@@ -30,6 +30,7 @@ The Rust branch currently has:
 - Mobile connection-shell guidance for loopback vs LAN/VPN vs HTTPS server URLs, auth status, and temporary token-storage limits.
 - Apple Keychain-backed API token storage for the Tauri macOS/iOS shell, with browser-only local-storage fallback for non-Tauri development.
 - Tauri iOS scaffold under `src-tauri/gen/apple`, including a verified debug simulator build, simulator launch, local server connection, and rustup toolchain pinning for Xcode's Rust prebuild phase.
+- iOS simulator Process review with phone-layout fixes, queue-first mobile ordering, and a verified guided inbox item to task conversion.
 - Python SQLite dry-run import and real import for projects/tasks/blocks/waiting_on.
 - Rust database backup file creation before import writes.
 - Backup manifest endpoint for current Rust tables.
@@ -86,6 +87,32 @@ Use the existing bootstrap contract before adding phone-specific writes:
 - Short Today task list.
 - Waiting On due/overdue count.
 - Refresh and connection-state feedback.
+
+### 3. Today Task Complete/Reopen Controls
+
+Finish the smallest useful Today write path before weekly review:
+
+- Complete and reopen Today tasks from the shared shell.
+- Keep action feedback reversible where the API supports it.
+- Verify the controls on Mac and iPhone simulator layouts before adding larger planning surfaces.
+
+## Completed Slice: iOS Progressive Process Review
+
+This slice reviewed the progressive Process flow on the iPhone simulator and fixed the mobile layout issues found during that review.
+
+Minimum scope delivered:
+
+- Widened the responsive breakpoint for Tauri iOS WebView layout widths.
+- Added horizontal overflow protection for the shared shell.
+- Put the actionable Process decision queue before inbox stats on phone layouts.
+- Verified Type -> Describe -> Plan task conversion against disposable Rust data in the iPhone 17 Pro simulator.
+- Confirmed no separate skip/defer action is needed yet because Park, Learning, Enjoy, and Recycle already cover the lightweight triage paths.
+
+Out of scope:
+
+- Physical iPhone signing and install.
+- Phone-native controls beyond responsive shell refinement.
+- Today task complete/reopen controls.
 
 ## Completed Slice: Workflow Shell
 

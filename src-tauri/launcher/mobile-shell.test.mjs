@@ -13,3 +13,17 @@ test("mobile shell opts into iOS safe-area layout", () => {
   assert.match(launcherCss, /env\(safe-area-inset-top/);
   assert.match(launcherCss, /body::after/);
 });
+
+test("mobile shell applies phone layout to iOS WebView viewport widths", () => {
+  const launcherCss = readFileSync(launcherCssPath, "utf8");
+
+  assert.match(launcherCss, /overflow-x:\s*hidden/);
+  assert.match(launcherCss, /@media \(max-width: 1024px\)[\s\S]*\.hero-card/);
+  assert.match(launcherCss, /@media \(max-width: 1024px\)[\s\S]*\.workflow-nav/);
+});
+
+test("mobile process view puts the actionable queue before inbox stats", () => {
+  const launcherCss = readFileSync(launcherCssPath, "utf8");
+
+  assert.match(launcherCss, /@media \(max-width: 1024px\)[\s\S]*\.inbox-processing-panel\s*\{[\s\S]*order:\s*-1/);
+});
