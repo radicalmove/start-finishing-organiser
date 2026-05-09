@@ -19,7 +19,7 @@ The Rust branch currently has:
 - Waiting On / OPP API with task owner type, create/list/update/resolve, and guided capture integration.
 - API token auth with public auth-status discovery, env-based server config, and Mac mini deployment runbook.
 - First static Tauri client shell with server settings, API token auth, Bootstrap/Home rendering, quick capture, direct inbox processing, and inline guided inbox conversion.
-- Home/Today daily context with One Thing/Frog, ritual status, Waiting On counts, and shell editing for daily focus.
+- Home/Today daily context with One Thing/Frog, ritual status, Waiting On counts, shell editing for daily focus, and Today task complete/reopen controls.
 - Hands-on Tauri shell UX review against seeded Rust data, covering direct inbox routing, OPP conversion, and new-project conversion.
 - Connected-state shell polish with reduced chrome and success/undo feedback for reversible inbox actions.
 - Guided processing polish with decision-card copy and personal category defaults for obvious personal captures.
@@ -47,7 +47,7 @@ This is a good foundation and now has a first reviewable client surface. It cove
 | Guided capture | Wizard decides task/project/inbox/OPP and routes source inbox items | Backend task/project/source processing API, including OPP waiting item creation, plus decision-card shell form | Very high | Covered enough for Mac real-use review; iPhone still needs a compact workflow. |
 | Inbox containers | Learning, Enjoy, Parked, Recycle bin, undo, metrics | Backend route/recycle/restore/containers API and shell processing panel with undo/restore feedback | Very high | Covered enough for real-use review; richer history can wait. |
 | Blocks/calendar | Focus/Admin/Social/Recovery blocks, appointments, week calendar | Core API, import, backup | Very high | Covered enough for a Bootstrap/Home summary slice; UI and external calendars are still pending. |
-| Home/Today | Inbox, Today calendar, Now strip, One Thing/Frog, Today tasks | Bootstrap summary, first shell rendering, daily focus, ritual status, Waiting On counts, and compact connected chrome | Very high | Covered enough for real-use review; next focus is guided flow quality. |
+| Home/Today | Inbox, Today calendar, Now strip, One Thing/Frog, Today tasks | Bootstrap summary, shell rendering, daily focus, ritual status, Waiting On counts, compact connected chrome, and Today task complete/reopen controls | Very high | Covered enough for a hands-on execution UX review before adding weekly review. |
 | Weekly review | 4+3 focus, resurfacing, block planning, archive completed | Not covered | High | Port after Home primitives; depends on projects, tasks, blocks, resurface. |
 | Resurface | Pull Month/Quarter/Later due items into Week | Partly possible through task fields | Medium-high | Add with weekly review or just before it. |
 | Waiting On / OPP | Captures other-owned priorities and follow-up dates | Backend API and guided capture integration | Medium-high | Add Home/bootstrap summary later if the client needs it. |
@@ -88,13 +88,30 @@ Use the existing bootstrap contract before adding phone-specific writes:
 - Waiting On due/overdue count.
 - Refresh and connection-state feedback.
 
-### 3. Today Task Complete/Reopen Controls
+### 3. Today Execution UX Review
 
-Finish the smallest useful Today write path before weekly review:
+Use the shared shell with seeded or real data before adding weekly review:
+
+- Verify complete/reopen controls on macOS and iOS simulator layouts.
+- Check whether completed Today tasks are visible enough to reverse mistakes without distracting from pending work.
+- Decide whether Today needs a phone-specific layout or whether the current responsive shell is good enough for the next product slice.
+
+## Completed Slice: Today Task Complete/Reopen Controls
+
+This slice finished the smallest useful Today write path before weekly review.
+
+Minimum scope delivered:
 
 - Complete and reopen Today tasks from the shared shell.
-- Keep action feedback reversible where the API supports it.
-- Verify the controls on Mac and iPhone simulator layouts before adding larger planning surfaces.
+- Keep completed Today tasks visible so Reopen is available in context.
+- Preserve reversible action feedback by offering the opposite lifecycle action.
+- Include completed Today tasks in the bootstrap summary while still excluding archived work.
+
+Out of scope:
+
+- Weekly review and long-range planning.
+- Physical iPhone signing.
+- Full native phone redesign.
 
 ## Completed Slice: iOS Progressive Process Review
 

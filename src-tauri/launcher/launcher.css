@@ -996,6 +996,28 @@ textarea:focus {
   padding: 12px;
 }
 
+.list-row-body {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.today-task-row {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+}
+
+.today-task-row.is-complete {
+  opacity: 0.72;
+}
+
+.today-task-row.is-complete strong {
+  color: var(--sfo-muted);
+  text-decoration: line-through;
+  text-decoration-thickness: 2px;
+}
+
 .list-row span,
 .inbox-item span,
 .inbox-item small,
@@ -1156,6 +1178,10 @@ textarea:focus {
   }
 
   .inbox-item {
+    grid-template-columns: 1fr;
+  }
+
+  .today-task-row {
     grid-template-columns: 1fr;
   }
 

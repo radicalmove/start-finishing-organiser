@@ -9,6 +9,7 @@ import {
   buildGuidedCapturePayload,
   buildGuidedCaptureFeedback,
   buildInboxActionFeedback,
+  buildTodayTaskActionFeedback,
   buildInboxProcessingViewModel,
   buildProcessWorkflowViewModel,
   buildJsonHeaders,
@@ -265,8 +266,21 @@ test("bootstrap view model favors current work and bounded counts", () => {
       recycle_bin: 5,
     },
     today_tasks: [
-      { verb_noun: "Write shell tests", block_type: "focus", frog: true },
-      { verb_noun: "Check docs", block_type: "admin", frog: false },
+      {
+        id: "task-1",
+        verb_noun: "Write shell tests",
+        block_type: "focus",
+        frog: true,
+        status: "pending",
+      },
+      {
+        id: "task-2",
+        verb_noun: "Check docs",
+        block_type: "admin",
+        frog: false,
+        status: "done",
+        completed_at: "2026-05-06T09:45:00Z",
+      },
     ],
     today_blocks: [
       {
@@ -313,6 +327,12 @@ test("bootstrap view model favors current work and bounded counts", () => {
   assert.equal(model.now.time, "09:00-10:30");
   assert.equal(model.inboxTotal, 15);
   assert.equal(model.todayTasks[0].meta, "focus · Frog");
+  assert.equal(model.todayTasks[0].id, "task-1");
+  assert.equal(model.todayTasks[0].completed, false);
+  assert.equal(model.todayTasks[0].lifecycleAction, "complete");
+  assert.equal(model.todayTasks[1].completed, true);
+  assert.equal(model.todayTasks[1].lifecycleAction, "reopen");
+  assert.equal(model.todayTasks[1].completedAt, "2026-05-06T09:45:00Z");
   assert.equal(model.weeklyProjects[0].title, "Ship client shell");
   assert.equal(model.dailyFocus.oneThing, "Ship the Rust client shell");
   assert.equal(model.dailyFocus.frog, "Make the first uncomfortable call");
@@ -505,6 +525,36 @@ test("inbox action feedback exposes undo paths for reversible actions", () => {
       undoPath: "/api/v1/inbox/task-2/restore",
       undoLabel: "Restore",
       restoredMessage: 'Restored "this item" to Inbox.',
+    },
+  );
+});
+
+test("today task action feedback exposes reversible lifecycle paths", () => {
+  assert.deepEqual(
+    buildTodayTaskActionFeedback({
+      action: "complete",
+      taskId: "task-1",
+      taskTitle: "Write shell tests",
+    }),
+    {
+      message: 'Completed "Write shell tests".',
+      undoPath: "/api/v1/tasks/task-1/reopen",
+      undoLabel: "Reopen",
+      restoredMessage: 'Reopened "Write shell tests".',
+    },
+  );
+
+  assert.deepEqual(
+    buildTodayTaskActionFeedback({
+      action: "reopen",
+      taskId: "task-2",
+      taskTitle: "",
+    }),
+    {
+      message: 'Reopened "this task".',
+      undoPath: "/api/v1/tasks/task-2/complete",
+      undoLabel: "Complete",
+      restoredMessage: 'Completed "this task".',
     },
   );
 });

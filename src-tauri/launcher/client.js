@@ -190,15 +190,24 @@ export function buildBootstrapViewModel(summary) {
     title: project.title || "Untitled project",
     meta: compactJoin([project.category, project.time_horizon]),
   }));
-  const todayTasks = (summary?.today_tasks || []).map((task) => ({
-    title: task.verb_noun || "Untitled task",
-    description: task.description || "No notes yet.",
-    meta: compactJoin([
-      task.block_type,
-      task.frog ? "Frog" : "",
-      task.alignment,
-    ]),
-  }));
+  const todayTasks = (summary?.today_tasks || []).map((task) => {
+    const completed = task.status === "done" || Boolean(task.completed_at);
+    return {
+      id: task.id || "",
+      title: task.verb_noun || "Untitled task",
+      description: task.description || "No notes yet.",
+      meta: compactJoin([
+        task.block_type,
+        task.frog ? "Frog" : "",
+        task.alignment,
+      ]),
+      status: task.status || "pending",
+      completed,
+      completedAt: task.completed_at || "",
+      lifecycleAction: completed ? "reopen" : "complete",
+      lifecycleLabel: completed ? "Reopen" : "Complete",
+    };
+  });
   const todayBlocks = (summary?.today_blocks || []).map(blockView);
   const dailyFocus = {
     oneThing: summary?.daily_focus?.one_thing || "",
@@ -440,6 +449,26 @@ export function buildInboxActionFeedback({ action, itemId, itemTitle, intentLabe
   };
 }
 
+export function buildTodayTaskActionFeedback({ action, taskId, taskTitle }) {
+  const title = displayTaskTitle(taskTitle);
+  const encodedTaskId = encodeURIComponent(String(taskId || ""));
+  if (action === "reopen") {
+    return {
+      message: `Reopened "${title}".`,
+      undoPath: encodedTaskId ? `/api/v1/tasks/${encodedTaskId}/complete` : "",
+      undoLabel: "Complete",
+      restoredMessage: `Completed "${title}".`,
+    };
+  }
+
+  return {
+    message: `Completed "${title}".`,
+    undoPath: encodedTaskId ? `/api/v1/tasks/${encodedTaskId}/reopen` : "",
+    undoLabel: "Reopen",
+    restoredMessage: `Reopened "${title}".`,
+  };
+}
+
 export function buildGuidedCaptureFeedback(decision, itemTitle) {
   const title = displayItemTitle(itemTitle);
   const noun =
@@ -486,6 +515,10 @@ function optionalText(value) {
 
 function displayItemTitle(value) {
   return optionalText(value) || "this item";
+}
+
+function displayTaskTitle(value) {
+  return optionalText(value) || "this task";
 }
 
 function setOptional(target, key, value) {

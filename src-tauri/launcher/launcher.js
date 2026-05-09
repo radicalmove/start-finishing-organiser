@@ -8,6 +8,7 @@ import {
   buildProcessWorkflowViewModel,
   buildProjectOptions,
   buildBootstrapViewModel,
+  buildTodayTaskActionFeedback,
   clearSettings,
   defaultGuidedProjectTargetDate,
   getTauriInvoke,
@@ -268,7 +269,7 @@ function renderDashboard(model) {
   elements.frogInput.value = model.dailyFocus.frog;
   elements.ritualStatus.textContent = ritualStatusText(model.rituals);
   elements.waitingSummary.textContent = model.waiting.label;
-  renderItems(elements.todayTasks, model.todayTasks, "No Today tasks yet.");
+  renderTodayTasks(elements.todayTasks, model.todayTasks);
   renderItems(elements.weeklyProjects, model.weeklyProjects, "No weekly projects selected.");
   renderBlocks(elements.todayBlocks, model.todayBlocks);
 }
@@ -751,6 +752,43 @@ function renderItems(container, items, emptyText) {
   }
 }
 
+function renderTodayTasks(container, tasks) {
+  container.replaceChildren();
+  if (!tasks.length) {
+    container.append(emptyState("No Today tasks yet."));
+    return;
+  }
+
+  for (const task of tasks.slice(0, 6)) {
+    const row = document.createElement("div");
+    row.className = "list-row today-task-row";
+    row.classList.toggle("is-complete", Boolean(task.completed));
+
+    const body = document.createElement("div");
+    body.className = "list-row-body";
+    const title = document.createElement("strong");
+    title.textContent = task.title;
+    const meta = document.createElement("span");
+    meta.textContent = [
+      task.meta || task.description || "",
+      task.completed ? "Done" : "",
+    ].filter(Boolean).join(" · ");
+    body.append(title, meta);
+
+    const button = document.createElement("button");
+    button.className = task.completed ? "mini-button quiet" : "mini-button";
+    button.type = "button";
+    button.dataset.todayTaskAction = task.lifecycleAction;
+    button.dataset.taskId = task.id;
+    button.dataset.taskTitle = task.title;
+    button.disabled = !task.id;
+    button.textContent = task.lifecycleLabel || (task.completed ? "Reopen" : "Complete");
+
+    row.append(body, button);
+    container.append(row);
+  }
+}
+
 function renderBlocks(container, blocks) {
   container.replaceChildren();
   if (!blocks.length) {
@@ -899,6 +937,36 @@ elements.dailyFocusForm.addEventListener("submit", async (event) => {
   } finally {
     elements.oneThingInput.disabled = false;
     elements.frogInput.disabled = false;
+  }
+});
+
+elements.todayTasks.addEventListener("click", async (event) => {
+  const button = event.target.closest("[data-today-task-action]");
+  if (!button) return;
+
+  const action = button.dataset.todayTaskAction;
+  const taskId = button.dataset.taskId;
+  if (!taskId || !["complete", "reopen"].includes(action)) return;
+
+  button.disabled = true;
+  try {
+    const feedback = buildTodayTaskActionFeedback({
+      action,
+      taskId,
+      taskTitle: button.dataset.taskTitle,
+    });
+    await requestJson(
+      window.fetch.bind(window),
+      settings,
+      `/api/v1/tasks/${encodeURIComponent(taskId)}/${action}`,
+      { method: "POST" },
+    );
+    await connectAndLoad();
+    showActionFeedback(feedback);
+  } catch (err) {
+    setConnectionState("error", "Today task update failed", err.message);
+  } finally {
+    button.disabled = false;
   }
 });
 

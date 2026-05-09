@@ -44,8 +44,18 @@ test("launcher uses workflow-specific capture and process models", () => {
 
   assert.match(launcherJs, /buildCaptureWorkflowViewModel/);
   assert.match(launcherJs, /buildProcessWorkflowViewModel/);
+  assert.match(launcherJs, /renderTodayTasks/);
   assert.match(launcherJs, /processPosition/);
   assert.match(launcherJs, /setWorkflow\("settings"\)/);
+});
+
+test("launcher wires Today task complete and reopen actions", () => {
+  const launcherJs = readFileSync(launcherJsPath, "utf8");
+
+  assert.match(launcherJs, /data-today-task-action/);
+  assert.match(launcherJs, /buildTodayTaskActionFeedback/);
+  assert.match(launcherJs, /todayTasks\.addEventListener\("click"/);
+  assert.match(launcherJs, /\/api\/v1\/tasks\/\$\{encodeURIComponent\(taskId\)\}\/\$\{action\}/);
 });
 
 test("launcher clears stale action feedback before reconnecting", () => {

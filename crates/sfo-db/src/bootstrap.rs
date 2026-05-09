@@ -25,8 +25,9 @@ pub async fn today_tasks(pool: &sqlx::SqlitePool, _today: NaiveDate) -> Result<V
         r#"
         SELECT * FROM tasks
         WHERE when_bucket = 'today'
-          AND status IN ('pending', 'in_progress')
-        ORDER BY block_type IS NULL ASC, block_type ASC,
+          AND status IN ('pending', 'in_progress', 'done')
+        ORDER BY CASE WHEN status = 'done' THEN 1 ELSE 0 END ASC,
+                 block_type IS NULL ASC, block_type ASC,
                  priority IS NULL ASC, priority ASC, created_at DESC
         "#,
     )
@@ -107,7 +108,7 @@ mod tests {
     use crate::planning::{create_project, create_task, update_task};
     use crate::schedule::create_block;
     use crate::{connect, run_migrations, DbConfig};
-    use chrono::{NaiveDate, NaiveTime};
+    use chrono::{NaiveDate, NaiveTime, Utc};
     use sfo_core::{
         BlockCreate, BlockType, ProjectCategory, ProjectCreate, TaskCreate, TaskStatus, WhenBucket,
         INBOX_INTENT_LEARN_EXPLORE, INBOX_INTENT_UNPROCESSED,
@@ -231,6 +232,62 @@ mod tests {
         let inbox = inbox_summary(&pool).await.expect("inbox summary");
         assert_eq!(inbox.unprocessed, 1);
         assert_eq!(inbox.learn_explore, 1);
+    }
+
+    #[tokio::test]
+    async fn today_tasks_include_completed_items_for_reopen_controls() {
+        let pool = migrated_pool().await;
+        let today = NaiveDate::from_ymd_opt(2026, 5, 6).expect("today");
+        create_task(
+            &pool,
+            TaskCreate {
+                verb_noun: "Pending today".to_string(),
+                project_id: None,
+                description: None,
+                in_inbox: false,
+                when_bucket: WhenBucket::Today,
+                block_type: Some(BlockType::Focus),
+                duration_minutes: None,
+                priority: Some(1),
+                frog: false,
+                alignment: None,
+                first_action: None,
+                scheduled_for: None,
+                owner_type: Default::default(),
+            },
+        )
+        .await
+        .expect("pending task");
+        let mut done = create_task(
+            &pool,
+            TaskCreate {
+                verb_noun: "Done today".to_string(),
+                project_id: None,
+                description: None,
+                in_inbox: false,
+                when_bucket: WhenBucket::Today,
+                block_type: Some(BlockType::Admin),
+                duration_minutes: None,
+                priority: Some(2),
+                frog: false,
+                alignment: None,
+                first_action: None,
+                scheduled_for: None,
+                owner_type: Default::default(),
+            },
+        )
+        .await
+        .expect("done task");
+        done.status = TaskStatus::Done;
+        done.completed_at = Some(Utc::now());
+        update_task(&pool, &done).await.expect("mark done");
+
+        let tasks = today_tasks(&pool, today).await.expect("today tasks");
+
+        assert_eq!(tasks.len(), 2);
+        assert_eq!(tasks[0].verb_noun, "Pending today");
+        assert_eq!(tasks[1].verb_noun, "Done today");
+        assert_eq!(tasks[1].status, TaskStatus::Done);
     }
 
     #[tokio::test]
