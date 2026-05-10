@@ -10,6 +10,8 @@ import {
   buildGuidedCaptureFeedback,
   buildInboxActionFeedback,
   buildTodayTaskActionFeedback,
+  buildWeeklyReviewActionFeedback,
+  buildWeeklyReviewViewModel,
   buildInboxProcessingViewModel,
   buildProcessWorkflowViewModel,
   buildJsonHeaders,
@@ -139,7 +141,7 @@ test("getTauriInvoke finds the global Tauri core invoke function", () => {
 test("workflow metadata exposes the intended app paths", () => {
   assert.deepEqual(
     WORKFLOWS.map((workflow) => workflow.id),
-    ["today", "capture", "process", "settings"],
+    ["today", "capture", "process", "review", "settings"],
   );
   assert.equal(WORKFLOWS[0].label, "Today");
 });
@@ -177,6 +179,68 @@ test("process workflow handles an empty inbox", () => {
   assert.equal(model.activeItem, null);
   assert.equal(model.positionLabel, "Inbox clear");
   assert.deepEqual(model.queue, []);
+});
+
+test("weekly review view model exposes focus counts and review queues", () => {
+  const model = buildWeeklyReviewViewModel({
+    review_date: "2026-05-10",
+    week_starts_on: "2026-05-04",
+    focus_counts: {
+      work: { current: 3, cap: 4 },
+      personal: { current: 2, cap: 3 },
+    },
+    weekly_projects: [
+      {
+        id: "p1",
+        title: "Ship Rust review",
+        category: "work",
+        time_horizon: "week",
+      },
+    ],
+    available_projects: [
+      {
+        id: "p1",
+        title: "Ship Rust review",
+        category: "work",
+        active_this_week: true,
+      },
+      {
+        id: "p2",
+        title: "Family reset",
+        category: "personal",
+        active_this_week: false,
+      },
+    ],
+    resurface_due: [
+      {
+        id: "t1",
+        title: "Revisit parked task",
+        when_bucket: "month",
+        resurface_on: "2026-05-09",
+      },
+    ],
+    completed_tasks: [
+      {
+        id: "t2",
+        title: "Finished task",
+        completed_at: "2026-05-10T08:00:00Z",
+      },
+    ],
+  });
+
+  assert.equal(model.reviewLabel, "Week of 2026-05-04");
+  assert.equal(model.focusCounts.work.label, "3 / 4 work");
+  assert.equal(model.weeklyProjects[0].title, "Ship Rust review");
+  assert.equal(model.focusCandidates[1].toggleLabel, "Add to week");
+  assert.equal(model.resurfaceDue[0].actionLabel, "Move to Week");
+  assert.equal(model.completedTasks[0].actionLabel, "Archive");
+});
+
+test("weekly review action feedback keeps irreversible move-to-week copy plain", () => {
+  assert.deepEqual(buildWeeklyReviewActionFeedback("move-to-week", "Revisit parked task"), {
+    message: "Moved Revisit parked task into this week.",
+    undo: null,
+  });
 });
 
 test("connection guidance treats loopback servers as simulator or Mac only", () => {

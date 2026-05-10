@@ -9,6 +9,7 @@ export const WORKFLOWS = [
   { id: "today", label: "Today" },
   { id: "capture", label: "Capture" },
   { id: "process", label: "Process" },
+  { id: "review", label: "Review" },
   { id: "settings", label: "Settings" },
 ];
 
@@ -321,6 +322,69 @@ export function buildProjectOptions(projectPage) {
   }));
 }
 
+export function buildWeeklyReviewViewModel(summary) {
+  const workCount = focusCountView(summary?.focus_counts?.work, "work");
+  const personalCount = focusCountView(summary?.focus_counts?.personal, "personal");
+  const weeklyProjects = (summary?.weekly_projects || []).map(reviewProjectView);
+  const focusCandidates = (summary?.available_projects || []).map((project) => {
+    const active = Boolean(project.active_this_week);
+    return {
+      ...reviewProjectView(project),
+      active,
+      toggleLabel: active ? "Drop from week" : "Add to week",
+      nextActive: !active,
+    };
+  });
+
+  return {
+    reviewDate: summary?.review_date || "",
+    weekStartsOn: summary?.week_starts_on || "",
+    reviewLabel: summary?.week_starts_on ? `Week of ${summary.week_starts_on}` : "Weekly Review",
+    focusCounts: {
+      work: workCount,
+      personal: personalCount,
+    },
+    weeklyProjects,
+    focusCandidates,
+    resurfaceDue: (summary?.resurface_due || []).map((task) =>
+      reviewTaskView(task, "Move to Week"),
+    ),
+    completedTasks: (summary?.completed_tasks || []).map((task) =>
+      reviewTaskView(task, "Archive"),
+    ),
+    emptyWeeklyProjects: "No weekly projects selected.",
+    emptyFocusCandidates: "No active projects available to add.",
+    emptyResurfaceDue: "No due resurfacing tasks.",
+    emptyCompletedTasks: "No completed tasks to archive this week.",
+  };
+}
+
+export function buildWeeklyReviewActionFeedback(action, title) {
+  const itemTitle = displayItemTitle(title);
+  if (action === "move-to-week") {
+    return {
+      message: `Moved ${itemTitle} into this week.`,
+      undo: null,
+    };
+  }
+  if (action === "archive") {
+    return {
+      message: `Archived ${itemTitle}.`,
+      undo: { label: "Restore", action: "restore-task" },
+    };
+  }
+  if (action === "focus-off") {
+    return {
+      message: `Dropped ${itemTitle} from this week.`,
+      undo: null,
+    };
+  }
+  return {
+    message: `Added ${itemTitle} to this week.`,
+    undo: null,
+  };
+}
+
 export function buildGuidedCapturePayload(decision, sourceTaskId, values) {
   const title = optionalText(values.capture_text) || "";
   const payload = {
@@ -498,6 +562,47 @@ function blockView(block) {
     title: block.title || titleCase(`${block.block_type || "time"} block`),
     time: compactJoin([trimSeconds(block.start_time), trimSeconds(block.end_time)], "-"),
     meta: titleCase(block.block_type || ""),
+  };
+}
+
+function focusCountView(count, fallbackCategory) {
+  const current = Number(count?.current || 0);
+  const cap = Number(count?.cap || 0);
+  const category = count?.category || fallbackCategory;
+  return {
+    category,
+    current,
+    cap,
+    label: `${current} / ${cap} ${category}`,
+    atCap: cap > 0 && current >= cap,
+  };
+}
+
+function reviewProjectView(project) {
+  return {
+    id: project.id || "",
+    title: project.title || "Untitled project",
+    meta: compactJoin([
+      project.category,
+      project.time_horizon,
+      project.target_date ? `target ${project.target_date}` : "",
+    ]),
+    description: project.description || project.why_link_text || "",
+    category: project.category || "",
+  };
+}
+
+function reviewTaskView(task, actionLabel) {
+  return {
+    id: task.id || "",
+    title: task.title || task.verb_noun || "Untitled task",
+    description: task.description || "",
+    meta: compactJoin([
+      task.when_bucket,
+      task.resurface_on ? `due ${task.resurface_on}` : "",
+      task.completed_at ? `completed ${String(task.completed_at).slice(0, 10)}` : "",
+    ]),
+    actionLabel,
   };
 }
 
