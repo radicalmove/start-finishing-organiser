@@ -11,10 +11,11 @@ use sfo_core::{
     ImportDryRunRequest, InboxContainers, InboxRouteRequest, Page, Project, ProjectCreate,
     ProjectId, ProjectUpdate, PythonSqliteImportReport, PythonSqliteImportRequest, QuickCapture,
     Task, TaskCreate, TaskId, TaskUpdate, WaitingId, WaitingOn, WaitingOnCreate, WaitingOnUpdate,
+    WeeklyReviewSummary, WeeklyReviewTask,
 };
 use sfo_services::{
     BootstrapService, CaptureService, InboxService, PlanningService, ScheduleService, ServiceError,
-    SystemService, WaitingService,
+    SystemService, WaitingService, WeeklyReviewService,
 };
 use std::str::FromStr;
 
@@ -30,6 +31,11 @@ struct PageQuery {
 struct BootstrapQuery {
     date: Option<NaiveDate>,
     time: Option<NaiveTime>,
+}
+
+#[derive(Debug, Deserialize)]
+struct WeeklyReviewQuery {
+    date: Option<NaiveDate>,
 }
 
 #[derive(Debug, Serialize)]
@@ -115,6 +121,11 @@ pub fn router() -> Router<AppState> {
         .route("/tasks/{task_id}/reopen", post(reopen_task))
         .route("/tasks/{task_id}/archive", post(archive_task))
         .route("/tasks/{task_id}/restore", post(restore_task))
+        .route("/weekly-review", get(weekly_review))
+        .route(
+            "/weekly-review/tasks/{task_id}/move-to-week",
+            post(move_task_to_week),
+        )
         .route("/blocks", get(list_blocks).post(create_block))
         .route(
             "/blocks/{block_id}",
@@ -162,6 +173,25 @@ async fn save_daily_focus(
     let today = Utc::now().date_naive();
     let service = BootstrapService::new(state.db);
     Ok(Json(service.save_daily_focus(today, payload).await?))
+}
+
+async fn weekly_review(
+    State(state): State<AppState>,
+    Query(query): Query<WeeklyReviewQuery>,
+) -> Result<Json<WeeklyReviewSummary>, ApiError> {
+    let review_date = query.date.unwrap_or_else(|| Utc::now().date_naive());
+    let service = WeeklyReviewService::new(state.db);
+    Ok(Json(service.summary(review_date).await?))
+}
+
+async fn move_task_to_week(
+    State(state): State<AppState>,
+    Path(task_id): Path<String>,
+) -> Result<Json<WeeklyReviewTask>, ApiError> {
+    let service = WeeklyReviewService::new(state.db);
+    Ok(Json(
+        service.move_task_to_week(parse_task_id(&task_id)?).await?,
+    ))
 }
 
 async fn list_projects(
