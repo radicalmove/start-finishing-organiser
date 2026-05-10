@@ -8,6 +8,7 @@ pub mod planning;
 pub mod ritual;
 pub mod schedule;
 pub mod waiting;
+pub mod weekly_review;
 
 use sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePoolOptions};
 use std::str::FromStr;
