@@ -7,6 +7,7 @@ pub mod ritual;
 pub mod schedule;
 pub mod system;
 pub mod waiting;
+pub mod weekly_review;
 
 pub use bootstrap::*;
 pub use capture::*;
@@ -17,3 +18,4 @@ pub use ritual::*;
 pub use schedule::*;
 pub use system::*;
 pub use waiting::*;
+pub use weekly_review::*;
