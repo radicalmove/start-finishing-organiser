@@ -20,6 +20,7 @@ The Rust branch currently has:
 - API token auth with public auth-status discovery, env-based server config, and Mac mini deployment runbook.
 - First static Tauri client shell with server settings, API token auth, Bootstrap/Home rendering, quick capture, direct inbox processing, and inline guided inbox conversion.
 - Home/Today daily context with One Thing/Frog, ritual status, Waiting On counts, shell editing for daily focus, and Today task complete/reopen controls.
+- Weekly Review API and Review shell workflow with 4+3 focus counts/toggles, due resurfacing queue, move-to-week, and completed-task archive/restore feedback.
 - Hands-on Tauri shell UX review against seeded Rust data, covering direct inbox routing, OPP conversion, and new-project conversion.
 - Connected-state shell polish with reduced chrome and success/undo feedback for reversible inbox actions.
 - Guided processing polish with decision-card copy and personal category defaults for obvious personal captures.
@@ -49,8 +50,8 @@ This is a good foundation and now has a first reviewable client surface. It cove
 | Inbox containers | Learning, Enjoy, Parked, Recycle bin, undo, metrics | Backend route/recycle/restore/containers API and shell processing panel with undo/restore feedback | Very high | Covered enough for real-use review; richer history can wait. |
 | Blocks/calendar | Focus/Admin/Social/Recovery blocks, appointments, week calendar | Core API, import, backup | Very high | Covered enough for a Bootstrap/Home summary slice; UI and external calendars are still pending. |
 | Home/Today | Inbox, Today calendar, Now strip, One Thing/Frog, Today tasks | Bootstrap summary, shell rendering, daily focus, ritual status, Waiting On counts, compact connected chrome, Today task complete/reopen controls, and hands-on execution review | Very high | Covered enough for the shared shell; next Today work should come from physical iPhone testing or deeper weekly-review needs. |
-| Weekly review | 4+3 focus, resurfacing, block planning, archive completed | Not covered | High | Port after Home primitives; depends on projects, tasks, blocks, resurface. |
-| Resurface | Pull Month/Quarter/Later due items into Week | Partly possible through task fields | Medium-high | Add with weekly review or just before it. |
+| Weekly review | 4+3 focus, resurfacing, block planning, archive completed | First API and shell workflow: focus counts/toggles, due resurfacing, move-to-week, archive completed | High | Validate with real weekly use before adding review notes, block planning, or more admin surface. |
+| Resurface | Pull Month/Quarter/Later due items into Week | Weekly Review due queue and move-to-week action | Medium-high | Covered for the first review loop; richer horizon review belongs with long-range planning. |
 | Waiting On / OPP | Captures other-owned priorities and follow-up dates | Backend API and guided capture integration | Medium-high | Add Home/bootstrap summary later if the client needs it. |
 | Rituals | Morning/midday/evening check-ins and Home status | Not covered | Medium | Defer until Home/Blocks exist. |
 | Health | Full health/training module | Not covered | Medium | Large independent slice; do not block first Mac/iPhone planning app. |
@@ -79,14 +80,14 @@ Move the generated iOS target from simulator-only toward real phone use:
 - Add Apple development-team signing when moving from simulator to a physical device.
 - Verify a physical iPhone can reach the Mac mini server URL on the intended LAN/VPN path.
 
-### 2. Weekly Review Product Slice
+### 2. Weekly Review UX Deepening
 
-Port the next high-value planning loop now that capture, process, and Today execution are reviewable:
+The first Review workflow now exists. Next review work should be based on actual usage rather than adding fields by default:
 
-- Weekly 4+3 focus review.
-- Resurface candidates from later horizons.
-- Archive or move completed weekly work.
-- Keep the UI focused on reducing commitments, not expanding admin.
+- Check whether the Review tab reduces commitments or creates admin drag.
+- Add persisted review notes only if there is a clear recall need.
+- Add week calendar/block planning only after the current Review loop proves useful.
+- Keep the long-range board separate from the lightweight weekly check-in.
 
 ### 3. Phone-Native Today Refinement
 
@@ -113,6 +114,24 @@ Out of scope:
 - Physical iPhone signing and LAN/VPN install.
 - Weekly review and long-range planning.
 - A phone-native rewrite of Today cards.
+
+## Completed Slice: Weekly Review Product Slice
+
+This slice added the first weekly planning loop to the Rust rewrite without adding new persisted review tables.
+
+Minimum scope delivered:
+
+- Weekly Review summary API with review date, week start, work/personal focus counts, active projects, available projects, due resurfacing tasks, and completed tasks.
+- Move-to-week action for due resurfacing tasks.
+- Review workflow in the shared Tauri launcher with focus toggles, due-task move-to-week, completed-task archive, restore feedback, and mobile-readable layout.
+- Client view-model tests, HTTP API tests, service/repository tests, and launcher shell coverage for the fifth workflow.
+
+Out of scope:
+
+- Persisted review notes.
+- Week calendar/block planning inside Review.
+- Long-range horizon board.
+- Physical iPhone signing and real-device LAN verification.
 
 ## Completed Slice: Today Task Complete/Reopen Controls
 
