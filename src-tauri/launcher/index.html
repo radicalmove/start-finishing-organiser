@@ -30,6 +30,7 @@
         <button class="workflow-tab is-active" type="button" data-workflow-tab="today" aria-selected="true">Today</button>
         <button class="workflow-tab" type="button" data-workflow-tab="capture" aria-selected="false">Capture</button>
         <button class="workflow-tab" type="button" data-workflow-tab="process" aria-selected="false">Process</button>
+        <button class="workflow-tab" type="button" data-workflow-tab="review" aria-selected="false">Review</button>
         <button class="workflow-tab" type="button" data-workflow-tab="settings" aria-selected="false">Settings</button>
       </nav>
 
@@ -139,6 +140,61 @@
                 <p>Quick-route loose items, or clarify them into a task, project, or OPP item.</p>
               </div>
               <div class="inbox-list" id="inbox-items"></div>
+            </article>
+          </div>
+        </section>
+
+        <section class="workflow-panel hidden" data-workflow-panel="review" id="workflow-review">
+          <div class="section-heading">
+            <div>
+              <div class="eyebrow" id="review-date-label">Weekly Review</div>
+              <h2>Review the week</h2>
+              <p class="workflow-lede">
+                Keep the active list deliberate, pull due resurfacing tasks forward, and clear
+                completed work before it clutters the next week.
+              </p>
+            </div>
+            <button class="ghost-button" id="review-refresh" type="button">Refresh Review</button>
+          </div>
+
+          <div class="review-count-grid" aria-label="Weekly focus counts">
+            <article class="review-count-card">
+              <span>Work focus</span>
+              <strong id="review-work-count">0 / 3 work</strong>
+            </article>
+            <article class="review-count-card">
+              <span>Personal focus</span>
+              <strong id="review-personal-count">0 / 2 personal</strong>
+            </article>
+          </div>
+
+          <div class="review-grid">
+            <article class="panel review-panel">
+              <div class="panel-kicker">Current Week</div>
+              <h3>Active Projects</h3>
+              <p class="panel-note">This should stay small enough to make visible progress.</p>
+              <div class="review-list" id="review-weekly-projects"></div>
+            </article>
+
+            <article class="panel review-panel">
+              <div class="panel-kicker">Focus Candidates</div>
+              <h3>Add or drop projects</h3>
+              <p class="panel-note">Use this when a project deserves weekly attention now.</p>
+              <div class="review-list" id="review-focus-candidates"></div>
+            </article>
+
+            <article class="panel review-panel">
+              <div class="panel-kicker">Resurface</div>
+              <h3>Due to reconsider</h3>
+              <p class="panel-note">Move useful work into this week; leave the rest parked.</p>
+              <div class="review-list" id="review-resurface-due"></div>
+            </article>
+
+            <article class="panel review-panel">
+              <div class="panel-kicker">Cleanup</div>
+              <h3>Completed Tasks</h3>
+              <p class="panel-note">Archive finished items once you are satisfied they are done.</p>
+              <div class="review-list" id="review-completed-tasks"></div>
             </article>
           </div>
         </section>

@@ -9,6 +9,8 @@ import {
   buildProjectOptions,
   buildBootstrapViewModel,
   buildTodayTaskActionFeedback,
+  buildWeeklyReviewActionFeedback,
+  buildWeeklyReviewViewModel,
   clearSettings,
   defaultGuidedProjectTargetDate,
   getTauriInvoke,
@@ -102,6 +104,14 @@ const elements = {
   todayTasks: document.getElementById("today-tasks"),
   weeklyProjects: document.getElementById("weekly-projects"),
   todayBlocks: document.getElementById("today-blocks"),
+  reviewDateLabel: document.getElementById("review-date-label"),
+  reviewRefresh: document.getElementById("review-refresh"),
+  reviewWorkCount: document.getElementById("review-work-count"),
+  reviewPersonalCount: document.getElementById("review-personal-count"),
+  reviewWeeklyProjects: document.getElementById("review-weekly-projects"),
+  reviewFocusCandidates: document.getElementById("review-focus-candidates"),
+  reviewResurfaceDue: document.getElementById("review-resurface-due"),
+  reviewCompletedTasks: document.getElementById("review-completed-tasks"),
 };
 
 const tauriInvoke = getTauriInvoke(window);
@@ -215,10 +225,11 @@ async function connectAndLoad() {
       throw new Error("This server requires an API token.");
     }
 
-    const [summary, inboxContainers, projectsPage] = await Promise.all([
+    const [summary, inboxContainers, projectsPage, weeklyReview] = await Promise.all([
       requestJson(window.fetch.bind(window), settings, "/api/v1/bootstrap"),
       requestJson(window.fetch.bind(window), settings, "/api/v1/inbox/containers"),
       requestJson(window.fetch.bind(window), settings, "/api/v1/projects?page=1&page_size=100"),
+      requestJson(window.fetch.bind(window), settings, "/api/v1/weekly-review"),
     ]);
     const dashboardModel = buildBootstrapViewModel(summary);
     renderDashboard(dashboardModel);
@@ -227,6 +238,7 @@ async function connectAndLoad() {
       buildProjectOptions(projectsPage),
       defaultGuidedProjectTargetDate(dashboardModel.todayLabel),
     );
+    renderWeeklyReview(buildWeeklyReviewViewModel(weeklyReview));
     setConnectionState(
       "ready",
       auth?.auth_required ? "Connected with API token" : "Connected without auth",
@@ -240,6 +252,24 @@ async function connectAndLoad() {
     );
     setWorkflow("settings");
   }
+}
+
+async function refreshDashboardAndReview() {
+  const [summary, weeklyReview] = await Promise.all([
+    requestJson(window.fetch.bind(window), settings, "/api/v1/bootstrap"),
+    requestJson(window.fetch.bind(window), settings, "/api/v1/weekly-review"),
+  ]);
+  renderDashboard(buildBootstrapViewModel(summary));
+  renderWeeklyReview(buildWeeklyReviewViewModel(weeklyReview));
+}
+
+async function reloadWeeklyReview() {
+  const weeklyReview = await requestJson(
+    window.fetch.bind(window),
+    settings,
+    "/api/v1/weekly-review",
+  );
+  renderWeeklyReview(buildWeeklyReviewViewModel(weeklyReview));
 }
 
 function renderDashboard(model) {
@@ -334,6 +364,148 @@ function renderProcessWorkflow(model, projectOptions = [], projectTargetDate = "
     row.append(body, actions, guidedCaptureDetails(item, projectOptions, projectTargetDate));
     elements.inboxItems.append(row);
   }
+}
+
+function renderWeeklyReview(model) {
+  elements.reviewDateLabel.textContent = model.reviewLabel;
+  elements.reviewWorkCount.textContent = model.focusCounts.work.label;
+  elements.reviewPersonalCount.textContent = model.focusCounts.personal.label;
+  elements.reviewWorkCount
+    .closest(".review-count-card")
+    ?.classList.toggle("at-cap", model.focusCounts.work.atCap);
+  elements.reviewPersonalCount
+    .closest(".review-count-card")
+    ?.classList.toggle("at-cap", model.focusCounts.personal.atCap);
+
+  renderReviewProjects(
+    elements.reviewWeeklyProjects,
+    model.weeklyProjects,
+    model.emptyWeeklyProjects,
+  );
+  renderReviewFocusCandidates(
+    elements.reviewFocusCandidates,
+    model.focusCandidates,
+    model.emptyFocusCandidates,
+  );
+  renderReviewTasks(
+    elements.reviewResurfaceDue,
+    model.resurfaceDue,
+    model.emptyResurfaceDue,
+    "move-to-week",
+  );
+  renderReviewTasks(
+    elements.reviewCompletedTasks,
+    model.completedTasks,
+    model.emptyCompletedTasks,
+    "archive-task",
+  );
+}
+
+function renderReviewProjects(container, projects, emptyText) {
+  container.replaceChildren();
+  if (!projects.length) {
+    container.append(emptyState(emptyText));
+    return;
+  }
+
+  for (const project of projects) {
+    container.append(reviewProjectCard(project));
+  }
+}
+
+function renderReviewFocusCandidates(container, projects, emptyText) {
+  container.replaceChildren();
+  if (!projects.length) {
+    container.append(emptyState(emptyText));
+    return;
+  }
+
+  for (const project of projects) {
+    container.append(reviewProjectCard(project, "focus-toggle"));
+  }
+}
+
+function renderReviewTasks(container, tasks, emptyText, action) {
+  container.replaceChildren();
+  if (!tasks.length) {
+    container.append(emptyState(emptyText));
+    return;
+  }
+
+  for (const task of tasks) {
+    container.append(reviewTaskRow(task, action));
+  }
+}
+
+function reviewProjectCard(project, action = "") {
+  const card = document.createElement("div");
+  card.className = "review-card";
+  card.classList.toggle("is-active", Boolean(project.active));
+
+  const body = document.createElement("div");
+  body.className = "review-card-body";
+  const title = document.createElement("strong");
+  title.textContent = project.title;
+  const meta = document.createElement("span");
+  meta.textContent = project.meta || project.category || "";
+  body.append(title, meta);
+  if (project.description) {
+    const description = document.createElement("small");
+    description.textContent = project.description;
+    body.append(description);
+  }
+  card.append(body);
+
+  if (action) {
+    const actions = document.createElement("div");
+    actions.className = "review-card-actions";
+    const button = document.createElement("button");
+    button.className = project.active ? "mini-button quiet" : "mini-button";
+    button.type = "button";
+    button.dataset.reviewAction = action;
+    button.dataset.projectId = project.id;
+    button.dataset.projectTitle = project.title;
+    button.dataset.nextActive = String(project.nextActive);
+    button.disabled = !project.id;
+    button.textContent = project.toggleLabel;
+    actions.append(button);
+    card.append(actions);
+  }
+
+  return card;
+}
+
+function reviewTaskRow(task, action) {
+  const row = document.createElement("div");
+  row.className = "review-task-row";
+
+  const body = document.createElement("div");
+  body.className = "review-task-body";
+  const title = document.createElement("strong");
+  title.textContent = task.title;
+  const meta = document.createElement("span");
+  meta.textContent = task.meta || task.description || "";
+  body.append(title, meta);
+  if (task.description && task.meta) {
+    const description = document.createElement("span");
+    description.textContent = task.description;
+    body.append(description);
+  }
+
+  const actions = document.createElement("div");
+  actions.className = "review-task-actions";
+  const button = document.createElement("button");
+  button.className = action === "archive-task" ? "mini-button quiet" : "mini-button";
+  button.type = "button";
+  button.dataset.reviewAction = action;
+  button.dataset.taskId = task.id;
+  button.dataset.taskTitle = task.title;
+  button.disabled = !task.id;
+  button.textContent = task.actionLabel;
+  actions.append(button);
+
+  row.append(body, actions);
+  return row;
 }
 
 function guidedCaptureDetails(item, projectOptions, projectTargetDate) {
@@ -886,6 +1058,18 @@ elements.refreshDashboard.addEventListener("click", () => {
   connectAndLoad();
 });
 
+elements.reviewRefresh.addEventListener("click", async () => {
+  elements.reviewRefresh.disabled = true;
+  try {
+    await reloadWeeklyReview();
+    showActionFeedback({ message: "Weekly review refreshed." });
+  } catch (err) {
+    setConnectionState("error", "Weekly review refresh failed", err.message);
+  } finally {
+    elements.reviewRefresh.disabled = false;
+  }
+});
+
 elements.quickCaptureForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   const verbNoun = elements.quickCaptureInput.value.trim();
@@ -970,6 +1154,82 @@ elements.todayTasks.addEventListener("click", async (event) => {
     button.disabled = false;
   }
 });
+
+for (const container of [
+  elements.reviewFocusCandidates,
+  elements.reviewResurfaceDue,
+  elements.reviewCompletedTasks,
+]) {
+  container.addEventListener("click", async (event) => {
+    const button = event.target.closest("[data-review-action]");
+    if (!button) return;
+
+    button.disabled = true;
+    try {
+      if (button.dataset.reviewAction === "focus-toggle") {
+        const projectId = button.dataset.projectId;
+        const nextActive = button.dataset.nextActive === "true";
+        if (!projectId) return;
+
+        await requestJson(
+          window.fetch.bind(window),
+          settings,
+          `/api/v1/projects/${encodeURIComponent(projectId)}`,
+          {
+            method: "PATCH",
+            body: { active_this_week: nextActive },
+          },
+        );
+        await refreshDashboardAndReview();
+        showActionFeedback(
+          buildWeeklyReviewActionFeedback(
+            nextActive ? "focus-on" : "focus-off",
+            button.dataset.projectTitle,
+          ),
+        );
+        return;
+      }
+
+      const taskId = button.dataset.taskId;
+      if (!taskId) return;
+
+      if (button.dataset.reviewAction === "move-to-week") {
+        await requestJson(
+          window.fetch.bind(window),
+          settings,
+          `/api/v1/weekly-review/tasks/${encodeURIComponent(taskId)}/move-to-week`,
+          { method: "POST" },
+        );
+        await refreshDashboardAndReview();
+        showActionFeedback(
+          buildWeeklyReviewActionFeedback("move-to-week", button.dataset.taskTitle),
+        );
+        return;
+      }
+
+      if (button.dataset.reviewAction === "archive-task") {
+        const feedback = buildWeeklyReviewActionFeedback("archive", button.dataset.taskTitle);
+        await requestJson(
+          window.fetch.bind(window),
+          settings,
+          `/api/v1/tasks/${encodeURIComponent(taskId)}/archive`,
+          { method: "POST" },
+        );
+        await refreshDashboardAndReview();
+        showActionFeedback({
+          message: feedback.message,
+          undoPath: `/api/v1/tasks/${encodeURIComponent(taskId)}/restore`,
+          undoLabel: feedback.undo?.label || "Restore",
+          restoredMessage: `Restored "${button.dataset.taskTitle || "this task"}".`,
+        });
+      }
+    } catch (err) {
+      setConnectionState("error", "Weekly review action failed", err.message);
+    } finally {
+      button.disabled = false;
+    }
+  });
+}
 
 elements.inboxItems.addEventListener("click", async (event) => {
   const guidedButton = event.target.closest("[data-guided-action]");

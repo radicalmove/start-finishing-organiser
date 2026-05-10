@@ -42,3 +42,11 @@ test("mobile process view puts the actionable queue before inbox stats", () => {
 
   assert.match(launcherCss, /@media \(max-width: 1024px\)[\s\S]*\.inbox-processing-panel\s*\{[\s\S]*order:\s*-1/);
 });
+
+test("mobile review view stays readable with five workflow tabs", () => {
+  const launcherCss = readFileSync(launcherCssPath, "utf8");
+
+  assert.match(launcherCss, /\.review-grid/);
+  assert.match(launcherCss, /\.review-count-grid/);
+  assert.match(launcherCss, /@media \(max-width: 1024px\)[\s\S]*\.review-grid\s*\{[\s\S]*grid-template-columns:\s*1fr/);
+});

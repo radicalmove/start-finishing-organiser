@@ -246,7 +246,7 @@ h3 {
 
 .workflow-nav {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 10px;
   margin-top: 18px;
   padding: 8px;
@@ -346,6 +346,106 @@ h3 {
 
 .process-queue {
   opacity: 0.82;
+}
+
+.review-count-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 20px;
+}
+
+.review-count-card {
+  display: grid;
+  gap: 6px;
+  padding: 16px;
+}
+
+.review-count-card span {
+  color: var(--sfo-muted);
+  font-size: 12px;
+  font-weight: 850;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.review-count-card strong {
+  color: white;
+  font-size: 24px;
+  letter-spacing: -0.03em;
+}
+
+.review-count-card.at-cap {
+  border-color: rgba(255, 200, 87, 0.34);
+  background:
+    radial-gradient(circle at top right, rgba(255, 200, 87, 0.1), transparent 12rem),
+    rgba(5, 3, 15, 0.38);
+}
+
+.review-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.review-panel {
+  min-height: 250px;
+}
+
+.panel-note {
+  margin-bottom: 0;
+  color: var(--sfo-muted);
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.review-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.review-card,
+.review-task-row {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+}
+
+.review-card.is-active {
+  border-color: rgba(73, 246, 163, 0.3);
+  background:
+    radial-gradient(circle at top right, rgba(73, 246, 163, 0.08), transparent 12rem),
+    rgba(5, 3, 15, 0.38);
+}
+
+.review-card-body,
+.review-task-body {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.review-card-body span,
+.review-card-body small,
+.review-task-body span {
+  color: var(--sfo-muted);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.review-card-actions,
+.review-task-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.review-task-row {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
 }
 
 .settings-panel {
@@ -750,6 +850,9 @@ textarea:focus {
 .list-row,
 .block-card,
 .inbox-item,
+.review-count-card,
+.review-card,
+.review-task-row,
 .empty-state {
   border: 1px solid var(--sfo-line);
   border-radius: var(--sfo-radius-md);
@@ -1106,7 +1209,8 @@ textarea:focus {
   .hero-card,
   .dashboard-grid,
   .connection-form,
-  .process-layout {
+  .process-layout,
+  .review-grid {
     grid-template-columns: 1fr;
   }
 
@@ -1155,7 +1259,8 @@ textarea:focus {
   .daily-focus-form,
   .quick-capture,
   .action-feedback,
-  .connection-guidance {
+  .connection-guidance,
+  .review-count-grid {
     grid-template-columns: 1fr;
   }
 
@@ -1188,6 +1293,10 @@ textarea:focus {
   }
 
   .today-task-row {
+    grid-template-columns: 1fr;
+  }
+
+  .review-task-row {
     grid-template-columns: 1fr;
   }
 

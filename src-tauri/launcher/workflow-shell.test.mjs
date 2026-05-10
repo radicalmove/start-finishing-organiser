@@ -5,10 +5,10 @@ import test from "node:test";
 const indexHtmlPath = new URL("./index.html", import.meta.url);
 const launcherJsPath = new URL("./launcher.js", import.meta.url);
 
-test("launcher exposes the four top-level workflows", () => {
+test("launcher exposes the five top-level workflows", () => {
   const indexHtml = readFileSync(indexHtmlPath, "utf8");
 
-  for (const workflow of ["today", "capture", "process", "settings"]) {
+  for (const workflow of ["today", "capture", "process", "review", "settings"]) {
     assert.match(indexHtml, new RegExp(`data-workflow-tab="${workflow}"`));
     assert.match(indexHtml, new RegExp(`data-workflow-panel="${workflow}"`));
   }
@@ -17,6 +17,7 @@ test("launcher exposes the four top-level workflows", () => {
   assert.match(indexHtml, /Today/);
   assert.match(indexHtml, /Capture/);
   assert.match(indexHtml, /Process/);
+  assert.match(indexHtml, /Review/);
   assert.match(indexHtml, /Settings/);
 });
 
@@ -82,4 +83,13 @@ test("launcher renders guided process as progressive steps", () => {
   assert.match(launcherJs, /dataset\.guidedStep/);
   assert.match(launcherJs, /function setGuidedStep\(/);
   assert.match(launcherJs, /data-guided-action/);
+});
+
+test("launcher wires weekly review actions", () => {
+  const launcherJs = readFileSync(launcherJsPath, "utf8");
+
+  assert.match(launcherJs, /buildWeeklyReviewViewModel/);
+  assert.match(launcherJs, /weekly-review/);
+  assert.match(launcherJs, /data-review-action/);
+  assert.match(launcherJs, /move-to-week/);
 });
