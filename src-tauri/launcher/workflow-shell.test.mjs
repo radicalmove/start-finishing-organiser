@@ -65,6 +65,15 @@ test("launcher clears stale action feedback before reconnecting", () => {
   assert.match(launcherJs, /async function connectAndLoad\(\) \{\n\s+clearActionFeedback\(\);/);
 });
 
+test("launcher clears action feedback when switching workflows", () => {
+  const launcherJs = readFileSync(launcherJsPath, "utf8");
+
+  assert.match(
+    launcherJs,
+    /tab\.addEventListener\("click", \(\) => \{\n\s+clearActionFeedback\(\);\n\s+setWorkflow\(tab\.dataset\.workflowTab\);/,
+  );
+});
+
 test("launcher renders guided process as progressive steps", () => {
   const launcherJs = readFileSync(launcherJsPath, "utf8");
 

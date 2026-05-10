@@ -848,6 +848,7 @@ function showActionFeedback(feedback) {
 
 for (const tab of elements.workflowTabs) {
   tab.addEventListener("click", () => {
+    clearActionFeedback();
     setWorkflow(tab.dataset.workflowTab);
   });
 }

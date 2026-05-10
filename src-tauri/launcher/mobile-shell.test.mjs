@@ -22,6 +22,21 @@ test("mobile shell applies phone layout to iOS WebView viewport widths", () => {
   assert.match(launcherCss, /@media \(max-width: 1024px\)[\s\S]*\.workflow-nav/);
 });
 
+test("mobile shell constrains iOS visual viewport width", () => {
+  const launcherCss = readFileSync(launcherCssPath, "utf8");
+
+  assert.match(launcherCss, /@supports \(width: 100svw\)/);
+  assert.match(launcherCss, /width:\s*min\(calc\(100svw - 20px\), 680px\)/);
+  assert.match(launcherCss, /\.status-card > div\s*\{[\s\S]*min-width:\s*0/);
+  assert.match(launcherCss, /\.status-detail\s*\{[\s\S]*overflow-wrap:\s*anywhere/);
+});
+
+test("mobile shell prevents iOS input focus zoom", () => {
+  const launcherCss = readFileSync(launcherCssPath, "utf8");
+
+  assert.match(launcherCss, /input,\s*select,\s*textarea\s*\{[^}]*font-size:\s*16px/);
+});
+
 test("mobile process view puts the actionable queue before inbox stats", () => {
   const launcherCss = readFileSync(launcherCssPath, "utf8");
 

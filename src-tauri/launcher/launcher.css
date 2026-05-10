@@ -204,6 +204,10 @@ h3 {
   background: rgba(5, 3, 15, 0.48);
 }
 
+.status-card > div {
+  min-width: 0;
+}
+
 .status-dot {
   width: 14px;
   height: 14px;
@@ -232,6 +236,7 @@ h3 {
   color: var(--sfo-muted);
   font-size: 13px;
   line-height: 1.4;
+  overflow-wrap: anywhere;
 }
 
 .connection-card,
@@ -532,6 +537,7 @@ textarea {
   padding: 0 15px;
   color: var(--sfo-text);
   background: rgba(5, 3, 15, 0.58);
+  font-size: 16px;
 }
 
 textarea {
@@ -1200,5 +1206,13 @@ textarea:focus {
 
   .inbox-actions {
     justify-content: flex-start;
+  }
+}
+
+@supports (width: 100svw) {
+  @media (max-width: 1024px) {
+    .app-shell {
+      width: min(calc(100svw - 20px), 680px);
+    }
   }
 }

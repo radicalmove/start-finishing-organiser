@@ -27,6 +27,7 @@ The Rust branch currently has:
 - iPhone workflow shape for Today, Capture, Process, and Settings against the shared Rust server.
 - Workflow shell UX review against seeded Rust data, including one-item Process refinement and stale feedback cleanup.
 - Progressive guided Process form for Task, Project, and Waiting On decisions.
+- Hands-on Today execution review in the macOS shell and iOS simulator, including Today task lifecycle, workflow-scoped feedback, and mobile Settings viewport/input focus fixes.
 - Mobile connection-shell guidance for loopback vs LAN/VPN vs HTTPS server URLs, auth status, and temporary token-storage limits.
 - Apple Keychain-backed API token storage for the Tauri macOS/iOS shell, with browser-only local-storage fallback for non-Tauri development.
 - Tauri iOS scaffold under `src-tauri/gen/apple`, including a verified debug simulator build, simulator launch, local server connection, and rustup toolchain pinning for Xcode's Rust prebuild phase.
@@ -47,7 +48,7 @@ This is a good foundation and now has a first reviewable client surface. It cove
 | Guided capture | Wizard decides task/project/inbox/OPP and routes source inbox items | Backend task/project/source processing API, including OPP waiting item creation, plus decision-card shell form | Very high | Covered enough for Mac real-use review; iPhone still needs a compact workflow. |
 | Inbox containers | Learning, Enjoy, Parked, Recycle bin, undo, metrics | Backend route/recycle/restore/containers API and shell processing panel with undo/restore feedback | Very high | Covered enough for real-use review; richer history can wait. |
 | Blocks/calendar | Focus/Admin/Social/Recovery blocks, appointments, week calendar | Core API, import, backup | Very high | Covered enough for a Bootstrap/Home summary slice; UI and external calendars are still pending. |
-| Home/Today | Inbox, Today calendar, Now strip, One Thing/Frog, Today tasks | Bootstrap summary, shell rendering, daily focus, ritual status, Waiting On counts, compact connected chrome, and Today task complete/reopen controls | Very high | Covered enough for a hands-on execution UX review before adding weekly review. |
+| Home/Today | Inbox, Today calendar, Now strip, One Thing/Frog, Today tasks | Bootstrap summary, shell rendering, daily focus, ritual status, Waiting On counts, compact connected chrome, Today task complete/reopen controls, and hands-on execution review | Very high | Covered enough for the shared shell; next Today work should come from physical iPhone testing or deeper weekly-review needs. |
 | Weekly review | 4+3 focus, resurfacing, block planning, archive completed | Not covered | High | Port after Home primitives; depends on projects, tasks, blocks, resurface. |
 | Resurface | Pull Month/Quarter/Later due items into Week | Partly possible through task fields | Medium-high | Add with weekly review or just before it. |
 | Waiting On / OPP | Captures other-owned priorities and follow-up dates | Backend API and guided capture integration | Medium-high | Add Home/bootstrap summary later if the client needs it. |
@@ -78,23 +79,40 @@ Move the generated iOS target from simulator-only toward real phone use:
 - Add Apple development-team signing when moving from simulator to a physical device.
 - Verify a physical iPhone can reach the Mac mini server URL on the intended LAN/VPN path.
 
-### 2. Mobile Today Read-Only
+### 2. Weekly Review Product Slice
 
-Use the existing bootstrap contract before adding phone-specific writes:
+Port the next high-value planning loop now that capture, process, and Today execution are reviewable:
 
-- Now card.
-- Next block.
-- Short Today task list.
-- Waiting On due/overdue count.
-- Refresh and connection-state feedback.
+- Weekly 4+3 focus review.
+- Resurface candidates from later horizons.
+- Archive or move completed weekly work.
+- Keep the UI focused on reducing commitments, not expanding admin.
 
-### 3. Today Execution UX Review
+### 3. Phone-Native Today Refinement
 
-Use the shared shell with seeded or real data before adding weekly review:
+Defer deeper phone-specific Today design until after a physical-device pass:
 
-- Verify complete/reopen controls on macOS and iOS simulator layouts.
-- Check whether completed Today tasks are visible enough to reverse mistakes without distracting from pending work.
-- Decide whether Today needs a phone-specific layout or whether the current responsive shell is good enough for the next product slice.
+- Verify thumb reach and real keyboard behavior on iPhone hardware.
+- Decide whether Today needs native-feeling cards rather than responsive desktop cards.
+- Keep Capture and Process sparse; do not add phone chrome unless the physical pass proves it is needed.
+
+## Completed Slice: Today Execution UX Review
+
+This slice checked whether the shared shell is useful for actual Today work before adding weekly review.
+
+Minimum scope delivered:
+
+- Seeded a disposable Rust database with realistic Today, Capture, Process, Settings, and Waiting On data.
+- Verified task complete/reopen and reversible feedback in the macOS Tauri shell.
+- Verified the same shared Today/Settings shell in the iPhone 17 Pro simulator.
+- Fixed action feedback so lifecycle messages clear when switching workflows.
+- Fixed mobile Settings width, long status wrapping, and iOS input focus zoom.
+
+Out of scope:
+
+- Physical iPhone signing and LAN/VPN install.
+- Weekly review and long-range planning.
+- A phone-native rewrite of Today cards.
 
 ## Completed Slice: Today Task Complete/Reopen Controls
 
