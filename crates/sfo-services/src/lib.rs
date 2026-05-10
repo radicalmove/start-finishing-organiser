@@ -6,6 +6,7 @@ pub mod planning;
 pub mod schedule;
 pub mod system;
 pub mod waiting;
+pub mod weekly_review;
 
 pub use bootstrap::BootstrapService;
 pub use capture::CaptureService;
@@ -15,3 +16,4 @@ pub use planning::PlanningService;
 pub use schedule::ScheduleService;
 pub use system::SystemService;
 pub use waiting::WaitingService;
+pub use weekly_review::WeeklyReviewService;
