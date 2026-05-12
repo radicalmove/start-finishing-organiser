@@ -71,8 +71,17 @@ test("launcher clears action feedback when switching workflows", () => {
 
   assert.match(
     launcherJs,
-    /tab\.addEventListener\("click", \(\) => \{\n\s+clearActionFeedback\(\);\n\s+setWorkflow\(tab\.dataset\.workflowTab\);/,
+    /tab\.addEventListener\("click", async \(\) => \{\n\s+const nextWorkflow = tab\.dataset\.workflowTab;\n\s+clearActionFeedback\(\);\n\s+setWorkflow\(nextWorkflow\);/,
   );
+});
+
+test("launcher refreshes shared server data when switching data-backed workflows", () => {
+  const launcherJs = readFileSync(launcherJsPath, "utf8");
+
+  assert.match(launcherJs, /async function refreshWorkflowData\(workflow\)/);
+  assert.match(launcherJs, /if \(\["today", "capture", "process"\]\.includes\(workflow\)\)/);
+  assert.match(launcherJs, /await refreshDashboardAndProcess\(\);/);
+  assert.match(launcherJs, /await refreshWorkflowData\(nextWorkflow\);/);
 });
 
 test("launcher renders guided process as progressive steps", () => {

@@ -263,6 +263,32 @@ async function refreshDashboardAndReview() {
   renderWeeklyReview(buildWeeklyReviewViewModel(weeklyReview));
 }
 
+async function refreshDashboardAndProcess() {
+  const [summary, inboxContainers, projectsPage] = await Promise.all([
+    requestJson(window.fetch.bind(window), settings, "/api/v1/bootstrap"),
+    requestJson(window.fetch.bind(window), settings, "/api/v1/inbox/containers"),
+    requestJson(window.fetch.bind(window), settings, "/api/v1/projects?page=1&page_size=100"),
+  ]);
+  const dashboardModel = buildBootstrapViewModel(summary);
+  renderDashboard(dashboardModel);
+  renderProcessWorkflow(
+    buildProcessWorkflowViewModel(inboxContainers),
+    buildProjectOptions(projectsPage),
+    defaultGuidedProjectTargetDate(dashboardModel.todayLabel),
+  );
+}
+
+async function refreshWorkflowData(workflow) {
+  if (["today", "capture", "process"].includes(workflow)) {
+    await refreshDashboardAndProcess();
+    return;
+  }
+
+  if (workflow === "review") {
+    await refreshDashboardAndReview();
+  }
+}
+
 async function reloadWeeklyReview() {
   const weeklyReview = await requestJson(
     window.fetch.bind(window),
@@ -1019,9 +1045,19 @@ function showActionFeedback(feedback) {
 }
 
 for (const tab of elements.workflowTabs) {
-  tab.addEventListener("click", () => {
+  tab.addEventListener("click", async () => {
+    const nextWorkflow = tab.dataset.workflowTab;
     clearActionFeedback();
-    setWorkflow(tab.dataset.workflowTab);
+    setWorkflow(nextWorkflow);
+    try {
+      await refreshWorkflowData(nextWorkflow);
+    } catch (err) {
+      setConnectionState(
+        "error",
+        "Refresh failed",
+        err instanceof Error ? err.message : String(err),
+      );
+    }
   });
 }
 
