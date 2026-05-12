@@ -1,9 +1,12 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { createHash } from "node:crypto";
 import test from "node:test";
 
 const projectYmlPath = new URL("../gen/apple/project.yml", import.meta.url);
 const xcodeProjectPath = new URL("../gen/apple/sfo.xcodeproj/project.pbxproj", import.meta.url);
+const generatedAppIconPath = new URL("../gen/apple/Assets.xcassets/AppIcon.appiconset/", import.meta.url);
+const canonicalIosIconPath = new URL("../icons/ios/", import.meta.url);
 const iosBuildScriptPath = new URL("../../scripts/build_tauri_ios_simulator.sh", import.meta.url);
 const cargoTomlPath = new URL("../Cargo.toml", import.meta.url);
 const tauriConfigPath = new URL("../tauri.conf.json", import.meta.url);
@@ -34,6 +37,22 @@ test("iOS simulator build wrapper clears stale generated bundle outputs", () => 
   assert.match(script, /cargo tauri ios build --debug --target aarch64-sim --ci/);
 });
 
+test("iOS generated app icons match the canonical SFO icon set", () => {
+  const contents = JSON.parse(readFileSync(new URL("Contents.json", generatedAppIconPath), "utf8"));
+  const filenames = contents.images
+    .map((image) => image.filename)
+    .filter(Boolean);
+
+  assert.ok(filenames.length > 0, "generated AppIcon catalog references PNG files");
+
+  for (const filename of filenames) {
+    const generatedHash = sha256(new URL(filename, generatedAppIconPath));
+    const canonicalHash = sha256(new URL(filename, canonicalIosIconPath));
+
+    assert.equal(generatedHash, canonicalHash, `${filename} should match canonical icon asset`);
+  }
+});
+
 test("Tauri exposes API token commands to the static launcher", () => {
   const cargoToml = readFileSync(cargoTomlPath, "utf8");
   const tauriConfig = JSON.parse(readFileSync(tauriConfigPath, "utf8"));
@@ -50,3 +69,7 @@ test("Tauri exposes API token commands to the static launcher", () => {
     /invoke_handler\(tauri::generate_handler!\[\s*get_api_token,\s*set_api_token,\s*clear_api_token,\s*\]\)/,
   );
 });
+
+function sha256(fileUrl) {
+  return createHash("sha256").update(readFileSync(fileUrl)).digest("hex");
+}
