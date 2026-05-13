@@ -13,12 +13,18 @@ if [[ -f "$HOME/.cargo/env" ]]; then
 fi
 
 pkill -f "$APP_BUNDLE/Contents/MacOS/sfo" || true
+pkill -f "$APP_BUNDLE/Contents/Resources/bin/sfo-server" || true
 
+"$ROOT_DIR/scripts/build_rust_backend.sh"
 cargo tauri build --debug --bundles app --config "$DEV_CONFIG"
 
 if [[ ! -d "$APP_BUNDLE" ]]; then
   echo "Dev app bundle not found at $APP_BUNDLE" >&2
   exit 1
 fi
+
+mkdir -p "$APP_BUNDLE/Contents/Resources/bin"
+cp "$ROOT_DIR/src-tauri/bin/sfo-server" "$APP_BUNDLE/Contents/Resources/bin/sfo-server"
+chmod +x "$APP_BUNDLE/Contents/Resources/bin/sfo-server"
 
 open -n -F "$APP_BUNDLE"

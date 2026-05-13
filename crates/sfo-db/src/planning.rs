@@ -1,7 +1,8 @@
 use chrono::{DateTime, NaiveDate, Utc};
 use sfo_core::{
-    OwnerType, Page, Project, ProjectCategory, ProjectCreate, ProjectId, ProjectStatus, Task,
-    TaskCreate, TaskId, TaskStatus, INBOX_INTENT_UNPROCESSED,
+    OwnerType, Page, Project, ProjectCard, ProjectCategory, ProjectChunkCreate, ProjectCreate,
+    ProjectId, ProjectStatus, SuccessPack, SuccessPackUpdate, Task, TaskCreate, TaskId, TaskStatus,
+    INBOX_INTENT_UNPROCESSED,
 };
 use sqlx::FromRow;
 use std::str::FromStr;
@@ -14,6 +15,7 @@ pub async fn create_project(
 ) -> Result<Project, DbError> {
     let id = ProjectId::new();
     let size = payload.size.map(|value| value.as_str().to_string());
+    let start_date = format_date(payload.start_date);
     let target_date = format_date(payload.target_date);
     let level_of_success = payload
         .level_of_success
@@ -23,9 +25,10 @@ pub async fn create_project(
         r#"
         INSERT INTO projects (
             id, title, description, category, status, size, time_horizon, target_date,
-            level_of_success, why_link_text, active_this_week
+            level_of_success, why_link_text, active_this_week, start_date,
+            drag_points_notes, gates_notes, budget_notes
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         "#,
     )
     .bind(id.to_string())
@@ -39,6 +42,10 @@ pub async fn create_project(
     .bind(level_of_success)
     .bind(payload.why_link_text)
     .bind(bool_to_i64(payload.active_this_week))
+    .bind(start_date)
+    .bind(payload.drag_points_notes)
+    .bind(payload.gates_notes)
+    .bind(payload.budget_notes)
     .execute(pool)
     .await?;
 
@@ -107,6 +114,7 @@ pub async fn update_project(
     project: &Project,
 ) -> Result<Project, DbError> {
     let size = project.size.map(|value| value.as_str().to_string());
+    let start_date = format_date(project.start_date);
     let target_date = format_date(project.target_date);
     let level_of_success = project
         .level_of_success
@@ -117,7 +125,8 @@ pub async fn update_project(
         UPDATE projects
         SET title = ?, description = ?, category = ?, status = ?, size = ?,
             time_horizon = ?, target_date = ?, level_of_success = ?, why_link_text = ?,
-            active_this_week = ?, updated_at = ?
+            active_this_week = ?, start_date = ?, drag_points_notes = ?, gates_notes = ?,
+            budget_notes = ?, updated_at = ?
         WHERE id = ?
         "#,
     )
@@ -131,6 +140,10 @@ pub async fn update_project(
     .bind(level_of_success)
     .bind(&project.why_link_text)
     .bind(bool_to_i64(project.active_this_week))
+    .bind(start_date)
+    .bind(&project.drag_points_notes)
+    .bind(&project.gates_notes)
+    .bind(&project.budget_notes)
     .bind(now_text())
     .bind(project.id.to_string())
     .execute(pool)
@@ -148,6 +161,114 @@ pub async fn delete_project(pool: &sqlx::SqlitePool, id: ProjectId) -> Result<bo
         .await?;
 
     Ok(result.rows_affected() > 0)
+}
+
+pub async fn get_project_card(
+    pool: &sqlx::SqlitePool,
+    id: ProjectId,
+) -> Result<Option<ProjectCard>, DbError> {
+    let Some(project) = get_project(pool, id).await? else {
+        return Ok(None);
+    };
+    let success_pack = get_success_pack(pool, id).await?;
+    let chunks = list_project_chunks(pool, id).await?;
+
+    Ok(Some(ProjectCard {
+        project,
+        success_pack,
+        chunks,
+    }))
+}
+
+pub async fn get_success_pack(
+    pool: &sqlx::SqlitePool,
+    project_id: ProjectId,
+) -> Result<Option<SuccessPack>, DbError> {
+    let row =
+        sqlx::query_as::<_, SuccessPackRow>("SELECT * FROM success_packs WHERE project_id = ?")
+            .bind(project_id.to_string())
+            .fetch_optional(pool)
+            .await?;
+
+    row.map(SuccessPack::try_from).transpose()
+}
+
+pub async fn upsert_success_pack(
+    pool: &sqlx::SqlitePool,
+    project_id: ProjectId,
+    payload: SuccessPackUpdate,
+) -> Result<SuccessPack, DbError> {
+    sqlx::query(
+        r#"
+        INSERT INTO success_packs (
+            project_id, guides, peers, supporters, beneficiaries, updated_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?)
+        ON CONFLICT(project_id) DO UPDATE SET
+            guides = excluded.guides,
+            peers = excluded.peers,
+            supporters = excluded.supporters,
+            beneficiaries = excluded.beneficiaries,
+            updated_at = excluded.updated_at
+        "#,
+    )
+    .bind(project_id.to_string())
+    .bind(payload.guides)
+    .bind(payload.peers)
+    .bind(payload.supporters)
+    .bind(payload.beneficiaries)
+    .bind(now_text())
+    .execute(pool)
+    .await?;
+
+    get_success_pack(pool, project_id)
+        .await?
+        .ok_or_else(|| DbError::InvalidData("success pack could not be loaded".to_string()))
+}
+
+pub async fn list_project_chunks(
+    pool: &sqlx::SqlitePool,
+    project_id: ProjectId,
+) -> Result<Vec<Task>, DbError> {
+    let rows = sqlx::query_as::<_, TaskRow>(
+        r#"
+        SELECT * FROM tasks
+        WHERE project_id = ?
+          AND status != 'archived'
+        ORDER BY when_bucket ASC, priority IS NULL ASC, priority ASC, created_at ASC
+        "#,
+    )
+    .bind(project_id.to_string())
+    .fetch_all(pool)
+    .await?;
+
+    rows.into_iter().map(Task::try_from).collect()
+}
+
+pub async fn create_project_chunk(
+    pool: &sqlx::SqlitePool,
+    project_id: ProjectId,
+    payload: ProjectChunkCreate,
+) -> Result<Task, DbError> {
+    create_task(
+        pool,
+        TaskCreate {
+            verb_noun: payload.verb_noun,
+            project_id: Some(project_id),
+            description: payload.description,
+            in_inbox: false,
+            when_bucket: payload.when_bucket,
+            block_type: payload.block_type,
+            duration_minutes: payload.duration_minutes,
+            priority: None,
+            frog: payload.frog,
+            alignment: None,
+            first_action: None,
+            scheduled_for: None,
+            owner_type: Default::default(),
+        },
+    )
+    .await
 }
 
 pub async fn create_task(pool: &sqlx::SqlitePool, payload: TaskCreate) -> Result<Task, DbError> {
@@ -236,6 +357,7 @@ pub async fn update_task(pool: &sqlx::SqlitePool, task: &Task) -> Result<Task, D
     let alignment = task.alignment.map(|value| value.as_str().to_string());
     let scheduled_for = format_date(task.scheduled_for);
     let resurface_on = format_date(task.resurface_on);
+    let parked_until = format_datetime(task.parked_until);
     let completed_at = format_datetime(task.completed_at);
 
     sqlx::query(
@@ -245,7 +367,8 @@ pub async fn update_task(pool: &sqlx::SqlitePool, task: &Task) -> Result<Task, D
             archived_from_inbox = ?, intake_intent = ?, intake_container = ?,
             intake_processed_at = ?, when_bucket = ?, block_type = ?, duration_minutes = ?,
             priority = ?, frog = ?, alignment = ?, first_action = ?, status = ?,
-            scheduled_for = ?, owner_type = ?, resurface_on = ?, completed_at = ?, updated_at = ?
+            scheduled_for = ?, owner_type = ?, resurface_on = ?, parked_until = ?,
+            completed_at = ?, updated_at = ?
         WHERE id = ?
         "#,
     )
@@ -268,6 +391,7 @@ pub async fn update_task(pool: &sqlx::SqlitePool, task: &Task) -> Result<Task, D
     .bind(scheduled_for)
     .bind(task.owner_type.as_str())
     .bind(resurface_on)
+    .bind(parked_until)
     .bind(completed_at)
     .bind(now_text())
     .bind(task.id.to_string())
@@ -297,9 +421,13 @@ pub(crate) struct ProjectRow {
     status: String,
     size: Option<String>,
     time_horizon: Option<String>,
+    start_date: Option<String>,
     target_date: Option<String>,
     level_of_success: Option<String>,
     why_link_text: Option<String>,
+    drag_points_notes: Option<String>,
+    gates_notes: Option<String>,
+    budget_notes: Option<String>,
     active_this_week: i64,
     created_at: String,
     updated_at: Option<String>,
@@ -317,11 +445,40 @@ impl TryFrom<ProjectRow> for Project {
             status: parse_enum(&row.status)?,
             size: parse_optional_enum(row.size)?,
             time_horizon: row.time_horizon,
+            start_date: parse_optional_date(row.start_date)?,
             target_date: parse_optional_date(row.target_date)?,
             level_of_success: parse_optional_enum(row.level_of_success)?,
             why_link_text: row.why_link_text,
+            drag_points_notes: row.drag_points_notes,
+            gates_notes: row.gates_notes,
+            budget_notes: row.budget_notes,
             active_this_week: i64_to_bool(row.active_this_week),
             created_at: parse_datetime(&row.created_at)?,
+            updated_at: parse_optional_datetime(row.updated_at)?,
+        })
+    }
+}
+
+#[derive(Debug, FromRow)]
+struct SuccessPackRow {
+    project_id: String,
+    guides: Option<String>,
+    peers: Option<String>,
+    supporters: Option<String>,
+    beneficiaries: Option<String>,
+    updated_at: Option<String>,
+}
+
+impl TryFrom<SuccessPackRow> for SuccessPack {
+    type Error = DbError;
+
+    fn try_from(row: SuccessPackRow) -> Result<Self, Self::Error> {
+        Ok(Self {
+            project_id: parse_id(&row.project_id)?,
+            guides: row.guides,
+            peers: row.peers,
+            supporters: row.supporters,
+            beneficiaries: row.beneficiaries,
             updated_at: parse_optional_datetime(row.updated_at)?,
         })
     }
@@ -349,6 +506,7 @@ pub(crate) struct TaskRow {
     scheduled_for: Option<String>,
     owner_type: String,
     resurface_on: Option<String>,
+    parked_until: Option<String>,
     completed_at: Option<String>,
     created_at: String,
     updated_at: Option<String>,
@@ -379,6 +537,7 @@ impl TryFrom<TaskRow> for Task {
             scheduled_for: parse_optional_date(row.scheduled_for)?,
             owner_type: parse_enum(&row.owner_type).unwrap_or(OwnerType::Mine),
             resurface_on: parse_optional_date(row.resurface_on)?,
+            parked_until: parse_optional_datetime(row.parked_until)?,
             completed_at: parse_optional_datetime(row.completed_at)?,
             created_at: parse_datetime(&row.created_at)?,
             updated_at: parse_optional_datetime(row.updated_at)?,
@@ -479,7 +638,10 @@ fn parse_optional_date(value: Option<String>) -> Result<Option<NaiveDate>, DbErr
 mod tests {
     use super::*;
     use crate::{connect, run_migrations, DbConfig};
-    use sfo_core::{ProjectStatus, TaskStatus, WhenBucket};
+    use sfo_core::{
+        ProjectChunkCreate, ProjectSize, ProjectStatus, SuccessLevel, SuccessPackUpdate,
+        TaskStatus, WhenBucket,
+    };
 
     async fn migrated_pool() -> sqlx::SqlitePool {
         let pool = connect(&DbConfig::new("sqlite::memory:"))
@@ -500,9 +662,13 @@ mod tests {
                 category: ProjectCategory::Work,
                 size: None,
                 time_horizon: None,
+                start_date: None,
                 target_date: None,
                 level_of_success: None,
                 why_link_text: None,
+                drag_points_notes: None,
+                gates_notes: None,
+                budget_notes: None,
                 active_this_week: true,
             },
         )
@@ -537,6 +703,88 @@ mod tests {
             .await
             .expect("get deleted project")
             .is_none());
+    }
+
+    #[tokio::test]
+    async fn project_card_round_trips_shaping_fields_success_pack_and_chunks() {
+        let pool = migrated_pool().await;
+        let project = create_project(
+            &pool,
+            ProjectCreate {
+                title: "Plan annual roadmap".to_string(),
+                description: Some("Scope".to_string()),
+                category: ProjectCategory::Personal,
+                size: Some(ProjectSize::Moderate),
+                time_horizon: Some("quarter".to_string()),
+                start_date: Some(NaiveDate::from_ymd_opt(2026, 5, 15).unwrap()),
+                target_date: Some(NaiveDate::from_ymd_opt(2026, 8, 1).unwrap()),
+                level_of_success: Some(SuccessLevel::Epic),
+                why_link_text: Some("Create a calmer month".to_string()),
+                drag_points_notes: Some("Too many commitments".to_string()),
+                gates_notes: Some("Use planning strengths".to_string()),
+                budget_notes: Some("Two focus blocks per week".to_string()),
+                active_this_week: true,
+            },
+        )
+        .await
+        .expect("create shaped project");
+
+        let success_pack = upsert_success_pack(
+            &pool,
+            project.id,
+            SuccessPackUpdate {
+                guides: Some("Charlie".to_string()),
+                peers: Some("Alex".to_string()),
+                supporters: Some("Morgan".to_string()),
+                beneficiaries: Some("Family".to_string()),
+            },
+        )
+        .await
+        .expect("upsert success pack");
+        assert_eq!(success_pack.project_id, project.id);
+
+        let chunk = create_project_chunk(
+            &pool,
+            project.id,
+            ProjectChunkCreate {
+                verb_noun: "Draft first roadmap".to_string(),
+                description: Some("Starter chunk".to_string()),
+                when_bucket: WhenBucket::Week,
+                block_type: None,
+                duration_minutes: Some(45),
+                frog: true,
+            },
+        )
+        .await
+        .expect("create chunk");
+
+        let card = get_project_card(&pool, project.id)
+            .await
+            .expect("load project card")
+            .expect("project card");
+
+        assert_eq!(
+            card.project.start_date,
+            Some(NaiveDate::from_ymd_opt(2026, 5, 15).unwrap())
+        );
+        assert_eq!(
+            card.project.drag_points_notes.as_deref(),
+            Some("Too many commitments")
+        );
+        assert_eq!(
+            card.project.gates_notes.as_deref(),
+            Some("Use planning strengths")
+        );
+        assert_eq!(
+            card.project.budget_notes.as_deref(),
+            Some("Two focus blocks per week")
+        );
+        assert_eq!(
+            card.success_pack.expect("success pack").guides.as_deref(),
+            Some("Charlie")
+        );
+        assert_eq!(card.chunks.len(), 1);
+        assert_eq!(card.chunks[0].id, chunk.id);
     }
 
     #[tokio::test]

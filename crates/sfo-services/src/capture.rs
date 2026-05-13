@@ -1,8 +1,9 @@
 use chrono::{Duration, Utc};
 use sfo_core::{
     CaptureHorizon, GuidedCaptureKind, GuidedCaptureRequest, GuidedCaptureResponse,
-    GuidedInboxIntent, OwnerType, ProjectCreate, Task, TaskCreate, TaskId, TaskStatus,
-    WaitingOnCreate, WhenBucket, INBOX_INTENT_SUPPORT_PROJECT, INBOX_INTENT_UNPROCESSED,
+    GuidedInboxIntent, OwnerType, ProjectChunkCreate, ProjectCreate, Task, TaskCreate, TaskId,
+    TaskStatus, WaitingOnCreate, WhenBucket, INBOX_INTENT_SUPPORT_PROJECT,
+    INBOX_INTENT_UNPROCESSED,
 };
 use sfo_db::planning as planning_repo;
 
@@ -164,13 +165,37 @@ impl CaptureService {
                 category: payload.category,
                 size: None,
                 time_horizon: Some(payload.horizon.project_horizon().to_string()),
+                start_date: None,
                 target_date: Some(target_date),
-                level_of_success: None,
+                level_of_success: payload.level_of_success,
                 why_link_text: compose_why_text(payload.why_link_text, payload.why_tags),
+                drag_points_notes: None,
+                gates_notes: None,
+                budget_notes: None,
                 active_this_week: payload.include_this_week
                     || payload.horizon == CaptureHorizon::Week,
             })
             .await?;
+
+        let chunk = if let Some(first_chunk) = normalize_optional_text(payload.first_chunk) {
+            Some(
+                PlanningService::new(self.db.clone())
+                    .create_project_chunk(
+                        project.id,
+                        ProjectChunkCreate {
+                            verb_noun: first_chunk,
+                            description: None,
+                            when_bucket: payload.horizon.task_when_bucket(),
+                            block_type: None,
+                            duration_minutes: None,
+                            frog: false,
+                        },
+                    )
+                    .await?,
+            )
+        } else {
+            None
+        };
 
         let source_task = if let Some(mut task) = source_task {
             mark_support_project_processed(&mut task);
@@ -184,7 +209,7 @@ impl CaptureService {
 
         Ok(GuidedCaptureResponse {
             message: "Captured".to_string(),
-            task: None,
+            task: chunk,
             project: Some(project),
             source_task,
         })
@@ -311,6 +336,17 @@ fn normalize_description(value: Option<String>, source_task: Option<&Task>) -> O
             }
         })
         .or_else(|| source_task.and_then(|task| task.description.clone()))
+}
+
+fn normalize_optional_text(value: Option<String>) -> Option<String> {
+    value.and_then(|text| {
+        let cleaned = text.trim().to_string();
+        if cleaned.is_empty() {
+            None
+        } else {
+            Some(cleaned)
+        }
+    })
 }
 
 fn apply_inbox_container(task: &mut Task, intent: GuidedInboxIntent) {
@@ -461,8 +497,10 @@ mod tests {
                 include_this_week: true,
                 target_date: None,
                 verb_check_ack: false,
+                level_of_success: None,
                 why_link_text: None,
                 why_tags: vec![],
+                first_chunk: None,
                 block_type: None,
                 duration_minutes: None,
                 frog: false,
@@ -503,8 +541,10 @@ mod tests {
                 include_this_week: true,
                 target_date: None,
                 verb_check_ack: false,
+                level_of_success: None,
                 why_link_text: None,
                 why_tags: vec![],
+                first_chunk: None,
                 block_type: None,
                 duration_minutes: None,
                 frog: false,

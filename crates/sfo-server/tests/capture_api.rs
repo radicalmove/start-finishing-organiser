@@ -98,6 +98,50 @@ async fn guided_capture_creates_project_under_api_v1() {
 }
 
 #[tokio::test]
+async fn guided_capture_creates_project_with_success_why_and_first_chunk() {
+    let app = test_app().await;
+
+    let (status, body) = request_json(
+        app.clone(),
+        Method::POST,
+        "/api/v1/capture/guided",
+        json!({
+            "capture_text": "Plan family calendar rhythm",
+            "item_kind": "project",
+            "horizon": "quarter",
+            "include_this_week": false,
+            "target_date": "2026-08-01",
+            "level_of_success": "moderate",
+            "why_link_text": "Less admin friction at home",
+            "first_chunk": "Draft first monthly checklist",
+            "displacement_ack": true
+        }),
+    )
+    .await;
+
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body["project"]["level_of_success"], "moderate");
+    assert_eq!(
+        body["project"]["why_link_text"],
+        "Less admin friction at home"
+    );
+    assert_eq!(body["task"]["verb_noun"], "Draft first monthly checklist");
+
+    let project_id = body["project"]["id"].as_str().unwrap();
+    let (status, card) = request_json(
+        app,
+        Method::GET,
+        &format!("/api/v1/projects/{project_id}/card"),
+        Value::Null,
+    )
+    .await;
+
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(card["chunks"].as_array().unwrap().len(), 1);
+    assert_eq!(card["chunks"][0]["project_id"], project_id);
+}
+
+#[tokio::test]
 async fn guided_capture_requires_project_for_source_support_task() {
     let app = test_app().await;
     let (capture_status, source) = request_json(

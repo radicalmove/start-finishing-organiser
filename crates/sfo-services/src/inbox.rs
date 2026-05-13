@@ -1,6 +1,6 @@
 use chrono::Utc;
 use sfo_core::{
-    InboxContainers, InboxRouteIntent, Task, TaskId, TaskStatus, WhenBucket,
+    InboxContainers, InboxRouteIntent, InboxRouteRequest, Task, TaskId, TaskStatus, WhenBucket,
     INBOX_INTENT_ENJOY_RECOVER, INBOX_INTENT_LEARN_EXPLORE, INBOX_INTENT_PARK_LET_GO,
     INBOX_INTENT_UNPROCESSED,
 };
@@ -22,10 +22,10 @@ impl InboxService {
     pub async fn route_item(
         &self,
         id: TaskId,
-        intent: InboxRouteIntent,
+        request: InboxRouteRequest,
     ) -> Result<Task, ServiceError> {
         let mut task = self.active_inbox_item_or_not_found(id).await?;
-        apply_inbox_container(&mut task, intent);
+        apply_inbox_container(&mut task, request.intent, request.parked_until);
         planning_repo::update_task(&self.db, &task)
             .await
             .map_err(Into::into)
@@ -97,8 +97,13 @@ impl InboxService {
     }
 }
 
-fn apply_inbox_container(task: &mut Task, intent: InboxRouteIntent) {
-    let intent = intent.as_str().to_string();
+fn apply_inbox_container(
+    task: &mut Task,
+    intent: InboxRouteIntent,
+    parked_until: Option<chrono::DateTime<Utc>>,
+) {
+    let route_intent = intent;
+    let intent = route_intent.as_str().to_string();
     task.in_inbox = false;
     task.when_bucket = WhenBucket::Later;
     task.intake_intent = intent.clone();
@@ -110,6 +115,11 @@ fn apply_inbox_container(task: &mut Task, intent: InboxRouteIntent) {
     task.frog = false;
     task.alignment = None;
     task.resurface_on = None;
+    task.parked_until = if matches!(route_intent, InboxRouteIntent::ParkLetGo) {
+        parked_until
+    } else {
+        None
+    };
     task.completed_at = None;
     task.status = TaskStatus::Pending;
     task.archived_from_inbox = false;
@@ -121,6 +131,7 @@ fn reset_to_unprocessed_inbox(task: &mut Task) {
     task.when_bucket = WhenBucket::Later;
     task.status = TaskStatus::Pending;
     task.completed_at = None;
+    task.parked_until = None;
     task.intake_intent = INBOX_INTENT_UNPROCESSED.to_string();
     task.intake_container = INBOX_INTENT_UNPROCESSED.to_string();
     task.intake_processed_at = None;
@@ -145,7 +156,11 @@ fn is_quick_route_container(container: &str) -> bool {
 mod tests {
     use super::*;
     use crate::PlanningService;
-    use sfo_core::{InboxRouteIntent, QuickCapture, TaskStatus, INBOX_INTENT_LEARN_EXPLORE};
+    use chrono::{DateTime, Utc};
+    use sfo_core::{
+        InboxRouteIntent, InboxRouteRequest, QuickCapture, TaskStatus, INBOX_INTENT_LEARN_EXPLORE,
+        INBOX_INTENT_PARK_LET_GO,
+    };
     use sfo_db::{connect, run_migrations, DbConfig};
 
     async fn services() -> (PlanningService, InboxService) {
@@ -168,7 +183,13 @@ mod tests {
             .expect("quick capture");
 
         let routed = inbox
-            .route_item(task.id, InboxRouteIntent::LearnExplore)
+            .route_item(
+                task.id,
+                InboxRouteRequest {
+                    intent: InboxRouteIntent::LearnExplore,
+                    parked_until: None,
+                },
+            )
             .await
             .expect("route item");
 
@@ -186,6 +207,60 @@ mod tests {
         assert!(undone.in_inbox);
         assert_eq!(undone.status, TaskStatus::Pending);
         assert_eq!(undone.intake_container, sfo_core::INBOX_INTENT_UNPROCESSED);
+    }
+
+    #[tokio::test]
+    async fn park_until_hides_future_items_and_returns_due_items_to_inbox() {
+        let (planning, inbox) = services().await;
+        let future_item = planning
+            .quick_capture(QuickCapture {
+                verb_noun: "Renew passport".to_string(),
+                description: None,
+            })
+            .await
+            .expect("quick capture future");
+        let due_item = planning
+            .quick_capture(QuickCapture {
+                verb_noun: "Print calendar".to_string(),
+                description: None,
+            })
+            .await
+            .expect("quick capture due");
+        let future_until = parse_utc("2099-01-01T09:00:00Z");
+        let past_until = parse_utc("2026-01-01T09:00:00Z");
+
+        let parked = inbox
+            .route_item(
+                future_item.id,
+                InboxRouteRequest {
+                    intent: InboxRouteIntent::ParkLetGo,
+                    parked_until: Some(future_until),
+                },
+            )
+            .await
+            .expect("park future");
+        assert!(!parked.in_inbox);
+        assert_eq!(parked.intake_container, INBOX_INTENT_PARK_LET_GO);
+        assert_eq!(parked.parked_until, Some(future_until));
+
+        inbox
+            .route_item(
+                due_item.id,
+                InboxRouteRequest {
+                    intent: InboxRouteIntent::ParkLetGo,
+                    parked_until: Some(past_until),
+                },
+            )
+            .await
+            .expect("park due");
+
+        let containers = inbox.containers().await.expect("containers");
+
+        assert_eq!(containers.counts.unprocessed, 1);
+        assert_eq!(containers.counts.park_let_go, 0);
+        assert_eq!(containers.unprocessed[0].id, due_item.id);
+        assert!(containers.unprocessed[0].parked_until.is_none());
+        assert!(containers.parked.is_empty());
     }
 
     #[tokio::test]
@@ -213,5 +288,11 @@ mod tests {
         assert!(restored.in_inbox);
         assert!(!restored.archived_from_inbox);
         assert_eq!(restored.status, TaskStatus::Pending);
+    }
+
+    fn parse_utc(value: &str) -> DateTime<Utc> {
+        DateTime::parse_from_rfc3339(value)
+            .expect("datetime")
+            .with_timezone(&Utc)
     }
 }

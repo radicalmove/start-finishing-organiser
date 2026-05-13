@@ -18,6 +18,9 @@ The Rust rewrite lives beside the current Python app while feature parity is bui
 - `PUT /api/v1/daily-focus`
 - `GET /api/v1/projects`
 - `POST /api/v1/projects`
+- `GET /api/v1/projects/{project_id}/card`
+- `PUT /api/v1/projects/{project_id}/card`
+- `POST /api/v1/projects/{project_id}/chunks`
 - `PATCH /api/v1/projects/{project_id}`
 - `DELETE /api/v1/projects/{project_id}`
 - `GET /api/v1/tasks`
@@ -63,6 +66,8 @@ Real import is exposed at `POST /api/v1/import/python-sqlite` with:
 `backup_dir` is optional and defaults to `backups`. Before any import writes, the Rust app creates a migrated SQLite backup file of the current Rust database. The importer then upserts supported legacy rows in one transaction:
 
 - Python `projects.id` is preserved as Rust `projects.legacy_id`.
+- Python project `start_date`, `target_date`, `level_of_success`, `why_link_text`, and `drag_points_notes` are preserved where present.
+- Python `success_packs` rows are imported and linked through project `legacy_id` values.
 - Python `tasks.id` is preserved as Rust `tasks.legacy_id`.
 - Python `blocks.id` is preserved as Rust `blocks.legacy_id`.
 - Python `waiting_on.id` is preserved as Rust `waiting_on.legacy_id`.
@@ -70,9 +75,15 @@ Real import is exposed at `POST /api/v1/import/python-sqlite` with:
 - Block `project_id` and `task_id` values are mapped through imported project/task `legacy_id` values.
 - Waiting On `project_id` values are mapped through imported project `legacy_id` values.
 - Legacy SQLite timestamps like `2026-01-02 03:04:05` are normalized to RFC 3339 UTC text.
-- Re-running the same import is idempotent for imported projects, tasks, blocks, and waiting items because upserts key off `legacy_id`.
+- Re-running the same import is idempotent for imported projects, success packs, tasks, blocks, and waiting items because upserts key off `legacy_id` or project identity.
 
-Unsupported Python tables, including Python `ritual_entries`, are still reported as warnings and are not imported in this slice. The backup endpoint returns a JSON manifest over the Rust database with schema metadata and table counts, including Rust `ritual_entries`.
+Unsupported Python tables, including Python `ritual_entries`, are still reported as warnings and are not imported in this slice. The backup endpoint returns a JSON manifest over the Rust database with schema metadata and table counts, including Rust `success_packs` and `ritual_entries`.
+
+## Project Cards
+
+Project cards are the first Start Finishing shaping surface in the Rust app. Review is the main home for the card, while Process can create a lightweight shaped project with success level, why, and an optional first chunk.
+
+The card stores the finish line, optional start date, required target date, success level, why, GATES notes, drag-point notes, budget/space notes, Success Pack fields, and roadmap chunks. Roadmap chunks are normal project-linked tasks so planning stays connected to execution.
 
 ## Bootstrap Summary
 

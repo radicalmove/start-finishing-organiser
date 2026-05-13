@@ -20,7 +20,10 @@ test("dev shell launch script builds and opens the dev app bundle", () => {
   const script = readFileSync(launchScriptPath, "utf8");
 
   assert.match(script, /tauri\.dev\.conf\.json/);
+  assert.match(script, /build_rust_backend\.sh/);
   assert.match(script, /cargo tauri build --debug --bundles app --config/);
   assert.match(script, /Start Finishing Organiser Dev\.app/);
+  assert.match(script, /Contents\/Resources\/bin/);
+  assert.match(script, /sfo-server/);
   assert.doesNotMatch(script, /Start Finishing Organiser\.app\/Contents\/MacOS\/sfo/);
 });

@@ -1,12 +1,14 @@
+use chrono::{DateTime, Utc};
 use sfo_core::{
     InboxContainerCounts, InboxContainers, Task, INBOX_INTENT_ENJOY_RECOVER,
-    INBOX_INTENT_LEARN_EXPLORE, INBOX_INTENT_PARK_LET_GO,
+    INBOX_INTENT_LEARN_EXPLORE, INBOX_INTENT_PARK_LET_GO, INBOX_INTENT_UNPROCESSED,
 };
 
 use crate::planning::TaskRow;
 use crate::DbError;
 
 pub async fn containers(pool: &sqlx::SqlitePool) -> Result<InboxContainers, DbError> {
+    promote_due_parked_items(pool, Utc::now()).await?;
     Ok(InboxContainers {
         counts: counts(pool).await?,
         unprocessed: active_unprocessed_items(pool).await?,
@@ -18,6 +20,7 @@ pub async fn containers(pool: &sqlx::SqlitePool) -> Result<InboxContainers, DbEr
 }
 
 pub async fn counts(pool: &sqlx::SqlitePool) -> Result<InboxContainerCounts, DbError> {
+    promote_due_parked_items(pool, Utc::now()).await?;
     Ok(InboxContainerCounts {
         unprocessed: count_active_inbox(pool).await?,
         learn_explore: count_active_container(pool, INBOX_INTENT_LEARN_EXPLORE).await?,
@@ -25,6 +28,43 @@ pub async fn counts(pool: &sqlx::SqlitePool) -> Result<InboxContainerCounts, DbE
         park_let_go: count_active_container(pool, INBOX_INTENT_PARK_LET_GO).await?,
         recycle_bin: count_recycle_bin(pool).await?,
     })
+}
+
+pub async fn promote_due_parked_items(
+    pool: &sqlx::SqlitePool,
+    now: DateTime<Utc>,
+) -> Result<i64, DbError> {
+    let result = sqlx::query(
+        r#"
+        UPDATE tasks
+        SET in_inbox = 1,
+            archived_from_inbox = 0,
+            intake_intent = ?,
+            intake_container = ?,
+            intake_processed_at = NULL,
+            when_bucket = 'later',
+            status = 'pending',
+            completed_at = NULL,
+            parked_until = NULL,
+            updated_at = ?
+        WHERE in_inbox = 0
+          AND archived_from_inbox = 0
+          AND intake_container = ?
+          AND status IN ('pending', 'in_progress')
+          AND parked_until IS NOT NULL
+          AND parked_until <= ?
+        "#,
+    )
+    .bind(INBOX_INTENT_UNPROCESSED)
+    .bind(INBOX_INTENT_UNPROCESSED)
+    .bind(now.to_rfc3339())
+    .bind(INBOX_INTENT_PARK_LET_GO)
+    .bind(now.to_rfc3339())
+    .execute(pool)
+    .await?;
+
+    Ok(i64::try_from(result.rows_affected())
+        .map_err(|error| DbError::InvalidData(error.to_string()))?)
 }
 
 async fn active_unprocessed_items(pool: &sqlx::SqlitePool) -> Result<Vec<Task>, DbError> {
@@ -51,10 +91,12 @@ async fn active_container_items(
         SELECT * FROM tasks
         WHERE intake_container = ?
           AND status IN ('pending', 'in_progress')
+          AND (intake_container != ? OR parked_until IS NULL)
         ORDER BY created_at DESC
         "#,
     )
     .bind(container)
+    .bind(INBOX_INTENT_PARK_LET_GO)
     .fetch_all(pool)
     .await?;
 
@@ -95,9 +137,11 @@ async fn count_active_container(pool: &sqlx::SqlitePool, container: &str) -> Res
         SELECT COUNT(*) FROM tasks
         WHERE intake_container = ?
           AND status IN ('pending', 'in_progress')
+          AND (intake_container != ? OR parked_until IS NULL)
         "#,
     )
     .bind(container)
+    .bind(INBOX_INTENT_PARK_LET_GO)
     .fetch_one(pool)
     .await?;
     Ok(count)

@@ -8,6 +8,7 @@ use crate::{connect, health_check, run_migrations, DbConfig, DbError};
 pub const RUST_BACKUP_TABLES: &[&str] = &[
     "app_metadata",
     "projects",
+    "success_packs",
     "tasks",
     "blocks",
     "waiting_on",
@@ -71,6 +72,10 @@ async fn copy_current_tables(
     let project_rows = sqlx::query_as::<_, BackupProjectRow>("SELECT * FROM projects")
         .fetch_all(source_pool)
         .await?;
+    let success_pack_rows =
+        sqlx::query_as::<_, BackupSuccessPackRow>("SELECT * FROM success_packs")
+            .fetch_all(source_pool)
+            .await?;
     let task_rows = sqlx::query_as::<_, BackupTaskRow>("SELECT * FROM tasks")
         .fetch_all(source_pool)
         .await?;
@@ -97,6 +102,9 @@ async fn copy_current_tables(
     sqlx::query("DELETE FROM tasks")
         .execute(&mut *transaction)
         .await?;
+    sqlx::query("DELETE FROM success_packs")
+        .execute(&mut *transaction)
+        .await?;
     sqlx::query("DELETE FROM projects")
         .execute(&mut *transaction)
         .await?;
@@ -118,10 +126,11 @@ async fn copy_current_tables(
             r#"
             INSERT INTO projects (
                 id, legacy_id, title, description, category, status, size,
-                time_horizon, target_date, level_of_success, why_link_text,
-                active_this_week, created_at, updated_at
+                time_horizon, start_date, target_date, level_of_success, why_link_text,
+                active_this_week, drag_points_notes, gates_notes, budget_notes,
+                created_at, updated_at
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             "#,
         )
         .bind(row.id)
@@ -132,11 +141,34 @@ async fn copy_current_tables(
         .bind(row.status)
         .bind(row.size)
         .bind(row.time_horizon)
+        .bind(row.start_date)
         .bind(row.target_date)
         .bind(row.level_of_success)
         .bind(row.why_link_text)
         .bind(row.active_this_week)
+        .bind(row.drag_points_notes)
+        .bind(row.gates_notes)
+        .bind(row.budget_notes)
         .bind(row.created_at)
+        .bind(row.updated_at)
+        .execute(&mut *transaction)
+        .await?;
+    }
+
+    for row in success_pack_rows {
+        sqlx::query(
+            r#"
+            INSERT INTO success_packs (
+                project_id, guides, peers, supporters, beneficiaries, updated_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?)
+            "#,
+        )
+        .bind(row.project_id)
+        .bind(row.guides)
+        .bind(row.peers)
+        .bind(row.supporters)
+        .bind(row.beneficiaries)
         .bind(row.updated_at)
         .execute(&mut *transaction)
         .await?;
@@ -195,10 +227,10 @@ async fn copy_current_tables(
                 id, legacy_id, project_id, verb_noun, description, in_inbox,
                 archived_from_inbox, intake_intent, intake_container, intake_processed_at,
                 when_bucket, block_type, duration_minutes, priority, frog, alignment,
-                first_action, status, scheduled_for, owner_type, resurface_on, completed_at,
-                created_at, updated_at
+                first_action, status, scheduled_for, owner_type, resurface_on, parked_until,
+                completed_at, created_at, updated_at
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             "#,
         )
         .bind(row.id)
@@ -222,6 +254,7 @@ async fn copy_current_tables(
         .bind(row.scheduled_for)
         .bind(row.owner_type)
         .bind(row.resurface_on)
+        .bind(row.parked_until)
         .bind(row.completed_at)
         .bind(row.created_at)
         .bind(row.updated_at)
@@ -288,11 +321,25 @@ struct BackupProjectRow {
     status: String,
     size: Option<String>,
     time_horizon: Option<String>,
+    start_date: Option<String>,
     target_date: Option<String>,
     level_of_success: Option<String>,
     why_link_text: Option<String>,
     active_this_week: i64,
+    drag_points_notes: Option<String>,
+    gates_notes: Option<String>,
+    budget_notes: Option<String>,
     created_at: String,
+    updated_at: Option<String>,
+}
+
+#[derive(Debug, FromRow)]
+struct BackupSuccessPackRow {
+    project_id: String,
+    guides: Option<String>,
+    peers: Option<String>,
+    supporters: Option<String>,
+    beneficiaries: Option<String>,
     updated_at: Option<String>,
 }
 
@@ -319,6 +366,7 @@ struct BackupTaskRow {
     scheduled_for: Option<String>,
     owner_type: String,
     resurface_on: Option<String>,
+    parked_until: Option<String>,
     completed_at: Option<String>,
     created_at: String,
     updated_at: Option<String>,
@@ -369,14 +417,14 @@ struct BackupBlockRow {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::planning::{create_project, create_task};
+    use crate::planning::{create_project, create_task, update_task, upsert_success_pack};
     use crate::ritual::save_daily_focus;
     use crate::schedule::create_block;
     use crate::{connect, run_migrations, DbConfig};
-    use chrono::{NaiveDate, NaiveTime};
+    use chrono::{DateTime, NaiveDate, NaiveTime, Utc};
     use sfo_core::{
-        BlockCreate, BlockType, DailyFocusUpdate, ProjectCategory, ProjectCreate, TaskCreate,
-        WhenBucket,
+        BlockCreate, BlockType, DailyFocusUpdate, ProjectCategory, ProjectCreate,
+        SuccessPackUpdate, TaskCreate, WhenBucket,
     };
 
     #[tokio::test]
@@ -386,7 +434,7 @@ mod tests {
             .expect("connect");
         run_migrations(&pool).await.expect("migrate");
 
-        create_project(
+        let project = create_project(
             &pool,
             ProjectCreate {
                 title: "A".to_string(),
@@ -394,14 +442,30 @@ mod tests {
                 category: ProjectCategory::Work,
                 size: None,
                 time_horizon: None,
-                target_date: None,
+                start_date: Some(NaiveDate::from_ymd_opt(2026, 5, 15).expect("start")),
+                target_date: Some(NaiveDate::from_ymd_opt(2026, 8, 1).expect("target")),
                 level_of_success: None,
                 why_link_text: None,
+                drag_points_notes: Some("Too many commitments".to_string()),
+                gates_notes: Some("Use planning strengths".to_string()),
+                budget_notes: Some("Two focus blocks".to_string()),
                 active_this_week: false,
             },
         )
         .await
         .expect("create project");
+        upsert_success_pack(
+            &pool,
+            project.id,
+            SuccessPackUpdate {
+                guides: Some("Charlie".to_string()),
+                peers: None,
+                supporters: Some("Morgan".to_string()),
+                beneficiaries: Some("Family".to_string()),
+            },
+        )
+        .await
+        .expect("success pack");
         create_task(
             &pool,
             TaskCreate {
@@ -466,7 +530,7 @@ mod tests {
             .await
             .expect("connect");
         run_migrations(&pool).await.expect("migrate");
-        create_project(
+        let project = create_project(
             &pool,
             ProjectCreate {
                 title: "A".to_string(),
@@ -474,14 +538,30 @@ mod tests {
                 category: ProjectCategory::Work,
                 size: None,
                 time_horizon: None,
-                target_date: None,
+                start_date: Some(NaiveDate::from_ymd_opt(2026, 5, 15).expect("start")),
+                target_date: Some(NaiveDate::from_ymd_opt(2026, 8, 1).expect("target")),
                 level_of_success: None,
                 why_link_text: None,
+                drag_points_notes: Some("Too many commitments".to_string()),
+                gates_notes: Some("Use planning strengths".to_string()),
+                budget_notes: Some("Two focus blocks".to_string()),
                 active_this_week: false,
             },
         )
         .await
         .expect("create project");
+        upsert_success_pack(
+            &pool,
+            project.id,
+            SuccessPackUpdate {
+                guides: Some("Charlie".to_string()),
+                peers: None,
+                supporters: Some("Morgan".to_string()),
+                beneficiaries: Some("Family".to_string()),
+            },
+        )
+        .await
+        .expect("success pack");
         create_block(
             &pool,
             BlockCreate {
@@ -497,6 +577,30 @@ mod tests {
         )
         .await
         .expect("create block");
+        let mut parked_task = create_task(
+            &pool,
+            TaskCreate {
+                verb_noun: "Parked reminder".to_string(),
+                project_id: None,
+                description: None,
+                in_inbox: false,
+                when_bucket: WhenBucket::Later,
+                block_type: None,
+                duration_minutes: None,
+                priority: None,
+                frog: false,
+                alignment: None,
+                first_action: None,
+                scheduled_for: None,
+                owner_type: Default::default(),
+            },
+        )
+        .await
+        .expect("create parked task");
+        parked_task.parked_until = Some(parse_utc("2099-01-01T09:00:00Z"));
+        update_task(&pool, &parked_task)
+            .await
+            .expect("update parked task");
         save_daily_focus(
             &pool,
             NaiveDate::from_ymd_opt(2026, 5, 6).expect("date"),
@@ -525,6 +629,21 @@ mod tests {
             .await
             .expect("count backup projects");
         assert_eq!(count, 1);
+        let shaping: (String, String, String, String) = sqlx::query_as(
+            "SELECT start_date, drag_points_notes, gates_notes, budget_notes FROM projects",
+        )
+        .fetch_one(&backup_pool)
+        .await
+        .expect("project shaping fields");
+        assert_eq!(shaping.0, "2026-05-15");
+        assert_eq!(shaping.1, "Too many commitments");
+        assert_eq!(shaping.2, "Use planning strengths");
+        assert_eq!(shaping.3, "Two focus blocks");
+        let success_pack_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM success_packs")
+            .fetch_one(&backup_pool)
+            .await
+            .expect("count success packs");
+        assert_eq!(success_pack_count, 1);
         let block_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM blocks")
             .fetch_one(&backup_pool)
             .await
@@ -535,6 +654,13 @@ mod tests {
             .await
             .expect("count backup rituals");
         assert_eq!(ritual_count, 1);
+        let parked_until: String = sqlx::query_scalar(
+            "SELECT parked_until FROM tasks WHERE verb_noun = 'Parked reminder'",
+        )
+        .fetch_one(&backup_pool)
+        .await
+        .expect("parked until");
+        assert_eq!(parked_until, "2099-01-01T09:00:00+00:00");
         backup_pool.close().await;
 
         let _ = std::fs::remove_dir_all(backup_dir);
@@ -554,5 +680,11 @@ mod tests {
             std::process::id(),
             chrono::Utc::now().timestamp_nanos_opt().unwrap_or_default()
         ))
+    }
+
+    fn parse_utc(value: &str) -> DateTime<Utc> {
+        DateTime::parse_from_rfc3339(value)
+            .expect("datetime")
+            .with_timezone(&Utc)
     }
 }

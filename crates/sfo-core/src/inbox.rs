@@ -1,3 +1,4 @@
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
 use crate::Task;
@@ -24,6 +25,8 @@ impl InboxRouteIntent {
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct InboxRouteRequest {
     pub intent: InboxRouteIntent,
+    #[serde(default)]
+    pub parked_until: Option<DateTime<Utc>>,
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
@@ -53,11 +56,26 @@ mod tests {
     fn inbox_route_request_serializes_intent() {
         let request = InboxRouteRequest {
             intent: InboxRouteIntent::LearnExplore,
+            parked_until: None,
         };
 
         let json = serde_json::to_value(&request).expect("serialize route request");
 
         assert_eq!(json["intent"], "learn_explore");
+    }
+
+    #[test]
+    fn inbox_route_request_accepts_optional_park_until_timestamp() {
+        let request: InboxRouteRequest = serde_json::from_str(
+            r#"{"intent":"park_let_go","parked_until":"2026-05-14T05:30:00Z"}"#,
+        )
+        .expect("deserialize park until request");
+
+        assert_eq!(request.intent, InboxRouteIntent::ParkLetGo);
+        assert_eq!(
+            request.parked_until.unwrap().to_rfc3339(),
+            "2026-05-14T05:30:00+00:00"
+        );
     }
 
     #[test]

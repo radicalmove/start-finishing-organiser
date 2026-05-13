@@ -4,6 +4,7 @@ import test from "node:test";
 
 const indexHtmlPath = new URL("./index.html", import.meta.url);
 const launcherJsPath = new URL("./launcher.js", import.meta.url);
+const launcherCssPath = new URL("./launcher.css", import.meta.url);
 
 test("launcher exposes the five top-level workflows", () => {
   const indexHtml = readFileSync(indexHtmlPath, "utf8");
@@ -50,6 +51,28 @@ test("launcher uses workflow-specific capture and process models", () => {
   assert.match(launcherJs, /setWorkflow\("settings"\)/);
 });
 
+test("process workflow reserves a dedicated current-decision panel", () => {
+  const indexHtml = readFileSync(indexHtmlPath, "utf8");
+  const launcherJs = readFileSync(launcherJsPath, "utf8");
+
+  assert.match(indexHtml, /id="process-active-item"/);
+  assert.match(indexHtml, /Current decision/);
+  assert.match(indexHtml, /id="process-active-actions"/);
+  assert.match(launcherJs, /processActiveItem/);
+  assert.match(launcherJs, /processActiveActions/);
+});
+
+test("process inbox card renders only the unresolved inbox total", () => {
+  const launcherJs = readFileSync(launcherJsPath, "utf8");
+
+  assert.match(launcherJs, /elements\.inboxTotal\.textContent = String\(model\.inboxTotal\);/);
+  assert.match(launcherJs, /elements\.inboxCounts\.replaceChildren\(\);/);
+  assert.doesNotMatch(launcherJs, /countPill\("Learning"/);
+  assert.doesNotMatch(launcherJs, /countPill\("Enjoy"/);
+  assert.doesNotMatch(launcherJs, /countPill\("Parked"/);
+  assert.doesNotMatch(launcherJs, /countPill\("Recycle"/);
+});
+
 test("launcher wires Today task complete and reopen actions", () => {
   const launcherJs = readFileSync(launcherJsPath, "utf8");
 
@@ -63,7 +86,21 @@ test("launcher clears stale action feedback before reconnecting", () => {
   const launcherJs = readFileSync(launcherJsPath, "utf8");
 
   assert.match(launcherJs, /function clearActionFeedback\(\)/);
-  assert.match(launcherJs, /async function connectAndLoad\(\) \{\n\s+clearActionFeedback\(\);/);
+  assert.match(
+    launcherJs,
+    /async function connectAndLoad\(options = \{\}\) \{\n\s+clearActionFeedback\(\);/,
+  );
+});
+
+test("launcher retries startup connection when the server is not ready yet", () => {
+  const launcherJs = readFileSync(launcherJsPath, "utf8");
+
+  assert.match(launcherJs, /const STARTUP_CONNECT_RETRY_MS = 1000;/);
+  assert.match(launcherJs, /const STARTUP_CONNECT_MAX_ATTEMPTS = 30;/);
+  assert.match(launcherJs, /async function connectAndLoad\(options = \{\}\)/);
+  assert.match(launcherJs, /scheduleStartupReconnect\(\);/);
+  assert.match(launcherJs, /startupReconnectAttempts >= STARTUP_CONNECT_MAX_ATTEMPTS/);
+  assert.match(launcherJs, /window\.setTimeout\(\(\) => \{/);
 });
 
 test("launcher clears action feedback when switching workflows", () => {
@@ -94,11 +131,69 @@ test("launcher renders guided process as progressive steps", () => {
   assert.match(launcherJs, /data-guided-action/);
 });
 
+test("launcher makes Park an explicit optional date-time choice", () => {
+  const launcherJs = readFileSync(launcherJsPath, "utf8");
+  const launcherCss = readFileSync(launcherCssPath, "utf8");
+
+  assert.match(launcherJs, /parkChoicePanel/);
+  assert.match(launcherJs, /park-menu/);
+  assert.match(launcherJs, /data-park-action|dataset\.parkAction/);
+  assert.match(launcherJs, /Park without date/);
+  assert.match(launcherJs, /Park until date\/time/);
+  assert.match(launcherJs, /buildParkRoutePayload/);
+  assert.match(launcherCss, /\.park-choice-panel/);
+});
+
 test("launcher wires weekly review actions", () => {
   const launcherJs = readFileSync(launcherJsPath, "utf8");
+  const indexHtml = readFileSync(indexHtmlPath, "utf8");
 
   assert.match(launcherJs, /buildWeeklyReviewViewModel/);
   assert.match(launcherJs, /weekly-review/);
   assert.match(launcherJs, /data-review-action/);
   assert.match(launcherJs, /move-to-week/);
+  assert.match(indexHtml, /review-learning-items/);
+  assert.match(indexHtml, /review-enjoy-items/);
+  assert.match(indexHtml, /review-parked-items/);
+  assert.match(indexHtml, /review-recycle-bin-items/);
+  assert.match(indexHtml, /review-recycle-bin-count/);
+  assert.match(indexHtml, /review-learning-count/);
+  assert.match(launcherJs, /data-review-inbox-action/);
+  assert.match(launcherJs, /restore-inbox-item/);
+  assert.match(launcherJs, /recycle-inbox-item/);
+  assert.match(launcherJs, /restore-recycled-item/);
+  assert.match(launcherJs, /delete-recycled-item/);
+  assert.match(launcherJs, /Confirm delete/);
+  assert.match(launcherJs, /confirming-delete/);
+  assert.match(launcherJs, /confirmResetTimer/);
+  assert.match(launcherJs, /setTimeout\(\(\) => \{/);
+  assert.match(launcherJs, /\/api\/v1\/tasks\/\$\{encodeURIComponent\(itemId\)\}/);
+});
+
+test("review workflow is structured as a weekly checklist", () => {
+  const indexHtml = readFileSync(indexHtmlPath, "utf8");
+  const launcherCss = readFileSync(launcherCssPath, "utf8");
+
+  assert.match(indexHtml, /review-checklist/);
+  assert.match(indexHtml, /Step 1/);
+  assert.match(indexHtml, /Choose this week/);
+  assert.match(indexHtml, /Step 2/);
+  assert.match(indexHtml, /Reconsider due work/);
+  assert.match(indexHtml, /Step 3/);
+  assert.match(indexHtml, /Scan parked buckets/);
+  assert.match(indexHtml, /Step 4/);
+  assert.match(indexHtml, /Finish clean/);
+  assert.match(indexHtml, /Recycle Bin/);
+  assert.match(launcherCss, /\.review-panel-title/);
+  assert.match(launcherCss, /\.review-list\.is-scrollable/);
+  assert.match(launcherCss, /max-height:\s*340px/);
+  assert.match(launcherCss, /\.review-step/);
+  assert.match(launcherCss, /\.review-step-grid/);
+});
+
+test("review and today date labels share the same presentation class", () => {
+  const indexHtml = readFileSync(indexHtmlPath, "utf8");
+
+  assert.match(indexHtml, /class="eyebrow workflow-date-label" id="today-label"/);
+  assert.match(indexHtml, /class="eyebrow workflow-date-label" id="review-date-label"/);
 });

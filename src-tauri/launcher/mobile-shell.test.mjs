@@ -18,7 +18,7 @@ test("mobile shell applies phone layout to iOS WebView viewport widths", () => {
   const launcherCss = readFileSync(launcherCssPath, "utf8");
 
   assert.match(launcherCss, /overflow-x:\s*hidden/);
-  assert.match(launcherCss, /@media \(max-width: 1024px\)[\s\S]*\.hero-card/);
+  assert.match(launcherCss, /@media \(max-width: 1024px\)[\s\S]*\.app-header/);
   assert.match(launcherCss, /@media \(max-width: 1024px\)[\s\S]*\.workflow-nav/);
 });
 
@@ -29,6 +29,15 @@ test("mobile shell constrains iOS visual viewport width", () => {
   assert.match(launcherCss, /width:\s*min\(calc\(100svw - 20px\), 680px\)/);
   assert.match(launcherCss, /\.status-card > div\s*\{[\s\S]*min-width:\s*0/);
   assert.match(launcherCss, /\.status-detail\s*\{[\s\S]*overflow-wrap:\s*anywhere/);
+});
+
+test("mobile shell has an iPhone SE width treatment", () => {
+  const launcherCss = readFileSync(launcherCssPath, "utf8");
+
+  assert.match(launcherCss, /@media \(max-width: 430px\)/);
+  assert.match(launcherCss, /@media \(max-width: 430px\)[\s\S]*width:\s*min\(calc\(100vw - 12px\),\s*680px\)/);
+  assert.match(launcherCss, /@media \(max-width: 430px\)[\s\S]*\.workflow-panel\s*\{[\s\S]*padding:\s*12px/);
+  assert.match(launcherCss, /@media \(max-width: 430px\)[\s\S]*\.mini-button\s*\{[\s\S]*flex:\s*1 1 calc\(50% - 4px\)/);
 });
 
 test("mobile shell prevents iOS input focus zoom", () => {
@@ -46,7 +55,11 @@ test("mobile process view puts the actionable queue before inbox stats", () => {
 test("mobile review view stays readable with five workflow tabs", () => {
   const launcherCss = readFileSync(launcherCssPath, "utf8");
 
-  assert.match(launcherCss, /\.review-grid/);
+  assert.match(launcherCss, /\.review-checklist/);
+  assert.match(launcherCss, /\.review-step-grid/);
   assert.match(launcherCss, /\.review-count-grid/);
-  assert.match(launcherCss, /@media \(max-width: 1024px\)[\s\S]*\.review-grid\s*\{[\s\S]*grid-template-columns:\s*1fr/);
+  assert.match(
+    launcherCss,
+    /@media \(max-width: 1024px\)[\s\S]*\.review-step-grid[\s\S]*grid-template-columns:\s*1fr/,
+  );
 });

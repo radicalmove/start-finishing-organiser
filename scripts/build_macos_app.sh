@@ -18,9 +18,17 @@ else
   echo "No Gmail credentials found; bundling skipped."
 fi
 
-scripts/build_backend.sh
+SFO_RUST_BACKEND_PROFILE=release scripts/build_rust_backend.sh
 
 source "$HOME/.cargo/env"
 cargo tauri build
+
+APP_BUNDLE="$ROOT_DIR/src-tauri/target/release/bundle/macos/Start Finishing Organiser.app"
+APP_BACKEND="$APP_BUNDLE/Contents/Resources/bin/sfo-server"
+if [[ -d "$APP_BUNDLE" ]]; then
+  mkdir -p "$(dirname "$APP_BACKEND")"
+  cp "$ROOT_DIR/src-tauri/bin/sfo-server" "$APP_BACKEND"
+  chmod +x "$APP_BACKEND"
+fi
 
 echo "Build complete. Check src-tauri/target/release/bundle/macos/ for the .app"

@@ -137,9 +137,13 @@ mod tests {
                 category: ProjectCategory::Work,
                 size: None,
                 time_horizon: None,
+                start_date: None,
                 target_date: None,
                 level_of_success: None,
                 why_link_text: None,
+                drag_points_notes: None,
+                gates_notes: None,
+                budget_notes: None,
                 active_this_week: false,
             },
         )

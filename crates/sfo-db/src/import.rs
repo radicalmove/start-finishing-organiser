@@ -12,7 +12,8 @@ use std::str::FromStr;
 
 use crate::{backup::write_backup_file, DbError};
 
-pub const SUPPORTED_PYTHON_TABLES: &[&str] = &["projects", "tasks", "blocks", "waiting_on"];
+pub const SUPPORTED_PYTHON_TABLES: &[&str] =
+    &["projects", "success_packs", "tasks", "blocks", "waiting_on"];
 pub const KNOWN_PYTHON_TABLES: &[&str] = &[
     "projects",
     "tasks",
@@ -125,6 +126,24 @@ pub async fn import_python_sqlite(
         });
     }
 
+    if table_names.iter().any(|table| table == "success_packs") {
+        let (source_rows, imported_rows, success_pack_warnings) =
+            import_success_packs(&source_pool, &mut transaction).await?;
+        warnings.extend(success_pack_warnings);
+        tables.push(TableImportResult {
+            table: "success_packs".to_string(),
+            source_rows,
+            imported_rows,
+        });
+    } else {
+        warnings.push("missing source table success_packs".to_string());
+        tables.push(TableImportResult {
+            table: "success_packs".to_string(),
+            source_rows: 0,
+            imported_rows: 0,
+        });
+    }
+
     if table_names.iter().any(|table| table == "tasks") {
         let (source_rows, imported_rows, task_warnings) =
             import_tasks(&source_pool, &mut transaction).await?;
@@ -221,6 +240,18 @@ async fn open_source_pool(source_path: &Path) -> Result<sqlx::SqlitePool, DbErro
     Ok(pool)
 }
 
+async fn source_table_columns(
+    pool: &sqlx::SqlitePool,
+    table: &str,
+) -> Result<HashSet<String>, DbError> {
+    let quoted_table = quote_identifier(table);
+    let query = format!("PRAGMA table_info({quoted_table})");
+    let rows = sqlx::query_as::<_, SourceColumnRow>(&query)
+        .fetch_all(pool)
+        .await?;
+    Ok(rows.into_iter().map(|row| row.name).collect())
+}
+
 async fn count_rows(pool: &sqlx::SqlitePool, table: &str) -> Result<i64, DbError> {
     let quoted_table = quote_identifier(table);
     let query = format!("SELECT COUNT(*) FROM {quoted_table}");
@@ -232,17 +263,29 @@ async fn import_projects(
     source_pool: &sqlx::SqlitePool,
     transaction: &mut sqlx::Transaction<'_, sqlx::Sqlite>,
 ) -> Result<(i64, i64), DbError> {
-    let rows = sqlx::query_as::<_, LegacyProjectRow>(
+    let columns = source_table_columns(source_pool, "projects").await?;
+    let start_date_expr = if columns.contains("start_date") {
+        "start_date"
+    } else {
+        "NULL AS start_date"
+    };
+    let drag_points_expr = if columns.contains("drag_points_notes") {
+        "drag_points_notes"
+    } else {
+        "NULL AS drag_points_notes"
+    };
+    let query = format!(
         r#"
         SELECT id, title, description, category, status, size, time_horizon,
-               target_date, level_of_success, why_link_text, active_this_week,
-               created_at, updated_at
+               {start_date_expr}, target_date, level_of_success, why_link_text,
+               {drag_points_expr}, active_this_week, created_at, updated_at
         FROM projects
         ORDER BY id ASC
         "#,
-    )
-    .fetch_all(source_pool)
-    .await?;
+    );
+    let rows = sqlx::query_as::<_, LegacyProjectRow>(&query)
+        .fetch_all(source_pool)
+        .await?;
     let source_rows =
         i64::try_from(rows.len()).map_err(|error| DbError::InvalidData(error.to_string()))?;
     let mut imported_rows = 0;
@@ -256,10 +299,11 @@ async fn import_projects(
             r#"
             INSERT INTO projects (
                 id, legacy_id, title, description, category, status, size,
-                time_horizon, target_date, level_of_success, why_link_text,
-                active_this_week, created_at, updated_at
+                time_horizon, start_date, target_date, level_of_success, why_link_text,
+                active_this_week, drag_points_notes, gates_notes, budget_notes,
+                created_at, updated_at
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(legacy_id) DO UPDATE SET
                 title = excluded.title,
                 description = excluded.description,
@@ -267,10 +311,12 @@ async fn import_projects(
                 status = excluded.status,
                 size = excluded.size,
                 time_horizon = excluded.time_horizon,
+                start_date = excluded.start_date,
                 target_date = excluded.target_date,
                 level_of_success = excluded.level_of_success,
                 why_link_text = excluded.why_link_text,
                 active_this_week = excluded.active_this_week,
+                drag_points_notes = excluded.drag_points_notes,
                 created_at = excluded.created_at,
                 updated_at = excluded.updated_at
             "#,
@@ -283,10 +329,14 @@ async fn import_projects(
         .bind(default_text(row.status, "active"))
         .bind(optional_text(row.size))
         .bind(optional_text(row.time_horizon))
+        .bind(optional_text(row.start_date))
         .bind(optional_text(row.target_date))
         .bind(optional_text(row.level_of_success))
         .bind(optional_text(row.why_link_text))
         .bind(row.active_this_week)
+        .bind(optional_text(row.drag_points_notes))
+        .bind(Option::<String>::None)
+        .bind(Option::<String>::None)
         .bind(created_at)
         .bind(updated_at)
         .execute(&mut **transaction)
@@ -296,6 +346,68 @@ async fn import_projects(
     }
 
     Ok((source_rows, imported_rows))
+}
+
+async fn import_success_packs(
+    source_pool: &sqlx::SqlitePool,
+    transaction: &mut sqlx::Transaction<'_, sqlx::Sqlite>,
+) -> Result<(i64, i64, Vec<String>), DbError> {
+    let rows = sqlx::query_as::<_, LegacySuccessPackRow>(
+        r#"
+        SELECT project_id, guides, peers, supporters, beneficiaries, updated_at
+        FROM success_packs
+        ORDER BY project_id ASC
+        "#,
+    )
+    .fetch_all(source_pool)
+    .await?;
+    let source_rows =
+        i64::try_from(rows.len()).map_err(|error| DbError::InvalidData(error.to_string()))?;
+    let mut imported_rows = 0;
+    let mut warnings = Vec::new();
+
+    for row in rows {
+        let project_id: Option<String> =
+            sqlx::query_scalar("SELECT id FROM projects WHERE legacy_id = ?")
+                .bind(row.project_id)
+                .fetch_optional(&mut **transaction)
+                .await?;
+        let Some(project_id) = project_id else {
+            warnings.push(format!(
+                "success pack references missing project {}",
+                row.project_id
+            ));
+            continue;
+        };
+        let updated_at = normalize_optional_datetime(row.updated_at)?;
+
+        let result = sqlx::query(
+            r#"
+            INSERT INTO success_packs (
+                project_id, guides, peers, supporters, beneficiaries, updated_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?)
+            ON CONFLICT(project_id) DO UPDATE SET
+                guides = excluded.guides,
+                peers = excluded.peers,
+                supporters = excluded.supporters,
+                beneficiaries = excluded.beneficiaries,
+                updated_at = excluded.updated_at
+            "#,
+        )
+        .bind(project_id)
+        .bind(optional_text(row.guides))
+        .bind(optional_text(row.peers))
+        .bind(optional_text(row.supporters))
+        .bind(optional_text(row.beneficiaries))
+        .bind(updated_at)
+        .execute(&mut **transaction)
+        .await?;
+        imported_rows += i64::try_from(result.rows_affected())
+            .map_err(|error| DbError::InvalidData(error.to_string()))?;
+    }
+
+    Ok((source_rows, imported_rows, warnings))
 }
 
 async fn import_tasks(
@@ -592,6 +704,11 @@ fn quote_identifier(identifier: &str) -> String {
 }
 
 #[derive(Debug, FromRow)]
+struct SourceColumnRow {
+    name: String,
+}
+
+#[derive(Debug, FromRow)]
 struct LegacyProjectRow {
     id: i64,
     title: String,
@@ -600,11 +717,23 @@ struct LegacyProjectRow {
     status: String,
     size: Option<String>,
     time_horizon: Option<String>,
+    start_date: Option<String>,
     target_date: Option<String>,
     level_of_success: Option<String>,
     why_link_text: Option<String>,
+    drag_points_notes: Option<String>,
     active_this_week: i64,
     created_at: String,
+    updated_at: Option<String>,
+}
+
+#[derive(Debug, FromRow)]
+struct LegacySuccessPackRow {
+    project_id: i64,
+    guides: Option<String>,
+    peers: Option<String>,
+    supporters: Option<String>,
+    beneficiaries: Option<String>,
     updated_at: Option<String>,
 }
 
@@ -774,12 +903,18 @@ mod tests {
         assert_eq!(report.source_sha256.len(), 64);
         assert!(std::path::Path::new(&report.backup_path).exists());
         assert_imported_table(&report.tables, "projects", 1, 1);
+        assert_imported_table(&report.tables, "success_packs", 1, 1);
         assert_imported_table(&report.tables, "tasks", 2, 2);
         assert_imported_table(&report.tables, "waiting_on", 2, 2);
         assert_imported_table(&report.tables, "blocks", 2, 2);
 
         let project = sqlx::query_as::<_, ImportedProject>(
-            "SELECT legacy_id, title, category, status, active_this_week, created_at FROM projects",
+            r#"
+            SELECT legacy_id, title, category, status, active_this_week,
+                   start_date, target_date, level_of_success, why_link_text,
+                   drag_points_notes, created_at
+            FROM projects
+            "#,
         )
         .fetch_one(&pool)
         .await
@@ -789,7 +924,26 @@ mod tests {
         assert_eq!(project.category, "personal");
         assert_eq!(project.status, "paused");
         assert_eq!(project.active_this_week, 1);
+        assert_eq!(project.start_date.as_deref(), Some("2026-01-15"));
+        assert_eq!(project.target_date.as_deref(), Some("2026-02-03"));
+        assert_eq!(project.level_of_success.as_deref(), Some("epic"));
+        assert_eq!(project.why_link_text.as_deref(), Some("Because it matters"));
+        assert_eq!(
+            project.drag_points_notes.as_deref(),
+            Some("Competing projects")
+        );
         assert_eq!(project.created_at, "2026-01-02T03:04:05+00:00");
+
+        let success_pack = sqlx::query_as::<_, ImportedSuccessPack>(
+            "SELECT guides, peers, supporters, beneficiaries FROM success_packs",
+        )
+        .fetch_one(&pool)
+        .await
+        .expect("success pack row");
+        assert_eq!(success_pack.guides.as_deref(), Some("Guide A"));
+        assert_eq!(success_pack.peers.as_deref(), Some("Peer B"));
+        assert_eq!(success_pack.supporters.as_deref(), Some("Support C"));
+        assert_eq!(success_pack.beneficiaries.as_deref(), Some("Family"));
 
         let tasks = sqlx::query_as::<_, ImportedTask>(
             r#"
@@ -975,7 +1129,20 @@ mod tests {
         category: String,
         status: String,
         active_this_week: i64,
+        start_date: Option<String>,
+        target_date: Option<String>,
+        level_of_success: Option<String>,
+        why_link_text: Option<String>,
+        drag_points_notes: Option<String>,
         created_at: String,
+    }
+
+    #[derive(Debug, FromRow)]
+    struct ImportedSuccessPack {
+        guides: Option<String>,
+        peers: Option<String>,
+        supporters: Option<String>,
+        beneficiaries: Option<String>,
     }
 
     #[derive(Debug, sqlx::FromRow)]
@@ -1060,14 +1227,44 @@ mod tests {
             )
             VALUES (
                 10, 'Legacy Project', 'Scope', NULL, 'personal', 'paused', 'moderate',
-                'quarter', NULL, '2026-02-03', 'epic', 'Because it matters',
-                NULL, 1, '2026-01-02 03:04:05', NULL
+                'quarter', '2026-01-15', '2026-02-03', 'epic', 'Because it matters',
+                'Competing projects', 1, '2026-01-02 03:04:05', NULL
             )
             "#,
         )
         .execute(&pool)
         .await
         .expect("insert project");
+
+        sqlx::query(
+            r#"
+            CREATE TABLE success_packs (
+                id INTEGER PRIMARY KEY,
+                project_id INTEGER NOT NULL,
+                guides TEXT,
+                peers TEXT,
+                supporters TEXT,
+                beneficiaries TEXT,
+                updated_at TEXT
+            )
+            "#,
+        )
+        .execute(&pool)
+        .await
+        .expect("create success packs");
+        sqlx::query(
+            r#"
+            INSERT INTO success_packs (
+                id, project_id, guides, peers, supporters, beneficiaries, updated_at
+            )
+            VALUES (
+                70, 10, 'Guide A', 'Peer B', 'Support C', 'Family', '2026-01-03 07:00:00'
+            )
+            "#,
+        )
+        .execute(&pool)
+        .await
+        .expect("insert success pack");
 
         sqlx::query(
             r#"

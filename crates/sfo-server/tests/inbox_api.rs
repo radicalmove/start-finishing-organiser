@@ -143,3 +143,58 @@ async fn inbox_recycle_and_restore_work_under_api_v1() {
     assert_eq!(restored["in_inbox"], true);
     assert_eq!(restored["status"], "pending");
 }
+
+#[tokio::test]
+async fn inbox_park_until_hides_future_items_and_returns_due_items_under_api_v1() {
+    let app = test_app().await;
+    let (future_status, future_task) = request_json(
+        app.clone(),
+        Method::POST,
+        "/api/v1/inbox/quick-capture",
+        json!({"verb_noun": "Renew passport"}),
+    )
+    .await;
+    assert_eq!(future_status, StatusCode::CREATED);
+    let future_task_id = future_task["id"].as_str().expect("future task id");
+
+    let (due_status, due_task) = request_json(
+        app.clone(),
+        Method::POST,
+        "/api/v1/inbox/quick-capture",
+        json!({"verb_noun": "Print calendar"}),
+    )
+    .await;
+    assert_eq!(due_status, StatusCode::CREATED);
+    let due_task_id = due_task["id"].as_str().expect("due task id");
+
+    let (future_route_status, future_routed) = request_json(
+        app.clone(),
+        Method::POST,
+        &format!("/api/v1/inbox/{future_task_id}/route"),
+        json!({"intent": "park_let_go", "parked_until": "2099-01-01T09:00:00Z"}),
+    )
+    .await;
+    assert_eq!(future_route_status, StatusCode::OK);
+    assert_eq!(future_routed["in_inbox"], false);
+    assert_eq!(future_routed["intake_container"], "park_let_go");
+    assert_eq!(future_routed["parked_until"], "2099-01-01T09:00:00Z");
+
+    let (due_route_status, due_routed) = request_json(
+        app.clone(),
+        Method::POST,
+        &format!("/api/v1/inbox/{due_task_id}/route"),
+        json!({"intent": "park_let_go", "parked_until": "2026-01-01T09:00:00Z"}),
+    )
+    .await;
+    assert_eq!(due_route_status, StatusCode::OK);
+    assert_eq!(due_routed["in_inbox"], false);
+
+    let (containers_status, containers) =
+        request_json(app, Method::GET, "/api/v1/inbox/containers", Value::Null).await;
+    assert_eq!(containers_status, StatusCode::OK);
+    assert_eq!(containers["counts"]["unprocessed"], 1);
+    assert_eq!(containers["counts"]["park_let_go"], 0);
+    assert_eq!(containers["unprocessed"][0]["id"], due_task_id);
+    assert_eq!(containers["unprocessed"][0]["parked_until"], Value::Null);
+    assert!(containers["parked"].as_array().unwrap().is_empty());
+}

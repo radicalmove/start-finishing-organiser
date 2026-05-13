@@ -5,7 +5,9 @@ import {
   buildGuidedCaptureFeedback,
   buildGuidedCapturePayload,
   buildInboxActionFeedback,
+  buildParkRoutePayload,
   buildProcessWorkflowViewModel,
+  buildProjectCardPayload,
   buildProjectOptions,
   buildBootstrapViewModel,
   buildTodayTaskActionFeedback,
@@ -37,6 +39,27 @@ const HORIZON_OPTIONS = [
   ["later", "Later"],
 ];
 
+const SUCCESS_LEVEL_OPTIONS = [
+  ["", "Unspecified"],
+  ["small", "Small - done and useful"],
+  ["moderate", "Moderate - strong progress"],
+  ["epic", "Epic - standout result"],
+];
+
+const PROJECT_STATUS_OPTIONS = [
+  ["active", "Active"],
+  ["paused", "Paused"],
+  ["completed", "Completed"],
+  ["archived", "Archived"],
+];
+
+const PROJECT_SIZE_OPTIONS = [
+  ["", "Unspecified"],
+  ["light", "Light"],
+  ["moderate", "Moderate"],
+  ["heavy", "Heavy"],
+];
+
 const DECISION_OPTIONS = [
   [
     "task",
@@ -62,6 +85,8 @@ const BLOCK_TYPE_OPTIONS = [
   ["social", "Social"],
   ["recovery", "Recovery"],
 ];
+const STARTUP_CONNECT_RETRY_MS = 1000;
+const STARTUP_CONNECT_MAX_ATTEMPTS = 30;
 
 const elements = {
   statusDot: document.getElementById("status-dot"),
@@ -97,6 +122,9 @@ const elements = {
   nextBlock: document.getElementById("next-block"),
   inboxTotal: document.getElementById("inbox-total"),
   inboxCounts: document.getElementById("inbox-counts"),
+  processWorkflow: document.getElementById("workflow-process"),
+  processActiveItem: document.getElementById("process-active-item"),
+  processActiveActions: document.getElementById("process-active-actions"),
   inboxItems: document.getElementById("inbox-items"),
   processPosition: document.getElementById("process-position"),
   ritualStatus: document.getElementById("ritual-status"),
@@ -109,9 +137,21 @@ const elements = {
   reviewWorkCount: document.getElementById("review-work-count"),
   reviewPersonalCount: document.getElementById("review-personal-count"),
   reviewWeeklyProjects: document.getElementById("review-weekly-projects"),
+  reviewWeeklyProjectsCount: document.getElementById("review-weekly-projects-count"),
   reviewFocusCandidates: document.getElementById("review-focus-candidates"),
+  reviewFocusCandidatesCount: document.getElementById("review-focus-candidates-count"),
   reviewResurfaceDue: document.getElementById("review-resurface-due"),
+  reviewResurfaceDueCount: document.getElementById("review-resurface-due-count"),
   reviewCompletedTasks: document.getElementById("review-completed-tasks"),
+  reviewCompletedTasksCount: document.getElementById("review-completed-tasks-count"),
+  reviewLearningItems: document.getElementById("review-learning-items"),
+  reviewLearningCount: document.getElementById("review-learning-count"),
+  reviewEnjoyItems: document.getElementById("review-enjoy-items"),
+  reviewEnjoyCount: document.getElementById("review-enjoy-count"),
+  reviewParkedItems: document.getElementById("review-parked-items"),
+  reviewParkedCount: document.getElementById("review-parked-count"),
+  reviewRecycleBinItems: document.getElementById("review-recycle-bin-items"),
+  reviewRecycleBinCount: document.getElementById("review-recycle-bin-count"),
 };
 
 const tauriInvoke = getTauriInvoke(window);
@@ -121,6 +161,8 @@ let settings = {
 };
 let lastAuthRequired = null;
 let activeWorkflow = "today";
+let startupReconnectTimer = null;
+let startupReconnectAttempts = 0;
 
 function setWorkflow(workflow) {
   const nextWorkflow = WORKFLOWS.some((item) => item.id === workflow) ? workflow : "today";
@@ -205,7 +247,7 @@ function setGuidance(labelElement, detailElement, label, detail) {
   detailElement.textContent = detail;
 }
 
-async function connectAndLoad() {
+async function connectAndLoad(options = {}) {
   clearActionFeedback();
   await saveSettings(window.localStorage, settings, tauriInvoke);
   lastAuthRequired = null;
@@ -238,29 +280,78 @@ async function connectAndLoad() {
       buildProjectOptions(projectsPage),
       defaultGuidedProjectTargetDate(dashboardModel.todayLabel),
     );
-    renderWeeklyReview(buildWeeklyReviewViewModel(weeklyReview));
+    renderWeeklyReview(buildWeeklyReviewViewModel(weeklyReview, inboxContainers));
+    if (startupReconnectTimer) {
+      window.clearTimeout(startupReconnectTimer);
+      startupReconnectTimer = null;
+    }
+    startupReconnectAttempts = 0;
     setConnectionState(
       "ready",
       auth?.auth_required ? "Connected with API token" : "Connected without auth",
       `${settings.serverUrl} · database ${summary?.system?.database_status || "unknown"}`,
     );
   } catch (err) {
+    if (options.startupRetry === true) {
+      scheduleStartupReconnect();
+      setConnectionState(
+        "loading",
+        "Starting local server...",
+        err instanceof Error ? err.message : String(err),
+      );
+      return;
+    }
     setConnectionState(
       "error",
       "Connection needs attention",
       err instanceof Error ? err.message : String(err),
     );
-    setWorkflow("settings");
+    if (options.startupRetry !== true) {
+      setWorkflow("settings");
+    }
   }
 }
 
+function scheduleStartupReconnect() {
+  if (startupReconnectTimer) return;
+  if (startupReconnectAttempts >= STARTUP_CONNECT_MAX_ATTEMPTS) {
+    setConnectionState(
+      "error",
+      "Connection needs attention",
+      "The local server did not become ready. Check Settings or restart the app.",
+    );
+    setWorkflow("settings");
+    return;
+  }
+
+  startupReconnectAttempts += 1;
+  setConnectionState(
+    "loading",
+    "Starting local server...",
+    `Waiting for ${settings.serverUrl} (${startupReconnectAttempts}/${STARTUP_CONNECT_MAX_ATTEMPTS})`,
+  );
+
+  startupReconnectTimer = window.setTimeout(() => {
+    startupReconnectTimer = null;
+    connectAndLoad({ startupRetry: true }).catch((err) => {
+      setConnectionState(
+        "error",
+        "Connection needs attention",
+        err instanceof Error ? err.message : String(err),
+      );
+      setWorkflow("settings");
+    });
+  }, STARTUP_CONNECT_RETRY_MS);
+}
+
 async function refreshDashboardAndReview() {
-  const [summary, weeklyReview] = await Promise.all([
+  const [summary, weeklyReview, inboxContainers] = await Promise.all([
     requestJson(window.fetch.bind(window), settings, "/api/v1/bootstrap"),
     requestJson(window.fetch.bind(window), settings, "/api/v1/weekly-review"),
+    requestJson(window.fetch.bind(window), settings, "/api/v1/inbox/containers"),
   ]);
   renderDashboard(buildBootstrapViewModel(summary));
-  renderWeeklyReview(buildWeeklyReviewViewModel(weeklyReview));
+  renderWeeklyReview(buildWeeklyReviewViewModel(weeklyReview, inboxContainers));
 }
 
 async function refreshDashboardAndProcess() {
@@ -290,19 +381,16 @@ async function refreshWorkflowData(workflow) {
 }
 
 async function reloadWeeklyReview() {
-  const weeklyReview = await requestJson(
-    window.fetch.bind(window),
-    settings,
-    "/api/v1/weekly-review",
-  );
-  renderWeeklyReview(buildWeeklyReviewViewModel(weeklyReview));
+  const [weeklyReview, inboxContainers] = await Promise.all([
+    requestJson(window.fetch.bind(window), settings, "/api/v1/weekly-review"),
+    requestJson(window.fetch.bind(window), settings, "/api/v1/inbox/containers"),
+  ]);
+  renderWeeklyReview(buildWeeklyReviewViewModel(weeklyReview, inboxContainers));
 }
 
 function renderDashboard(model) {
   elements.dashboard.classList.remove("hidden");
-  elements.todayLabel.textContent = model.currentTime
-    ? `${model.todayLabel} · ${model.currentTime}`
-    : model.todayLabel;
+  elements.todayLabel.textContent = model.todayDisplayLabel || model.todayLabel;
   elements.nowTitle.textContent = model.now.title;
   elements.nowMeta.textContent = [model.now.time, model.now.meta].filter(Boolean).join(" · ");
   if (model.next) {
@@ -314,13 +402,7 @@ function renderDashboard(model) {
   }
 
   elements.inboxTotal.textContent = String(model.inboxTotal);
-  elements.inboxCounts.replaceChildren(
-    countPill("Inbox", model.inbox.unprocessed),
-    countPill("Learning", model.inbox.learn_explore),
-    countPill("Enjoy", model.inbox.enjoy_recover),
-    countPill("Parked", model.inbox.park_let_go),
-    countPill("Recycle", model.inbox.recycle_bin),
-  );
+  elements.inboxCounts.replaceChildren();
   elements.oneThingInput.value = model.dailyFocus.oneThing;
   elements.frogInput.value = model.dailyFocus.frog;
   elements.ritualStatus.textContent = ritualStatusText(model.rituals);
@@ -341,55 +423,30 @@ function renderCaptureWorkflow() {
 
 function renderProcessWorkflow(model, projectOptions = [], projectTargetDate = "") {
   elements.processPosition.textContent = model.positionLabel;
+  elements.processActiveItem.replaceChildren();
+  elements.processActiveActions.replaceChildren();
   elements.inboxItems.replaceChildren();
   if (!model.queue.length) {
+    elements.processActiveItem.append(
+      emptyState("Inbox is clear. Capture something when it appears."),
+    );
     elements.inboxItems.append(emptyState("Inbox is clear. Capture something when it appears."));
     return;
   }
 
-  for (const item of model.queue) {
-    const row = document.createElement("div");
-    row.className = "inbox-item";
-    row.classList.toggle("process-primary", item.id === model.activeItem?.id);
-    row.classList.toggle("process-queue", item.id !== model.activeItem?.id);
+  const item = model.activeItem || model.queue[0];
+  if (!item) return;
 
-    const body = document.createElement("div");
-    body.className = "inbox-item-body";
-    const title = document.createElement("strong");
-    title.textContent = item.title;
-    const description = document.createElement("span");
-    description.textContent = item.description;
-    const meta = document.createElement("small");
-    meta.textContent = item.meta;
-    body.append(title, description, meta);
+  const activeCard = document.createElement("div");
+  activeCard.className = "inbox-item process-primary process-active-card";
+  activeCard.append(inboxItemBody(item));
+  elements.processActiveItem.append(activeCard);
+  elements.processActiveActions.append(...buildInboxActions(item));
 
-    const actions = document.createElement("div");
-    actions.className = "inbox-actions";
-    for (const [intent, label] of Object.entries(INBOX_ROUTE_ACTIONS)) {
-      const button = document.createElement("button");
-      button.className = "mini-button";
-      button.type = "button";
-      button.dataset.inboxAction = "route";
-      button.dataset.itemId = item.id;
-      button.dataset.itemTitle = item.title;
-      button.dataset.intent = intent;
-      button.dataset.intentLabel = label;
-      button.textContent = label;
-      actions.append(button);
-    }
-
-    const recycle = document.createElement("button");
-    recycle.className = "mini-button quiet";
-    recycle.type = "button";
-    recycle.dataset.inboxAction = "recycle";
-    recycle.dataset.itemId = item.id;
-    recycle.dataset.itemTitle = item.title;
-    recycle.textContent = "Recycle";
-    actions.append(recycle);
-
-    row.append(body, actions, guidedCaptureDetails(item, projectOptions, projectTargetDate));
-    elements.inboxItems.append(row);
-  }
+  elements.inboxItems.append(parkChoicePanel(item));
+  const details = guidedCaptureDetails(item, projectOptions, projectTargetDate);
+  details.open = true;
+  elements.inboxItems.append(details);
 }
 
 function renderWeeklyReview(model) {
@@ -402,6 +459,14 @@ function renderWeeklyReview(model) {
   elements.reviewPersonalCount
     .closest(".review-count-card")
     ?.classList.toggle("at-cap", model.focusCounts.personal.atCap);
+  elements.reviewWeeklyProjectsCount.textContent = model.weeklyProjectsCountLabel;
+  elements.reviewFocusCandidatesCount.textContent = model.focusCandidatesCountLabel;
+  elements.reviewResurfaceDueCount.textContent = model.resurfaceDueCountLabel;
+  elements.reviewCompletedTasksCount.textContent = model.completedTasksCountLabel;
+  elements.reviewLearningCount.textContent = model.learningItemsCountLabel;
+  elements.reviewEnjoyCount.textContent = model.enjoyItemsCountLabel;
+  elements.reviewParkedCount.textContent = model.parkedItemsCountLabel;
+  elements.reviewRecycleBinCount.textContent = model.recycleBinItemsCountLabel;
 
   renderReviewProjects(
     elements.reviewWeeklyProjects,
@@ -424,6 +489,18 @@ function renderWeeklyReview(model) {
     model.completedTasks,
     model.emptyCompletedTasks,
     "archive-task",
+  );
+  renderRoutedInboxItems(
+    elements.reviewLearningItems,
+    model.learningItems,
+    model.emptyLearningItems,
+  );
+  renderRoutedInboxItems(elements.reviewEnjoyItems, model.enjoyItems, model.emptyEnjoyItems);
+  renderRoutedInboxItems(elements.reviewParkedItems, model.parkedItems, model.emptyParkedItems);
+  renderRecycleBinItems(
+    elements.reviewRecycleBinItems,
+    model.recycleBinItems,
+    model.emptyRecycleBinItems,
   );
 }
 
@@ -463,6 +540,30 @@ function renderReviewTasks(container, tasks, emptyText, action) {
   }
 }
 
+function renderRoutedInboxItems(container, items, emptyText) {
+  container.replaceChildren();
+  if (!items.length) {
+    container.append(emptyState(emptyText));
+    return;
+  }
+
+  for (const item of items) {
+    container.append(reviewInboxItemRow(item));
+  }
+}
+
+function renderRecycleBinItems(container, items, emptyText) {
+  container.replaceChildren();
+  if (!items.length) {
+    container.append(emptyState(emptyText));
+    return;
+  }
+
+  for (const item of items) {
+    container.append(reviewRecycleBinItemRow(item));
+  }
+}
+
 function reviewProjectCard(project, action = "") {
   const card = document.createElement("div");
   card.className = "review-card";
@@ -482,9 +583,20 @@ function reviewProjectCard(project, action = "") {
   }
   card.append(body);
 
+  const actions = document.createElement("div");
+  actions.className = "review-card-actions";
+  if (project.id) {
+    const shapeButton = document.createElement("button");
+    shapeButton.className = "mini-button quiet";
+    shapeButton.type = "button";
+    shapeButton.dataset.reviewAction = "toggle-project-card";
+    shapeButton.dataset.projectId = project.id;
+    shapeButton.dataset.projectTitle = project.title;
+    shapeButton.textContent = "Shape";
+    actions.append(shapeButton);
+  }
+
   if (action) {
-    const actions = document.createElement("div");
-    actions.className = "review-card-actions";
     const button = document.createElement("button");
     button.className = project.active ? "mini-button quiet" : "mini-button";
     button.type = "button";
@@ -495,10 +607,123 @@ function reviewProjectCard(project, action = "") {
     button.disabled = !project.id;
     button.textContent = project.toggleLabel;
     actions.append(button);
+  }
+  if (actions.childElementCount) {
     card.append(actions);
   }
 
+  const details = document.createElement("div");
+  details.className = "project-card-detail hidden";
+  details.dataset.projectCardDetail = project.id || "";
+  card.append(details);
+
   return card;
+}
+
+function renderProjectCardDetail(container, card) {
+  const project = card?.project || {};
+  const successPack = card?.success_pack || {};
+  const chunks = card?.chunks || [];
+  container.replaceChildren(projectCardForm(project, successPack), projectChunkPanel(project, chunks));
+  container.dataset.loaded = "true";
+}
+
+function projectCardForm(project, successPack) {
+  const form = document.createElement("form");
+  form.className = "project-card-form";
+  form.dataset.projectId = project.id || "";
+
+  form.append(
+    projectCardSection("Finish line", [
+      formField("Title", textInput("title", project.title, "Verb-noun project title")),
+      formField("Status", selectInput("status", PROJECT_STATUS_OPTIONS, project.status || "active")),
+      formField("Category", selectInput("category", [["work", "Work"], ["personal", "Personal"]], project.category || "work")),
+      formField("Size", selectInput("size", PROJECT_SIZE_OPTIONS, project.size || "")),
+      formField("Horizon", selectInput("time_horizon", [["", "Unspecified"], ["week", "Week"], ["month", "Month"], ["quarter", "Quarter"], ["year", "Year"], ["later", "Later"]], project.time_horizon || "")),
+      formField("Start date", textInput("start_date", project.start_date, "Optional", "date")),
+      formField("Target date", textInput("target_date", project.target_date, "Required", "date")),
+      formField("Success level", selectInput("level_of_success", SUCCESS_LEVEL_OPTIONS, project.level_of_success || "")),
+      checkboxField("Active this week", "active_this_week", Boolean(project.active_this_week)),
+      checkboxField("Allow non-action title", "verb_check_ack", false),
+    ]),
+    projectCardSection("Why and constraints", [
+      formField("Why", textAreaInput("why_link_text", project.why_link_text, "Why does this matter?"), "full"),
+      formField("Description", textAreaInput("description", project.description, "Useful scope notes"), "full"),
+      formField("GATES", textAreaInput("gates_notes", project.gates_notes, "Genius, affinity, talents, expertise, strengths"), "full"),
+      formField("Drag points", textAreaInput("drag_points_notes", project.drag_points_notes, "Likely friction, derailers, or OPP"), "full"),
+      formField("Budget / space", textAreaInput("budget_notes", project.budget_notes, "Focus blocks, money, energy, or support needed"), "full"),
+    ]),
+    projectCardSection("Success pack", [
+      formField("Guides", textAreaInput("success_pack_guides", successPack.guides, "People or sources that can guide this"), "full"),
+      formField("Peers", textAreaInput("success_pack_peers", successPack.peers, "People working beside you"), "full"),
+      formField("Supporters", textAreaInput("success_pack_supporters", successPack.supporters, "People who can make space"), "full"),
+      formField("Beneficiaries", textAreaInput("success_pack_beneficiaries", successPack.beneficiaries, "Who benefits when this is finished?"), "full"),
+    ]),
+  );
+
+  const actions = document.createElement("div");
+  actions.className = "project-card-actions";
+  const save = document.createElement("button");
+  save.className = "mini-button";
+  save.type = "submit";
+  save.textContent = "Save project card";
+  actions.append(save);
+  form.append(actions);
+  return form;
+}
+
+function projectCardSection(titleText, fields) {
+  const section = document.createElement("details");
+  section.className = "project-card-section";
+  section.open = true;
+  const summary = document.createElement("summary");
+  summary.textContent = titleText;
+  const grid = document.createElement("div");
+  grid.className = "project-card-grid";
+  grid.append(...fields);
+  section.append(summary, grid);
+  return section;
+}
+
+function projectChunkPanel(project, chunks) {
+  const panel = document.createElement("section");
+  panel.className = "project-chunk-panel";
+  const heading = document.createElement("h4");
+  heading.textContent = "Roadmap chunks";
+  const list = document.createElement("div");
+  list.className = "project-chunk-list";
+  if (!chunks.length) {
+    list.append(emptyState("No chunks yet. Add the next small piece."));
+  } else {
+    for (const chunk of chunks) {
+      const item = document.createElement("div");
+      item.className = "project-chunk-item";
+      const title = document.createElement("strong");
+      title.textContent = chunk.verb_noun || "Untitled chunk";
+      const meta = document.createElement("span");
+      meta.textContent = [chunk.when_bucket, chunk.duration_minutes ? `${chunk.duration_minutes} min` : ""]
+        .filter(Boolean)
+        .join(" · ");
+      item.append(title, meta);
+      list.append(item);
+    }
+  }
+
+  const form = document.createElement("form");
+  form.className = "project-chunk-form";
+  form.dataset.projectId = project.id || "";
+  form.append(
+    formField("Next chunk", textInput("verb_noun", "", "Draft next small chunk")),
+    formField("Minutes", textInput("duration_minutes", "", "Optional", "number")),
+  );
+  const button = document.createElement("button");
+  button.className = "mini-button";
+  button.type = "submit";
+  button.textContent = "Add chunk";
+  form.append(button);
+
+  panel.append(heading, list, form);
+  return panel;
 }
 
 function reviewTaskRow(task, action) {
@@ -532,6 +757,105 @@ function reviewTaskRow(task, action) {
 
   row.append(body, actions);
   return row;
+}
+
+function reviewInboxItemRow(item) {
+  const row = document.createElement("div");
+  row.className = "review-task-row";
+
+  const body = document.createElement("div");
+  body.className = "review-task-body";
+  const title = document.createElement("strong");
+  title.textContent = item.title;
+  const meta = document.createElement("span");
+  meta.textContent = item.meta || item.description || "";
+  body.append(title, meta);
+  if (item.description && item.meta) {
+    const description = document.createElement("span");
+    description.textContent = item.description;
+    body.append(description);
+  }
+
+  const actions = document.createElement("div");
+  actions.className = "review-task-actions";
+  const restoreButton = document.createElement("button");
+  restoreButton.className = "mini-button";
+  restoreButton.type = "button";
+  restoreButton.dataset.reviewInboxAction = "restore-inbox-item";
+  restoreButton.dataset.itemId = item.id;
+  restoreButton.dataset.itemTitle = item.title;
+  restoreButton.disabled = !item.id;
+  restoreButton.textContent = item.actionLabel;
+
+  const recycleButton = document.createElement("button");
+  recycleButton.className = "mini-button quiet";
+  recycleButton.type = "button";
+  recycleButton.dataset.reviewInboxAction = "recycle-inbox-item";
+  recycleButton.dataset.itemId = item.id;
+  recycleButton.dataset.itemTitle = item.title;
+  recycleButton.disabled = !item.id;
+  recycleButton.textContent = "Recycle";
+
+  actions.append(restoreButton, recycleButton);
+  row.append(body, actions);
+  return row;
+}
+
+function reviewRecycleBinItemRow(item) {
+  const row = document.createElement("div");
+  row.className = "review-task-row";
+
+  const body = document.createElement("div");
+  body.className = "review-task-body";
+  const title = document.createElement("strong");
+  title.textContent = item.title;
+  const meta = document.createElement("span");
+  meta.textContent = item.meta || item.description || "";
+  body.append(title, meta);
+  if (item.description && item.meta) {
+    const description = document.createElement("span");
+    description.textContent = item.description;
+    body.append(description);
+  }
+
+  const actions = document.createElement("div");
+  actions.className = "review-task-actions";
+  const restoreButton = document.createElement("button");
+  restoreButton.className = "mini-button";
+  restoreButton.type = "button";
+  restoreButton.dataset.reviewInboxAction = "restore-recycled-item";
+  restoreButton.dataset.itemId = item.id;
+  restoreButton.dataset.itemTitle = item.title;
+  restoreButton.disabled = !item.id;
+  restoreButton.textContent = item.actionLabel;
+
+  const deleteButton = document.createElement("button");
+  deleteButton.className = "mini-button danger";
+  deleteButton.type = "button";
+  deleteButton.dataset.reviewInboxAction = "delete-recycled-item";
+  deleteButton.dataset.itemId = item.id;
+  deleteButton.dataset.itemTitle = item.title;
+  deleteButton.disabled = !item.id;
+  deleteButton.textContent = "Delete permanently";
+
+  actions.append(restoreButton, deleteButton);
+  row.append(body, actions);
+  return row;
+}
+
+function resetPendingRecycleDeleteButtons(exceptButton = null) {
+  for (const button of elements.reviewRecycleBinItems.querySelectorAll(
+    '[data-review-inbox-action="delete-recycled-item"][data-confirming-delete="true"]',
+  )) {
+    if (button === exceptButton) continue;
+
+    const resetTimer = Number(button.dataset.confirmResetTimer || 0);
+    if (resetTimer) window.clearTimeout(resetTimer);
+    delete button.dataset.confirmResetTimer;
+    button.removeAttribute("data-confirming-delete");
+    button.classList.remove("is-confirming");
+    button.textContent = "Delete permanently";
+  }
 }
 
 function guidedCaptureDetails(item, projectOptions, projectTargetDate) {
@@ -590,6 +914,21 @@ function guidedCaptureDetails(item, projectOptions, projectTargetDate) {
         textInput("target_date", projectTargetDate, "YYYY-MM-DD", "date"),
         "project-only",
       ),
+      formField(
+        "Success level",
+        selectInput("level_of_success", SUCCESS_LEVEL_OPTIONS),
+        "project-only",
+      ),
+      formField(
+        "Why",
+        textAreaInput("why_link_text", "", "Why does this deserve a project slot?"),
+        "project-only",
+      ),
+      formField(
+        "First chunk",
+        textInput("first_chunk", "", "Optional first next action"),
+        "project-only",
+      ),
       checkboxField("Include this project this week", "include_this_week", true, "project-only"),
       checkboxField("Allow non-action project title", "verb_check_ack", false, "project-only"),
       formField(
@@ -606,6 +945,132 @@ function guidedCaptureDetails(item, projectOptions, projectTargetDate) {
   details.append(summary, form);
   syncGuidedForm(form);
   return details;
+}
+
+function inboxItemBody(item) {
+  const body = document.createElement("div");
+  body.className = "inbox-item-body";
+  const title = document.createElement("strong");
+  title.textContent = item.title;
+  const description = document.createElement("span");
+  description.textContent = item.description;
+  const meta = document.createElement("small");
+  meta.textContent = item.meta;
+  body.append(title, description, meta);
+  return body;
+}
+
+function buildInboxActions(item) {
+  const actions = [];
+  for (const [intent, label] of Object.entries(INBOX_ROUTE_ACTIONS)) {
+    const button = document.createElement("button");
+    button.className = "mini-button";
+    button.type = "button";
+    button.dataset.inboxAction = intent === "park_let_go" ? "park-menu" : "route";
+    button.dataset.itemId = item.id;
+    button.dataset.itemTitle = item.title;
+    button.dataset.intent = intent;
+    button.dataset.intentLabel = label;
+    button.textContent = label;
+    actions.push(button);
+  }
+
+  const recycle = document.createElement("button");
+  recycle.className = "mini-button quiet";
+  recycle.type = "button";
+  recycle.dataset.inboxAction = "recycle";
+  recycle.dataset.itemId = item.id;
+  recycle.dataset.itemTitle = item.title;
+  recycle.textContent = "Recycle";
+  actions.push(recycle);
+  return actions;
+}
+
+function parkChoicePanel(item) {
+  const panel = document.createElement("form");
+  panel.className = "park-choice-panel hidden";
+  panel.dataset.parkPanel = item.id;
+
+  const heading = document.createElement("div");
+  heading.className = "compact-heading";
+  const title = document.createElement("h3");
+  title.textContent = "Park this item";
+  const description = document.createElement("p");
+  description.textContent =
+    "Choose whether this disappears until a specific date and time, or stays parked for Review.";
+  heading.append(title, description);
+
+  const dateLabel = document.createElement("label");
+  dateLabel.textContent = "Return to Inbox";
+  const dateInput = document.createElement("input");
+  dateInput.type = "datetime-local";
+  dateInput.name = "park_until";
+  dateInput.required = true;
+  dateLabel.append(dateInput);
+
+  const actions = document.createElement("div");
+  actions.className = "park-choice-actions";
+  const parkUntil = document.createElement("button");
+  parkUntil.className = "primary-button";
+  parkUntil.type = "submit";
+  parkUntil.dataset.parkAction = "until";
+  parkUntil.dataset.itemId = item.id;
+  parkUntil.dataset.itemTitle = item.title;
+  parkUntil.textContent = "Park until date/time";
+
+  const parkWithoutDate = document.createElement("button");
+  parkWithoutDate.className = "ghost-button";
+  parkWithoutDate.type = "button";
+  parkWithoutDate.dataset.parkAction = "without-date";
+  parkWithoutDate.dataset.itemId = item.id;
+  parkWithoutDate.dataset.itemTitle = item.title;
+  parkWithoutDate.textContent = "Park without date";
+
+  const cancel = document.createElement("button");
+  cancel.className = "mini-button quiet";
+  cancel.type = "button";
+  cancel.dataset.parkAction = "cancel";
+  cancel.textContent = "Cancel";
+
+  actions.append(parkUntil, parkWithoutDate, cancel);
+  panel.append(heading, dateLabel, actions);
+  return panel;
+}
+
+function showParkChoicePanel(itemId) {
+  for (const panel of elements.inboxItems.querySelectorAll(".park-choice-panel")) {
+    const selected = panel.dataset.parkPanel === itemId;
+    panel.classList.toggle("hidden", !selected);
+    if (selected) {
+      panel.querySelector('[name="park_until"]')?.focus();
+    }
+  }
+}
+
+function hideParkChoicePanels() {
+  for (const panel of elements.inboxItems.querySelectorAll(".park-choice-panel")) {
+    panel.classList.add("hidden");
+  }
+}
+
+async function submitParkRoute(itemId, itemTitle, parkedUntilValue = "") {
+  await requestJson(
+    window.fetch.bind(window),
+    settings,
+    `/api/v1/inbox/${encodeURIComponent(itemId)}/route`,
+    {
+      method: "POST",
+      body: buildParkRoutePayload(parkedUntilValue),
+    },
+  );
+  await connectAndLoad();
+  const untilCopy = parkedUntilValue ? ` until ${parkedUntilValue.replace("T", " ")}` : "";
+  showActionFeedback({
+    message: `Parked "${itemTitle || "this item"}"${untilCopy}.`,
+    undoPath: `/api/v1/inbox/${encodeURIComponent(itemId)}/undo`,
+    undoLabel: "Undo",
+    restoredMessage: `Restored "${itemTitle || "this item"}" to Inbox.`,
+  });
 }
 
 function guidedStepHeader() {
@@ -1192,16 +1657,107 @@ elements.todayTasks.addEventListener("click", async (event) => {
 });
 
 for (const container of [
+  elements.reviewWeeklyProjects,
   elements.reviewFocusCandidates,
   elements.reviewResurfaceDue,
   elements.reviewCompletedTasks,
+  elements.reviewLearningItems,
+  elements.reviewEnjoyItems,
+  elements.reviewParkedItems,
+  elements.reviewRecycleBinItems,
 ]) {
   container.addEventListener("click", async (event) => {
+    const inboxButton = event.target.closest("[data-review-inbox-action]");
+    if (inboxButton) {
+      const itemId = inboxButton.dataset.itemId;
+      const itemTitle = inboxButton.dataset.itemTitle;
+      if (!itemId) return;
+
+      inboxButton.disabled = true;
+      try {
+        const action = inboxButton.dataset.reviewInboxAction;
+        const feedback = buildWeeklyReviewActionFeedback(action, itemTitle);
+        if (action === "delete-recycled-item") {
+          if (inboxButton.getAttribute("data-confirming-delete") !== "true") {
+            resetPendingRecycleDeleteButtons(inboxButton);
+            inboxButton.setAttribute("data-confirming-delete", "true");
+            inboxButton.classList.add("is-confirming");
+            inboxButton.textContent = "Confirm delete";
+            const resetTimer = window.setTimeout(() => {
+              resetPendingRecycleDeleteButtons();
+            }, 5000);
+            inboxButton.dataset.confirmResetTimer = String(resetTimer);
+            inboxButton.disabled = false;
+            return;
+          }
+
+          const resetTimer = Number(inboxButton.dataset.confirmResetTimer || 0);
+          if (resetTimer) window.clearTimeout(resetTimer);
+          delete inboxButton.dataset.confirmResetTimer;
+          await requestJson(
+            window.fetch.bind(window),
+            settings,
+            `/api/v1/tasks/${encodeURIComponent(itemId)}`,
+            { method: "DELETE" },
+          );
+          await refreshDashboardAndReview();
+          showActionFeedback(feedback);
+          return;
+        }
+
+        const endpointAction = action === "recycle-inbox-item" ? "recycle" : "restore";
+        await requestJson(
+          window.fetch.bind(window),
+          settings,
+          `/api/v1/inbox/${encodeURIComponent(itemId)}/${endpointAction}`,
+          { method: "POST" },
+        );
+        await refreshDashboardAndReview();
+        if (action === "recycle-inbox-item") {
+          showActionFeedback({
+            message: feedback.message,
+            undoPath: `/api/v1/inbox/${encodeURIComponent(itemId)}/restore`,
+            undoLabel: feedback.undo?.label || "Restore",
+            restoredMessage: `Restored "${itemTitle || "this item"}".`,
+          });
+          return;
+        }
+        showActionFeedback(feedback);
+      } catch (err) {
+        setConnectionState("error", "Review item update failed", err.message);
+      } finally {
+        inboxButton.disabled = false;
+      }
+      return;
+    }
+
     const button = event.target.closest("[data-review-action]");
     if (!button) return;
 
     button.disabled = true;
     try {
+      if (button.dataset.reviewAction === "toggle-project-card") {
+        const projectId = button.dataset.projectId;
+        const detail = button.closest(".review-card")?.querySelector("[data-project-card-detail]");
+        if (!projectId || !detail) return;
+
+        if (!detail.classList.contains("hidden")) {
+          detail.classList.add("hidden");
+          return;
+        }
+
+        if (detail.dataset.loaded !== "true") {
+          const card = await requestJson(
+            window.fetch.bind(window),
+            settings,
+            `/api/v1/projects/${encodeURIComponent(projectId)}/card`,
+          );
+          renderProjectCardDetail(detail, card);
+        }
+        detail.classList.remove("hidden");
+        return;
+      }
+
       if (button.dataset.reviewAction === "focus-toggle") {
         const projectId = button.dataset.projectId;
         const nextActive = button.dataset.nextActive === "true";
@@ -1267,7 +1823,66 @@ for (const container of [
   });
 }
 
-elements.inboxItems.addEventListener("click", async (event) => {
+for (const container of [elements.reviewWeeklyProjects, elements.reviewFocusCandidates]) {
+  container.addEventListener("submit", async (event) => {
+    const cardForm = event.target.closest(".project-card-form");
+    const chunkForm = event.target.closest(".project-chunk-form");
+    if (!cardForm && !chunkForm) return;
+    event.preventDefault();
+
+    const form = cardForm || chunkForm;
+    const projectId = form.dataset.projectId;
+    const detail = form.closest("[data-project-card-detail]");
+    const submit = form.querySelector('button[type="submit"]');
+    if (!projectId || !detail || !submit) return;
+
+    submit.disabled = true;
+    try {
+      if (cardForm) {
+        const payload = buildProjectCardPayload(Object.fromEntries(new FormData(cardForm).entries()));
+        const card = await requestJson(
+          window.fetch.bind(window),
+          settings,
+          `/api/v1/projects/${encodeURIComponent(projectId)}/card`,
+          { method: "PUT", body: payload },
+        );
+        renderProjectCardDetail(detail, card);
+        detail.classList.remove("hidden");
+        showActionFeedback({ message: "Saved project card." });
+        return;
+      }
+
+      const values = Object.fromEntries(new FormData(chunkForm).entries());
+      const duration = Number(values.duration_minutes || 0);
+      await requestJson(
+        window.fetch.bind(window),
+        settings,
+        `/api/v1/projects/${encodeURIComponent(projectId)}/chunks`,
+        {
+          method: "POST",
+          body: {
+            verb_noun: values.verb_noun,
+            duration_minutes: Number.isFinite(duration) && duration > 0 ? duration : undefined,
+          },
+        },
+      );
+      const card = await requestJson(
+        window.fetch.bind(window),
+        settings,
+        `/api/v1/projects/${encodeURIComponent(projectId)}/card`,
+      );
+      renderProjectCardDetail(detail, card);
+      detail.classList.remove("hidden");
+      showActionFeedback({ message: "Added project chunk." });
+    } catch (err) {
+      setConnectionState("error", "Project card update failed", err.message);
+    } finally {
+      submit.disabled = false;
+    }
+  });
+}
+
+elements.processWorkflow.addEventListener("click", async (event) => {
   const guidedButton = event.target.closest("[data-guided-action]");
   if (guidedButton) {
     const form = guidedButton.closest(".guided-form");
@@ -1299,11 +1914,36 @@ elements.inboxItems.addEventListener("click", async (event) => {
     }
   }
 
+  const parkButton = event.target.closest("[data-park-action]");
+  if (parkButton && parkButton.dataset.parkAction !== "until") {
+    if (parkButton.dataset.parkAction === "cancel") {
+      hideParkChoicePanels();
+      return;
+    }
+
+    const itemId = parkButton.dataset.itemId;
+    if (!itemId) return;
+    parkButton.disabled = true;
+    try {
+      await submitParkRoute(itemId, parkButton.dataset.itemTitle, "");
+    } catch (err) {
+      setConnectionState("error", "Park action failed", err.message);
+    } finally {
+      parkButton.disabled = false;
+    }
+    return;
+  }
+
   const button = event.target.closest("[data-inbox-action]");
   if (!button) return;
 
   const itemId = button.dataset.itemId;
   if (!itemId) return;
+
+  if (button.dataset.inboxAction === "park-menu") {
+    showParkChoicePanel(itemId);
+    return;
+  }
 
   button.disabled = true;
   try {
@@ -1340,12 +1980,31 @@ elements.inboxItems.addEventListener("click", async (event) => {
   }
 });
 
-elements.inboxItems.addEventListener("change", (event) => {
+elements.processWorkflow.addEventListener("change", (event) => {
   if (!event.target.matches('[name="decision"]')) return;
   syncGuidedForm(event.target.closest("form"));
 });
 
-elements.inboxItems.addEventListener("submit", async (event) => {
+elements.processWorkflow.addEventListener("submit", async (event) => {
+  const parkForm = event.target.closest(".park-choice-panel");
+  if (parkForm) {
+    event.preventDefault();
+    const submit = parkForm.querySelector('[data-park-action="until"]');
+    const itemId = submit?.dataset.itemId;
+    if (!itemId) return;
+
+    submit.disabled = true;
+    try {
+      const values = Object.fromEntries(new FormData(parkForm).entries());
+      await submitParkRoute(itemId, submit.dataset.itemTitle, values.park_until);
+    } catch (err) {
+      setConnectionState("error", "Park action failed", err.message);
+    } finally {
+      submit.disabled = false;
+    }
+    return;
+  }
+
   const form = event.target.closest(".guided-form");
   if (!form) return;
   event.preventDefault();
@@ -1403,7 +2062,7 @@ async function initialize() {
     settings = await loadSettings(window.localStorage, tauriInvoke);
     renderCaptureWorkflow();
     applySettingsToForm();
-    await connectAndLoad();
+    await connectAndLoad({ startupRetry: true });
   } catch (err) {
     setConnectionState(
       "error",

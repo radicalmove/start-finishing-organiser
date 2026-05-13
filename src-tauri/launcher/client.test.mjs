@@ -9,6 +9,8 @@ import {
   buildGuidedCapturePayload,
   buildGuidedCaptureFeedback,
   buildInboxActionFeedback,
+  buildParkRoutePayload,
+  buildProjectCardPayload,
   buildTodayTaskActionFeedback,
   buildWeeklyReviewActionFeedback,
   buildWeeklyReviewViewModel,
@@ -182,58 +184,163 @@ test("process workflow handles an empty inbox", () => {
 });
 
 test("weekly review view model exposes focus counts and review queues", () => {
-  const model = buildWeeklyReviewViewModel({
-    review_date: "2026-05-10",
-    week_starts_on: "2026-05-04",
-    focus_counts: {
-      work: { current: 3, cap: 4 },
-      personal: { current: 2, cap: 3 },
+  const model = buildWeeklyReviewViewModel(
+    {
+      review_date: "2026-05-10",
+      week_starts_on: "2026-05-04",
+      focus_counts: {
+        work: { current: 3, cap: 4 },
+        personal: { current: 2, cap: 3 },
+      },
+      weekly_projects: [
+        {
+          id: "p1",
+          title: "Ship Rust review",
+          category: "work",
+          time_horizon: "week",
+        },
+      ],
+      available_projects: [
+        {
+          id: "p1",
+          title: "Ship Rust review",
+          category: "work",
+          active_this_week: true,
+        },
+        {
+          id: "p2",
+          title: "Family reset",
+          category: "personal",
+          active_this_week: false,
+        },
+      ],
+      resurface_due: [
+        {
+          id: "t1",
+          title: "Revisit parked task",
+          when_bucket: "month",
+          resurface_on: "2026-05-09",
+        },
+      ],
+      completed_tasks: [
+        {
+          id: "t2",
+          title: "Finished task",
+          completed_at: "2026-05-10T08:00:00Z",
+        },
+      ],
     },
-    weekly_projects: [
-      {
-        id: "p1",
-        title: "Ship Rust review",
-        category: "work",
-        time_horizon: "week",
-      },
-    ],
-    available_projects: [
-      {
-        id: "p1",
-        title: "Ship Rust review",
-        category: "work",
-        active_this_week: true,
-      },
-      {
-        id: "p2",
-        title: "Family reset",
-        category: "personal",
-        active_this_week: false,
-      },
-    ],
-    resurface_due: [
-      {
-        id: "t1",
-        title: "Revisit parked task",
-        when_bucket: "month",
-        resurface_on: "2026-05-09",
-      },
-    ],
-    completed_tasks: [
-      {
-        id: "t2",
-        title: "Finished task",
-        completed_at: "2026-05-10T08:00:00Z",
-      },
-    ],
-  });
+    {
+      learning: [
+        {
+          id: "l1",
+          verb_noun: "Read GTD article",
+          description: "Maybe useful",
+          created_at: "2026-05-09T08:00:00Z",
+        },
+      ],
+      enjoy: [
+        {
+          id: "e1",
+          verb_noun: "Watch film",
+          created_at: "2026-05-08T08:00:00Z",
+        },
+      ],
+      parked: [
+        {
+          id: "pk1",
+          verb_noun: "Maybe buy scanner",
+          created_at: "2026-05-07T08:00:00Z",
+        },
+      ],
+      recycle_bin: [
+        {
+          id: "r1",
+          verb_noun: "Old loose end",
+          description: "No longer useful",
+          created_at: "2026-05-06T08:00:00Z",
+        },
+      ],
+    },
+  );
 
-  assert.equal(model.reviewLabel, "Week of 2026-05-04");
+  assert.equal(model.reviewLabel, "Week of Mon 4 May - Sun 10 May 2026");
   assert.equal(model.focusCounts.work.label, "3 / 4 work");
   assert.equal(model.weeklyProjects[0].title, "Ship Rust review");
   assert.equal(model.focusCandidates[1].toggleLabel, "Add to week");
   assert.equal(model.resurfaceDue[0].actionLabel, "Move to Week");
   assert.equal(model.completedTasks[0].actionLabel, "Archive");
+  assert.equal(model.weeklyProjectsCountLabel, "1");
+  assert.equal(model.focusCandidatesCountLabel, "2");
+  assert.equal(model.resurfaceDueCountLabel, "1");
+  assert.equal(model.completedTasksCountLabel, "1");
+  assert.equal(model.learningItemsCountLabel, "1");
+  assert.equal(model.enjoyItemsCountLabel, "1");
+  assert.equal(model.parkedItemsCountLabel, "1");
+  assert.equal(model.recycleBinItemsCountLabel, "1");
+  assert.equal(model.learningItems[0].title, "Read GTD article");
+  assert.equal(model.learningItems[0].meta, "Captured 2026-05-09");
+  assert.equal(model.learningItems[0].description, "Maybe useful");
+  assert.equal(model.enjoyItems[0].actionLabel, "Move to Inbox");
+  assert.equal(model.parkedItems[0].title, "Maybe buy scanner");
+  assert.equal(model.recycleBinItems[0].title, "Old loose end");
+  assert.equal(model.recycleBinItems[0].description, "No longer useful");
+  assert.equal(model.recycleBinItems[0].actionLabel, "Restore");
+});
+
+test("weekly review view model keeps routed review buckets empty by default", () => {
+  const model = buildWeeklyReviewViewModel({});
+
+  assert.deepEqual(model.learningItems, []);
+  assert.deepEqual(model.enjoyItems, []);
+  assert.deepEqual(model.parkedItems, []);
+  assert.deepEqual(model.recycleBinItems, []);
+  assert.equal(model.weeklyProjectsCountLabel, "0");
+  assert.equal(model.focusCandidatesCountLabel, "0");
+  assert.equal(model.resurfaceDueCountLabel, "0");
+  assert.equal(model.completedTasksCountLabel, "0");
+  assert.equal(model.learningItemsCountLabel, "0");
+  assert.equal(model.enjoyItemsCountLabel, "0");
+  assert.equal(model.parkedItemsCountLabel, "0");
+  assert.equal(model.recycleBinItemsCountLabel, "0");
+  assert.equal(model.emptyLearningItems, "No learning items parked.");
+  assert.equal(model.emptyEnjoyItems, "No enjoy items parked.");
+  assert.equal(model.emptyParkedItems, "No maybe-later items parked.");
+  assert.equal(model.emptyRecycleBinItems, "Recycle Bin is empty.");
+});
+
+test("weekly review view model formats week ranges across month and year boundaries", () => {
+  const monthBoundary = buildWeeklyReviewViewModel({
+    week_starts_on: "2026-06-29",
+  });
+  const yearBoundary = buildWeeklyReviewViewModel({
+    week_starts_on: "2025-12-29",
+  });
+
+  assert.equal(monthBoundary.reviewLabel, "Week of Mon 29 Jun - Sun 5 Jul 2026");
+  assert.equal(yearBoundary.reviewLabel, "Week of Mon 29 Dec 2025 - Sun 4 Jan 2026");
+});
+
+test("weekly review routed item feedback supports restore and recycle", () => {
+  assert.deepEqual(buildWeeklyReviewActionFeedback("restore-inbox-item", "Read article"), {
+    message: "Moved Read article back to Inbox.",
+    undo: null,
+  });
+
+  assert.deepEqual(buildWeeklyReviewActionFeedback("restore-recycled-item", "Old idea"), {
+    message: "Restored Old idea to Inbox.",
+    undo: null,
+  });
+
+  assert.deepEqual(buildWeeklyReviewActionFeedback("recycle-inbox-item", "Old idea"), {
+    message: "Recycled Old idea.",
+    undo: { label: "Restore", action: "restore-inbox-item" },
+  });
+
+  assert.deepEqual(buildWeeklyReviewActionFeedback("delete-recycled-item", "Old idea"), {
+    message: "Deleted Old idea permanently.",
+    undo: null,
+  });
 });
 
 test("weekly review action feedback keeps irreversible move-to-week copy plain", () => {
@@ -387,9 +494,12 @@ test("bootstrap view model favors current work and bounded counts", () => {
 
   assert.equal(model.todayLabel, "2026-05-06");
   assert.equal(model.currentTime, "09:30");
+  assert.equal(model.todayDisplayLabel, "Wed 6 May 2026 9:30AM");
   assert.equal(model.now.title, "Deep work");
   assert.equal(model.now.time, "09:00-10:30");
-  assert.equal(model.inboxTotal, 15);
+  assert.equal(model.inboxTotal, 2);
+  assert.equal(model.routedInboxTotal, 8);
+  assert.equal(model.recycleBinTotal, 5);
   assert.equal(model.todayTasks[0].meta, "focus · Frog");
   assert.equal(model.todayTasks[0].id, "task-1");
   assert.equal(model.todayTasks[0].completed, false);
@@ -426,6 +536,28 @@ test("bootstrap view model falls back to daily focus when no block is active", (
   assert.equal(model.now.title, "Write proposal");
   assert.equal(model.now.meta, "One Thing");
   assert.equal(model.dailyFocus.frog, "Call the supplier");
+});
+
+test("bootstrap view model formats Today label with weekday and AM/PM time", () => {
+  const morning = buildBootstrapViewModel({
+    today: "2026-05-13",
+    current_time: "09:05:17.123456",
+    inbox: {},
+    rituals: {},
+    waiting: {},
+    system: {},
+  });
+  const evening = buildBootstrapViewModel({
+    today: "2026-05-13",
+    current_time: "17:50:00",
+    inbox: {},
+    rituals: {},
+    waiting: {},
+    system: {},
+  });
+
+  assert.equal(morning.todayDisplayLabel, "Wed 13 May 2026 9:05AM");
+  assert.equal(evening.todayDisplayLabel, "Wed 13 May 2026 5:50PM");
 });
 
 test("inbox processing view model exposes actionable unprocessed items", () => {
@@ -513,6 +645,9 @@ test("guided capture payload converts an inbox item into a project", () => {
     category: "personal",
     horizon: "quarter",
     target_date: "2026-08-01",
+    level_of_success: "moderate",
+    why_link_text: "Make the trip calmer",
+    first_chunk: "Draft options list",
     include_this_week: "on",
     verb_check_ack: "on",
     displacement_ack: "on",
@@ -526,9 +661,59 @@ test("guided capture payload converts an inbox item into a project", () => {
     category: "personal",
     horizon: "quarter",
     target_date: "2026-08-01",
+    level_of_success: "moderate",
+    why_link_text: "Make the trip calmer",
+    first_chunk: "Draft options list",
     include_this_week: true,
     verb_check_ack: true,
     displacement_ack: true,
+  });
+});
+
+test("project card payload preserves full shaping fields and trims success pack", () => {
+  const payload = buildProjectCardPayload({
+    title: "  Plan annual roadmap  ",
+    description: " Shape it clearly ",
+    category: "personal",
+    status: "active",
+    size: "",
+    time_horizon: " quarter ",
+    start_date: "2026-05-15",
+    target_date: "2026-08-01",
+    level_of_success: "epic",
+    why_link_text: " Calmer month ",
+    drag_points_notes: " Too many commitments ",
+    gates_notes: " Use planning strengths ",
+    budget_notes: " Two focus blocks ",
+    active_this_week: "on",
+    verb_check_ack: "",
+    success_pack_guides: " Charlie ",
+    success_pack_peers: " ",
+    success_pack_supporters: " Morgan ",
+    success_pack_beneficiaries: " Family ",
+  });
+
+  assert.deepEqual(payload, {
+    title: "Plan annual roadmap",
+    description: "Shape it clearly",
+    category: "personal",
+    status: "active",
+    time_horizon: "quarter",
+    start_date: "2026-05-15",
+    target_date: "2026-08-01",
+    level_of_success: "epic",
+    why_link_text: "Calmer month",
+    drag_points_notes: "Too many commitments",
+    gates_notes: "Use planning strengths",
+    budget_notes: "Two focus blocks",
+    active_this_week: true,
+    verb_check_ack: false,
+    success_pack: {
+      guides: "Charlie",
+      peers: null,
+      supporters: "Morgan",
+      beneficiaries: "Family",
+    },
   });
 });
 
@@ -591,6 +776,17 @@ test("inbox action feedback exposes undo paths for reversible actions", () => {
       restoredMessage: 'Restored "this item" to Inbox.',
     },
   );
+});
+
+test("park route payload supports optional date-time resurfacing", () => {
+  assert.deepEqual(buildParkRoutePayload(""), {
+    intent: "park_let_go",
+  });
+  assert.deepEqual(buildParkRoutePayload("2026-05-14T05:30:00Z"), {
+    intent: "park_let_go",
+    parked_until: "2026-05-14T05:30:00.000Z",
+  });
+  assert.throws(() => buildParkRoutePayload("not a date"), /valid date and time/);
 });
 
 test("today task action feedback exposes reversible lifecycle paths", () => {

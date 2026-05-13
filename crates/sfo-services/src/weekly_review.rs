@@ -56,10 +56,7 @@ impl WeeklyReviewService {
         })
     }
 
-    pub async fn move_task_to_week(
-        &self,
-        id: TaskId,
-    ) -> Result<WeeklyReviewTask, ServiceError> {
+    pub async fn move_task_to_week(&self, id: TaskId) -> Result<WeeklyReviewTask, ServiceError> {
         let task = sfo_db::planning::get_task(&self.db, id)
             .await?
             .ok_or(ServiceError::NotFound { entity: "task" })?;

@@ -8,10 +8,11 @@ use serde::{Deserialize, Serialize};
 use sfo_core::{
     BackupManifest, Block, BlockCreate, BlockId, BlockUpdate, BootstrapSummary, DailyFocus,
     DailyFocusUpdate, GuidedCaptureRequest, GuidedCaptureResponse, ImportDryRunReport,
-    ImportDryRunRequest, InboxContainers, InboxRouteRequest, Page, Project, ProjectCreate,
-    ProjectId, ProjectUpdate, PythonSqliteImportReport, PythonSqliteImportRequest, QuickCapture,
-    Task, TaskCreate, TaskId, TaskUpdate, WaitingId, WaitingOn, WaitingOnCreate, WaitingOnUpdate,
-    WeeklyReviewSummary, WeeklyReviewTask,
+    ImportDryRunRequest, InboxContainers, InboxRouteRequest, Page, Project, ProjectCard,
+    ProjectCardUpdate, ProjectChunkCreate, ProjectCreate, ProjectId, ProjectUpdate,
+    PythonSqliteImportReport, PythonSqliteImportRequest, QuickCapture, Task, TaskCreate, TaskId,
+    TaskUpdate, WaitingId, WaitingOn, WaitingOnCreate, WaitingOnUpdate, WeeklyReviewSummary,
+    WeeklyReviewTask,
 };
 use sfo_services::{
     BootstrapService, CaptureService, InboxService, PlanningService, ScheduleService, ServiceError,
@@ -111,6 +112,11 @@ pub fn router() -> Router<AppState> {
         .route("/bootstrap", get(bootstrap))
         .route("/daily-focus", put(save_daily_focus))
         .route("/projects", get(list_projects).post(create_project))
+        .route(
+            "/projects/{project_id}/card",
+            get(get_project_card).put(save_project_card),
+        )
+        .route("/projects/{project_id}/chunks", post(create_project_chunk))
         .route(
             "/projects/{project_id}",
             patch(update_project).delete(delete_project),
@@ -226,6 +232,43 @@ async fn update_project(
     Ok(Json(project))
 }
 
+async fn get_project_card(
+    State(state): State<AppState>,
+    Path(project_id): Path<String>,
+) -> Result<Json<ProjectCard>, ApiError> {
+    let service = PlanningService::new(state.db);
+    Ok(Json(
+        service
+            .get_project_card(parse_project_id(&project_id)?)
+            .await?,
+    ))
+}
+
+async fn save_project_card(
+    State(state): State<AppState>,
+    Path(project_id): Path<String>,
+    Json(payload): Json<ProjectCardUpdate>,
+) -> Result<Json<ProjectCard>, ApiError> {
+    let service = PlanningService::new(state.db);
+    Ok(Json(
+        service
+            .save_project_card(parse_project_id(&project_id)?, payload)
+            .await?,
+    ))
+}
+
+async fn create_project_chunk(
+    State(state): State<AppState>,
+    Path(project_id): Path<String>,
+    Json(payload): Json<ProjectChunkCreate>,
+) -> Result<(StatusCode, Json<Task>), ApiError> {
+    let service = PlanningService::new(state.db);
+    let task = service
+        .create_project_chunk(parse_project_id(&project_id)?, payload)
+        .await?;
+    Ok((StatusCode::CREATED, Json(task)))
+}
+
 async fn delete_project(
     State(state): State<AppState>,
     Path(project_id): Path<String>,
@@ -334,7 +377,7 @@ async fn route_inbox_item(
     let service = InboxService::new(state.db);
     Ok(Json(
         service
-            .route_item(parse_task_id(&task_id)?, payload.intent)
+            .route_item(parse_task_id(&task_id)?, payload)
             .await?,
     ))
 }

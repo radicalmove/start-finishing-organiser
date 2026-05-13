@@ -186,6 +186,8 @@ export async function requestJson(fetchImpl, settings, path, options = {}) {
 }
 
 export function buildBootstrapViewModel(summary) {
+  const todayLabel = summary?.today || "Today";
+  const currentTime = trimSeconds(summary?.current_time || "");
   const inbox = summary?.inbox || {};
   const weeklyProjects = (summary?.weekly_projects || []).map((project) => ({
     title: project.title || "Untitled project",
@@ -226,15 +228,16 @@ export function buildBootstrapViewModel(summary) {
       : `${waiting.total} waiting`;
 
   return {
-    todayLabel: summary?.today || "Today",
-    currentTime: trimSeconds(summary?.current_time || ""),
+    todayLabel,
+    currentTime,
+    todayDisplayLabel: formatTodayDisplayLabel(todayLabel, currentTime),
     inbox,
-    inboxTotal:
-      Number(inbox.unprocessed || 0) +
+    inboxTotal: Number(inbox.unprocessed || 0),
+    routedInboxTotal:
       Number(inbox.learn_explore || 0) +
       Number(inbox.enjoy_recover || 0) +
-      Number(inbox.park_let_go || 0) +
-      Number(inbox.recycle_bin || 0),
+      Number(inbox.park_let_go || 0),
+    recycleBinTotal: Number(inbox.recycle_bin || 0),
     weeklyProjects,
     todayTasks,
     todayBlocks,
@@ -322,7 +325,7 @@ export function buildProjectOptions(projectPage) {
   }));
 }
 
-export function buildWeeklyReviewViewModel(summary) {
+export function buildWeeklyReviewViewModel(summary, inboxContainers = {}) {
   const workCount = focusCountView(summary?.focus_counts?.work, "work");
   const personalCount = focusCountView(summary?.focus_counts?.personal, "personal");
   const weeklyProjects = (summary?.weekly_projects || []).map(reviewProjectView);
@@ -335,32 +338,80 @@ export function buildWeeklyReviewViewModel(summary) {
       nextActive: !active,
     };
   });
+  const resurfaceDue = (summary?.resurface_due || []).map((task) =>
+    reviewTaskView(task, "Move to Week"),
+  );
+  const completedTasks = (summary?.completed_tasks || []).map((task) =>
+    reviewTaskView(task, "Archive"),
+  );
+  const learningItems = (inboxContainers?.learning || []).map(routedInboxItemView);
+  const enjoyItems = (inboxContainers?.enjoy || []).map(routedInboxItemView);
+  const parkedItems = (inboxContainers?.parked || []).map(routedInboxItemView);
+  const recycleBinItems = (inboxContainers?.recycle_bin || []).map(recycleBinItemView);
 
   return {
     reviewDate: summary?.review_date || "",
     weekStartsOn: summary?.week_starts_on || "",
-    reviewLabel: summary?.week_starts_on ? `Week of ${summary.week_starts_on}` : "Weekly Review",
+    reviewLabel: summary?.week_starts_on
+      ? `Week of ${formatWeekRangeDisplayLabel(summary.week_starts_on)}`
+      : "Weekly Review",
     focusCounts: {
       work: workCount,
       personal: personalCount,
     },
     weeklyProjects,
     focusCandidates,
-    resurfaceDue: (summary?.resurface_due || []).map((task) =>
-      reviewTaskView(task, "Move to Week"),
-    ),
-    completedTasks: (summary?.completed_tasks || []).map((task) =>
-      reviewTaskView(task, "Archive"),
-    ),
+    resurfaceDue,
+    completedTasks,
+    learningItems,
+    enjoyItems,
+    parkedItems,
+    recycleBinItems,
+    weeklyProjectsCountLabel: countLabel(weeklyProjects),
+    focusCandidatesCountLabel: countLabel(focusCandidates),
+    resurfaceDueCountLabel: countLabel(resurfaceDue),
+    completedTasksCountLabel: countLabel(completedTasks),
+    learningItemsCountLabel: countLabel(learningItems),
+    enjoyItemsCountLabel: countLabel(enjoyItems),
+    parkedItemsCountLabel: countLabel(parkedItems),
+    recycleBinItemsCountLabel: countLabel(recycleBinItems),
     emptyWeeklyProjects: "No weekly projects selected.",
     emptyFocusCandidates: "No active projects available to add.",
     emptyResurfaceDue: "No due resurfacing tasks.",
     emptyCompletedTasks: "No completed tasks to archive this week.",
+    emptyLearningItems: "No learning items parked.",
+    emptyEnjoyItems: "No enjoy items parked.",
+    emptyParkedItems: "No maybe-later items parked.",
+    emptyRecycleBinItems: "Recycle Bin is empty.",
   };
 }
 
 export function buildWeeklyReviewActionFeedback(action, title) {
   const itemTitle = displayItemTitle(title);
+  if (action === "restore-inbox-item") {
+    return {
+      message: `Moved ${itemTitle} back to Inbox.`,
+      undo: null,
+    };
+  }
+  if (action === "restore-recycled-item") {
+    return {
+      message: `Restored ${itemTitle} to Inbox.`,
+      undo: null,
+    };
+  }
+  if (action === "recycle-inbox-item") {
+    return {
+      message: `Recycled ${itemTitle}.`,
+      undo: { label: "Restore", action: "restore-inbox-item" },
+    };
+  }
+  if (action === "delete-recycled-item") {
+    return {
+      message: `Deleted ${itemTitle} permanently.`,
+      undo: null,
+    };
+  }
   if (action === "move-to-week") {
     return {
       message: `Moved ${itemTitle} into this week.`,
@@ -401,6 +452,9 @@ export function buildGuidedCapturePayload(decision, sourceTaskId, values) {
   if (decision === "project") {
     payload.category = values.category || "work";
     setOptional(payload, "target_date", values.target_date);
+    setOptional(payload, "level_of_success", values.level_of_success);
+    setOptional(payload, "why_link_text", values.why_link_text);
+    setOptional(payload, "first_chunk", values.first_chunk);
     payload.include_this_week = Boolean(values.include_this_week);
     payload.verb_check_ack = Boolean(values.verb_check_ack);
     return payload;
@@ -422,6 +476,35 @@ export function buildGuidedCapturePayload(decision, sourceTaskId, values) {
   } else {
     payload.owner_type = "mine";
   }
+
+  return payload;
+}
+
+export function buildProjectCardPayload(values) {
+  const payload = {
+    title: optionalText(values.title) || "",
+    category: optionalText(values.category) || "work",
+    status: optionalText(values.status) || "active",
+    active_this_week: checkboxValue(values.active_this_week),
+    verb_check_ack: checkboxValue(values.verb_check_ack),
+    success_pack: {
+      guides: optionalText(values.success_pack_guides),
+      peers: optionalText(values.success_pack_peers),
+      supporters: optionalText(values.success_pack_supporters),
+      beneficiaries: optionalText(values.success_pack_beneficiaries),
+    },
+  };
+
+  setOptional(payload, "description", values.description);
+  setOptional(payload, "size", values.size);
+  setOptional(payload, "time_horizon", values.time_horizon);
+  setOptional(payload, "start_date", values.start_date);
+  setOptional(payload, "target_date", values.target_date);
+  setOptional(payload, "level_of_success", values.level_of_success);
+  setOptional(payload, "why_link_text", values.why_link_text);
+  setOptional(payload, "drag_points_notes", values.drag_points_notes);
+  setOptional(payload, "gates_notes", values.gates_notes);
+  setOptional(payload, "budget_notes", values.budget_notes);
 
   return payload;
 }
@@ -511,6 +594,22 @@ export function buildInboxActionFeedback({ action, itemId, itemTitle, intentLabe
     undoLabel: "Restore",
     restoredMessage: `Restored "${title}" to Inbox.`,
   };
+}
+
+export function buildParkRoutePayload(parkedUntilValue = "") {
+  const payload = {
+    intent: "park_let_go",
+  };
+  const parkedUntil = String(parkedUntilValue || "").trim();
+  if (!parkedUntil) return payload;
+
+  const date = new Date(parkedUntil);
+  if (Number.isNaN(date.getTime())) {
+    throw new Error("Choose a valid date and time.");
+  }
+
+  payload.parked_until = date.toISOString();
+  return payload;
 }
 
 export function buildTodayTaskActionFeedback({ action, taskId, taskTitle }) {
@@ -606,6 +705,27 @@ function reviewTaskView(task, actionLabel) {
   };
 }
 
+function routedInboxItemView(item) {
+  return {
+    id: item.id || "",
+    title: item.verb_noun || item.title || "Untitled item",
+    description: item.description || "",
+    meta: item.created_at ? `Captured ${String(item.created_at).slice(0, 10)}` : "",
+    actionLabel: "Move to Inbox",
+  };
+}
+
+function recycleBinItemView(item) {
+  return {
+    ...routedInboxItemView(item),
+    actionLabel: "Restore",
+  };
+}
+
+function countLabel(items) {
+  return String(items.length);
+}
+
 function compactJoin(values, separator = " · ") {
   return values
     .map((value) => String(value || "").trim())
@@ -633,6 +753,10 @@ function setOptional(target, key, value) {
   }
 }
 
+function checkboxValue(value) {
+  return value === true || value === "true" || value === "on" || value === "1";
+}
+
 function positiveInteger(value) {
   const number = Number.parseInt(String(value || ""), 10);
   return Number.isFinite(number) && number > 0 ? number : null;
@@ -640,6 +764,75 @@ function positiveInteger(value) {
 
 function trimSeconds(value) {
   return String(value || "").replace(/^(\d{2}:\d{2})(?::\d{2}(?:\.\d+)?)?$/, "$1");
+}
+
+function formatTodayDisplayLabel(todayLabel, currentTime) {
+  const match = String(todayLabel || "").match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) {
+    return compactJoin([todayLabel, formatClockLabel(currentTime)], " ");
+  }
+
+  return compactJoin([formatDateDisplayLabel(todayLabel), formatClockLabel(currentTime)], " ");
+}
+
+function formatDateDisplayLabel(value) {
+  const parts = dateDisplayParts(value);
+  if (!parts) return String(value || "").trim();
+
+  return `${parts.weekday} ${parts.day} ${parts.monthLabel} ${parts.year}`;
+}
+
+function formatWeekRangeDisplayLabel(value) {
+  const start = dateDisplayParts(value);
+  if (!start) return String(value || "").trim();
+
+  const endDate = new Date(Date.UTC(start.year, start.month - 1, start.day + 6));
+  const end = dateDisplayParts(endDate.toISOString().slice(0, 10));
+  if (!end) return formatDateDisplayLabel(value);
+
+  if (start.year !== end.year) {
+    return `${start.weekday} ${start.day} ${start.monthLabel} ${start.year} - ${end.weekday} ${end.day} ${end.monthLabel} ${end.year}`;
+  }
+
+  return `${start.weekday} ${start.day} ${start.monthLabel} - ${end.weekday} ${end.day} ${end.monthLabel} ${end.year}`;
+}
+
+function dateDisplayParts(value) {
+  const match = String(value || "").match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return null;
+
+  const [, yearText, monthText, dayText] = match;
+  const year = Number.parseInt(yearText, 10);
+  const month = Number.parseInt(monthText, 10);
+  const day = Number.parseInt(dayText, 10);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  const weekday = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][date.getUTCDay()];
+  const monthLabel = [
+    "Jan",
+    "Feb",
+    "Mar",
+    "Apr",
+    "May",
+    "Jun",
+    "Jul",
+    "Aug",
+    "Sep",
+    "Oct",
+    "Nov",
+    "Dec",
+  ][month - 1];
+  return { day, month, monthLabel, weekday, year };
+}
+
+function formatClockLabel(value) {
+  const match = String(value || "").match(/^(\d{2}):(\d{2})$/);
+  if (!match) return String(value || "").trim();
+
+  const [, hourText, minuteText] = match;
+  const hour = Number.parseInt(hourText, 10);
+  const suffix = hour >= 12 ? "PM" : "AM";
+  const hour12 = hour % 12 || 12;
+  return `${hour12}:${minuteText}${suffix}`;
 }
 
 function titleCase(value) {

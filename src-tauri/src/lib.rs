@@ -9,37 +9,65 @@ use tauri::Manager;
 
 mod credential_store;
 
+const BACKEND_BIND_ADDR: &str = "127.0.0.1:8088";
+const BACKEND_BINARY_NAME: &str = "sfo-server";
+const BACKEND_DATABASE_FILE: &str = "sfo-rust.db";
+
 struct BackendState(Mutex<Option<Child>>);
 
 fn should_spawn_backend() -> bool {
-    should_spawn_backend_from_flag(std::env::var("SFO_SPAWN_BACKEND").ok().as_deref())
+    should_spawn_backend_from_flag(
+        std::env::var("SFO_SPAWN_BACKEND").ok().as_deref(),
+        cfg!(target_os = "macos") && !cfg!(mobile),
+    )
 }
 
-fn should_spawn_backend_from_flag(flag: Option<&str>) -> bool {
-    flag.is_some_and(|value| value == "1" || value.eq_ignore_ascii_case("true"))
+fn should_spawn_backend_from_flag(flag: Option<&str>, default_enabled: bool) -> bool {
+    match flag.map(str::trim).filter(|value| !value.is_empty()) {
+        Some(value) if value == "1" || value.eq_ignore_ascii_case("true") => true,
+        Some(value) if value == "0" || value.eq_ignore_ascii_case("false") => false,
+        Some(_) => false,
+        None => default_enabled,
+    }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::should_spawn_backend_from_flag;
+    use super::{backend_resource_candidates, should_spawn_backend_from_flag};
 
     #[test]
-    fn backend_spawn_is_disabled_without_explicit_flag() {
-        assert!(!should_spawn_backend_from_flag(None));
+    fn backend_spawn_defaults_to_desktop_policy_when_unset() {
+        assert!(should_spawn_backend_from_flag(None, true));
+        assert!(!should_spawn_backend_from_flag(None, false));
     }
 
     #[test]
     fn backend_spawn_accepts_true_flags() {
-        assert!(should_spawn_backend_from_flag(Some("1")));
-        assert!(should_spawn_backend_from_flag(Some("true")));
-        assert!(should_spawn_backend_from_flag(Some("TRUE")));
+        assert!(should_spawn_backend_from_flag(Some("1"), false));
+        assert!(should_spawn_backend_from_flag(Some("true"), false));
+        assert!(should_spawn_backend_from_flag(Some("TRUE"), false));
     }
 
     #[test]
     fn backend_spawn_rejects_other_flags() {
-        assert!(!should_spawn_backend_from_flag(Some("0")));
-        assert!(!should_spawn_backend_from_flag(Some("false")));
-        assert!(!should_spawn_backend_from_flag(Some("yes")));
+        assert!(!should_spawn_backend_from_flag(Some("0"), true));
+        assert!(!should_spawn_backend_from_flag(Some("false"), true));
+        assert!(!should_spawn_backend_from_flag(Some("yes"), true));
+    }
+
+    #[test]
+    fn backend_resource_candidates_prefer_current_rust_server() {
+        let candidates = backend_resource_candidates(std::path::Path::new("/bundle/Resources"));
+
+        assert_eq!(
+            candidates[0],
+            std::path::Path::new("/bundle/Resources/bin/sfo-server")
+        );
+        assert!(candidates.iter().all(|path| {
+            path.file_name()
+                .and_then(|name| name.to_str())
+                .is_some_and(|name| name.starts_with("sfo-server"))
+        }));
     }
 }
 
@@ -73,14 +101,13 @@ fn spawn_backend(app: &tauri::AppHandle) -> Option<Child> {
         }
     };
     spawn_log(&format!("resource_dir: {}", resource_dir.display()));
-    let backend_path = resource_dir.join("bin").join("sfo-backend");
-    if !backend_path.exists() {
+    let Some(backend_path) = find_backend_resource(&resource_dir) else {
         spawn_log(&format!(
-            "backend binary not found at {}",
-            backend_path.display()
+            "backend binary not found; checked {:?}",
+            backend_resource_candidates(&resource_dir)
         ));
         return None;
-    }
+    };
     spawn_log(&format!("backend_path: {}", backend_path.display()));
 
     let app_data_dir = match app.path().app_data_dir() {
@@ -93,50 +120,16 @@ fn spawn_backend(app: &tauri::AppHandle) -> Option<Child> {
     if let Err(err) = fs::create_dir_all(&app_data_dir) {
         spawn_log(&format!("app_data_dir create error: {err}"));
     }
-    let db_path = app_data_dir.join("sfo.db");
+    let db_path = app_data_dir.join(BACKEND_DATABASE_FILE);
     let db_url = format!("sqlite:///{}", db_path.display());
     spawn_log(&format!("db_url: {db_url}"));
-
-    let app_config_dir = match app.path().app_config_dir() {
-        Ok(dir) => dir,
-        Err(err) => {
-            spawn_log(&format!("app_config_dir error: {err}"));
-            return None;
-        }
-    };
-    if let Err(err) = fs::create_dir_all(&app_config_dir) {
-        spawn_log(&format!("app_config_dir create error: {err}"));
-    }
-
-    let creds_target = app_config_dir.join("gmail_credentials.json");
-    if !creds_target.exists() {
-        let bundled_creds = resource_dir
-            .join("resources")
-            .join("gmail_credentials.json");
-        if bundled_creds.exists() {
-            let should_copy = fs::metadata(&bundled_creds)
-                .map(|meta| meta.len() > 0)
-                .unwrap_or(false);
-            if should_copy {
-                if let Err(err) = fs::copy(&bundled_creds, &creds_target) {
-                    spawn_log(&format!("copy gmail credentials error: {err}"));
-                }
-            } else {
-                spawn_log("bundled gmail credentials empty; skipping copy");
-            }
-        }
-    }
-    let token_path = app_config_dir.join("gmail_token.json");
 
     let log_path = log_dir.join("backend.log");
     spawn_log(&format!("backend_log: {}", log_path.display()));
 
     let mut cmd = Command::new(backend_path);
-    cmd.env("SFO_DATABASE_URL", db_url)
-        .env("SFO_GMAIL_CLIENT_SECRETS", &creds_target)
-        .env("SFO_GMAIL_TOKEN_PATH", &token_path)
-        .env("SFO_HOST", "127.0.0.1")
-        .env("SFO_PORT", "8000")
+    cmd.env("SFO_RUST_DATABASE_URL", db_url)
+        .env("SFO_RUST_BIND", BACKEND_BIND_ADDR)
         .env("SFO_TAURI", "1");
 
     match fs::OpenOptions::new()
@@ -162,6 +155,21 @@ fn spawn_backend(app: &tauri::AppHandle) -> Option<Child> {
             None
         }
     }
+}
+
+fn find_backend_resource(resource_dir: &std::path::Path) -> Option<std::path::PathBuf> {
+    backend_resource_candidates(resource_dir)
+        .into_iter()
+        .find(|path| path.exists())
+}
+
+fn backend_resource_candidates(resource_dir: &std::path::Path) -> Vec<std::path::PathBuf> {
+    let bin_dir = resource_dir.join("bin");
+    vec![
+        bin_dir.join(BACKEND_BINARY_NAME),
+        bin_dir.join("sfo-server-aarch64-apple-darwin"),
+        bin_dir.join("sfo-server-x86_64-apple-darwin"),
+    ]
 }
 
 fn shutdown_backend(app: &tauri::AppHandle) {

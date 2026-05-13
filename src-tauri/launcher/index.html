@@ -8,14 +8,13 @@
   </head>
   <body>
     <main class="app-shell">
-      <section class="hero-card">
-        <div>
-          <div class="eyebrow">SFO Rust client</div>
-          <h1>Calm command centre, real SFO data.</h1>
-          <p class="lede">
-            Connect to the Rust server on this Mac or your Mac mini. This shell sets the shared
-            neon identity for Home, Today, and capture before the iPhone workflow expands.
-          </p>
+      <section class="app-header">
+        <div class="app-title-lockup">
+          <div class="app-mark">SFO</div>
+          <div>
+            <div class="eyebrow">Start Finishing Organiser</div>
+            <h1>Today’s operating system</h1>
+          </div>
         </div>
         <div class="status-card" aria-live="polite">
           <div class="status-dot" id="status-dot"></div>
@@ -40,7 +39,7 @@
         <section class="workflow-panel" data-workflow-panel="today" id="workflow-today">
           <div class="dashboard-topline">
             <div>
-              <div class="eyebrow" id="today-label">Today</div>
+              <div class="eyebrow workflow-date-label" id="today-label">Today</div>
               <h2>Home / Today</h2>
             </div>
             <div class="topline-actions">
@@ -131,6 +130,18 @@
               <div class="count-grid" id="inbox-counts"></div>
             </article>
 
+            <article class="panel process-active-panel">
+              <div class="section-heading compact-heading">
+                <div>
+                  <div class="panel-kicker">Current decision</div>
+                  <h3>Make the next call.</h3>
+                </div>
+                <p>Use quick routes for low-value items, or clarify the item below into real work.</p>
+              </div>
+              <div class="process-active-item" id="process-active-item"></div>
+              <div class="inbox-actions process-active-actions" id="process-active-actions"></div>
+            </article>
+
             <article class="panel wide-panel inbox-processing-panel">
               <div class="section-heading compact-heading">
                 <div>
@@ -147,7 +158,7 @@
         <section class="workflow-panel hidden" data-workflow-panel="review" id="workflow-review">
           <div class="section-heading">
             <div>
-              <div class="eyebrow" id="review-date-label">Weekly Review</div>
+              <div class="eyebrow workflow-date-label" id="review-date-label">Weekly Review</div>
               <h2>Review the week</h2>
               <p class="workflow-lede">
                 Keep the active list deliberate, pull due resurfacing tasks forward, and clear
@@ -168,34 +179,106 @@
             </article>
           </div>
 
-          <div class="review-grid">
-            <article class="panel review-panel">
-              <div class="panel-kicker">Current Week</div>
-              <h3>Active Projects</h3>
-              <p class="panel-note">This should stay small enough to make visible progress.</p>
-              <div class="review-list" id="review-weekly-projects"></div>
-            </article>
+          <div class="review-checklist">
+            <section class="review-step">
+              <div class="review-step-heading">
+                <span>Step 1</span>
+                <div>
+                  <h3>Choose this week</h3>
+                  <p>Keep the week small enough that progress is obvious.</p>
+                </div>
+              </div>
+              <div class="review-step-grid">
+                <article class="panel review-panel">
+                  <div class="panel-kicker">Current Week</div>
+                  <h3 class="review-panel-title">Active Projects <span id="review-weekly-projects-count">0</span></h3>
+                  <p class="panel-note">These are the projects currently allowed to take focus.</p>
+                  <div class="review-list is-scrollable" id="review-weekly-projects"></div>
+                </article>
 
-            <article class="panel review-panel">
-              <div class="panel-kicker">Focus Candidates</div>
-              <h3>Add or drop projects</h3>
-              <p class="panel-note">Use this when a project deserves weekly attention now.</p>
-              <div class="review-list" id="review-focus-candidates"></div>
-            </article>
+                <article class="panel review-panel">
+                  <div class="panel-kicker">Focus Candidates</div>
+                  <h3 class="review-panel-title">Add or drop projects <span id="review-focus-candidates-count">0</span></h3>
+                  <p class="panel-note">Promote only what deserves real attention this week.</p>
+                  <div class="review-list is-scrollable" id="review-focus-candidates"></div>
+                </article>
+              </div>
+            </section>
 
-            <article class="panel review-panel">
-              <div class="panel-kicker">Resurface</div>
-              <h3>Due to reconsider</h3>
-              <p class="panel-note">Move useful work into this week; leave the rest parked.</p>
-              <div class="review-list" id="review-resurface-due"></div>
-            </article>
+            <section class="review-step">
+              <div class="review-step-heading">
+                <span>Step 2</span>
+                <div>
+                  <h3>Reconsider due work</h3>
+                  <p>Pull resurfaced work forward only when it belongs in the current week.</p>
+                </div>
+              </div>
+              <div class="review-step-grid single">
+                <article class="panel review-panel">
+                  <div class="panel-kicker">Resurface</div>
+                  <h3 class="review-panel-title">Due to reconsider <span id="review-resurface-due-count">0</span></h3>
+                  <p class="panel-note">Move useful work into this week; leave the rest parked.</p>
+                  <div class="review-list is-scrollable" id="review-resurface-due"></div>
+                </article>
+              </div>
+            </section>
 
-            <article class="panel review-panel">
-              <div class="panel-kicker">Cleanup</div>
-              <h3>Completed Tasks</h3>
-              <p class="panel-note">Archive finished items once you are satisfied they are done.</p>
-              <div class="review-list" id="review-completed-tasks"></div>
-            </article>
+            <section class="review-step">
+              <div class="review-step-heading">
+                <span>Step 3</span>
+                <div>
+                  <h3>Scan parked buckets</h3>
+                  <p>Review low-pressure items without letting them behave like Inbox work.</p>
+                </div>
+              </div>
+              <div class="review-step-grid three-up">
+                <article class="panel review-panel">
+                  <div class="panel-kicker">Learning</div>
+                  <h3 class="review-panel-title">Things to explore <span id="review-learning-count">0</span></h3>
+                  <p class="panel-note">Ideas worth learning from, but not active work yet.</p>
+                  <div class="review-list is-scrollable" id="review-learning-items"></div>
+                </article>
+
+                <article class="panel review-panel">
+                  <div class="panel-kicker">Enjoy</div>
+                  <h3 class="review-panel-title">Recovery and pleasure <span id="review-enjoy-count">0</span></h3>
+                  <p class="panel-note">Reminders for rest, play, and low-pressure enjoyment.</p>
+                  <div class="review-list is-scrollable" id="review-enjoy-items"></div>
+                </article>
+
+                <article class="panel review-panel">
+                  <div class="panel-kicker">Parked</div>
+                  <h3 class="review-panel-title">Maybe later <span id="review-parked-count">0</span></h3>
+                  <p class="panel-note">Keep these out of the Inbox until they deserve attention.</p>
+                  <div class="review-list is-scrollable" id="review-parked-items"></div>
+                </article>
+              </div>
+            </section>
+
+            <section class="review-step">
+              <div class="review-step-heading">
+                <span>Step 4</span>
+                <div>
+                  <h3>Finish clean</h3>
+                  <p>Archive completed work and empty only what you are sure you no longer need.</p>
+                </div>
+              </div>
+              <div class="review-step-grid">
+                <article class="panel review-panel">
+                  <div class="panel-kicker">Cleanup</div>
+                  <h3 class="review-panel-title">Completed Tasks <span id="review-completed-tasks-count">0</span></h3>
+                  <p class="panel-note">Archive finished items once you are satisfied they are done.</p>
+                  <div class="review-list is-scrollable" id="review-completed-tasks"></div>
+                </article>
+
+                <article class="panel review-panel">
+                  <div class="panel-kicker">Recycle Bin</div>
+                  <h3 class="review-panel-title">Ready to delete <span id="review-recycle-bin-count">0</span></h3>
+                  <p class="panel-note">Restore mistakes, or permanently delete items you are sure are gone.</p>
+                  <div class="review-list is-scrollable" id="review-recycle-bin-items"></div>
+                </article>
+              </div>
+            </section>
           </div>
         </section>
 

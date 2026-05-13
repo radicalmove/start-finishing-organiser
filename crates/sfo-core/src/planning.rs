@@ -166,11 +166,19 @@ pub struct ProjectCreate {
     #[serde(default)]
     pub time_horizon: Option<String>,
     #[serde(default)]
+    pub start_date: Option<NaiveDate>,
+    #[serde(default)]
     pub target_date: Option<NaiveDate>,
     #[serde(default)]
     pub level_of_success: Option<SuccessLevel>,
     #[serde(default)]
     pub why_link_text: Option<String>,
+    #[serde(default)]
+    pub drag_points_notes: Option<String>,
+    #[serde(default)]
+    pub gates_notes: Option<String>,
+    #[serde(default)]
+    pub budget_notes: Option<String>,
     #[serde(default)]
     pub active_this_week: bool,
 }
@@ -190,11 +198,19 @@ pub struct ProjectUpdate {
     #[serde(default)]
     pub time_horizon: Option<String>,
     #[serde(default)]
+    pub start_date: Option<NaiveDate>,
+    #[serde(default)]
     pub target_date: Option<NaiveDate>,
     #[serde(default)]
     pub level_of_success: Option<SuccessLevel>,
     #[serde(default)]
     pub why_link_text: Option<String>,
+    #[serde(default)]
+    pub drag_points_notes: Option<String>,
+    #[serde(default)]
+    pub gates_notes: Option<String>,
+    #[serde(default)]
+    pub budget_notes: Option<String>,
     #[serde(default)]
     pub active_this_week: Option<bool>,
 }
@@ -208,12 +224,99 @@ pub struct Project {
     pub status: ProjectStatus,
     pub size: Option<ProjectSize>,
     pub time_horizon: Option<String>,
+    pub start_date: Option<NaiveDate>,
     pub target_date: Option<NaiveDate>,
     pub level_of_success: Option<SuccessLevel>,
     pub why_link_text: Option<String>,
+    pub drag_points_notes: Option<String>,
+    pub gates_notes: Option<String>,
+    pub budget_notes: Option<String>,
     pub active_this_week: bool,
     pub created_at: DateTime<Utc>,
     pub updated_at: Option<DateTime<Utc>>,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+pub struct SuccessPackUpdate {
+    #[serde(default)]
+    pub guides: Option<String>,
+    #[serde(default)]
+    pub peers: Option<String>,
+    #[serde(default)]
+    pub supporters: Option<String>,
+    #[serde(default)]
+    pub beneficiaries: Option<String>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct SuccessPack {
+    pub project_id: ProjectId,
+    pub guides: Option<String>,
+    pub peers: Option<String>,
+    pub supporters: Option<String>,
+    pub beneficiaries: Option<String>,
+    pub updated_at: Option<DateTime<Utc>>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct ProjectCard {
+    pub project: Project,
+    pub success_pack: Option<SuccessPack>,
+    pub chunks: Vec<Task>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct ProjectCardUpdate {
+    pub title: String,
+    #[serde(default)]
+    pub description: Option<String>,
+    #[serde(default)]
+    pub status: ProjectStatus,
+    #[serde(default)]
+    pub category: ProjectCategory,
+    #[serde(default)]
+    pub size: Option<ProjectSize>,
+    #[serde(default)]
+    pub time_horizon: Option<String>,
+    #[serde(default)]
+    pub start_date: Option<NaiveDate>,
+    #[serde(default)]
+    pub target_date: Option<NaiveDate>,
+    #[serde(default)]
+    pub level_of_success: Option<SuccessLevel>,
+    #[serde(default)]
+    pub why_link_text: Option<String>,
+    #[serde(default)]
+    pub drag_points_notes: Option<String>,
+    #[serde(default)]
+    pub gates_notes: Option<String>,
+    #[serde(default)]
+    pub budget_notes: Option<String>,
+    #[serde(default)]
+    pub active_this_week: bool,
+    #[serde(default)]
+    pub verb_check_ack: bool,
+    #[serde(default)]
+    pub success_pack: Option<SuccessPackUpdate>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct ProjectChunkCreate {
+    pub verb_noun: String,
+    #[serde(default)]
+    pub description: Option<String>,
+    #[serde(default = "default_chunk_when_bucket")]
+    pub when_bucket: WhenBucket,
+    #[serde(default)]
+    pub block_type: Option<BlockType>,
+    #[serde(default)]
+    pub duration_minutes: Option<i64>,
+    #[serde(default)]
+    pub frog: bool,
+}
+
+fn default_chunk_when_bucket() -> WhenBucket {
+    WhenBucket::Week
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -299,6 +402,7 @@ pub struct Task {
     pub scheduled_for: Option<NaiveDate>,
     pub owner_type: OwnerType,
     pub resurface_on: Option<NaiveDate>,
+    pub parked_until: Option<DateTime<Utc>>,
     pub completed_at: Option<DateTime<Utc>>,
     pub created_at: DateTime<Utc>,
     pub updated_at: Option<DateTime<Utc>>,
@@ -369,5 +473,66 @@ mod tests {
 
         assert_eq!(page.page, 3);
         assert_eq!(page.total_pages, 3);
+    }
+
+    #[test]
+    fn project_card_update_deserializes_full_shaping_payload() {
+        let payload: ProjectCardUpdate = serde_json::from_str(
+            r#"
+            {
+              "title": "Plan annual roadmap",
+              "description": "Scope the finish line",
+              "category": "personal",
+              "status": "active",
+              "size": "moderate",
+              "time_horizon": "quarter",
+              "start_date": "2026-05-15",
+              "target_date": "2026-08-01",
+              "level_of_success": "epic",
+              "why_link_text": "This makes the month calmer.",
+              "drag_points_notes": "Too many competing commitments.",
+              "gates_notes": "Use planning strengths and existing templates.",
+              "budget_notes": "Two focus blocks per week.",
+              "active_this_week": true,
+              "verb_check_ack": true,
+              "success_pack": {
+                "guides": "Charlie",
+                "peers": "Alex",
+                "supporters": "Morgan",
+                "beneficiaries": "Family"
+              }
+            }
+            "#,
+        )
+        .expect("deserialize project card update");
+
+        assert_eq!(payload.title, "Plan annual roadmap");
+        assert_eq!(payload.category, ProjectCategory::Personal);
+        assert_eq!(payload.level_of_success, Some(SuccessLevel::Epic));
+        assert_eq!(
+            payload.start_date,
+            Some(NaiveDate::from_ymd_opt(2026, 5, 15).unwrap())
+        );
+        assert_eq!(
+            payload.target_date,
+            Some(NaiveDate::from_ymd_opt(2026, 8, 1).unwrap())
+        );
+        assert!(payload.active_this_week);
+        assert_eq!(
+            payload.success_pack.expect("success pack").beneficiaries,
+            Some("Family".to_string())
+        );
+    }
+
+    #[test]
+    fn project_chunk_create_defaults_to_week_task() {
+        let payload: ProjectChunkCreate =
+            serde_json::from_str(r#"{"verb_noun":"Draft rough outline"}"#)
+                .expect("deserialize chunk create");
+
+        assert_eq!(payload.verb_noun, "Draft rough outline");
+        assert_eq!(payload.when_bucket, WhenBucket::Week);
+        assert!(!payload.frog);
+        assert!(payload.duration_minutes.is_none());
     }
 }

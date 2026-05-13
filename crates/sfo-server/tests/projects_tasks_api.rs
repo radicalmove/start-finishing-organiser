@@ -132,6 +132,85 @@ async fn project_weekly_cap_returns_bad_request() {
 }
 
 #[tokio::test]
+async fn project_card_endpoints_save_shape_and_create_chunks() {
+    let app = test_app().await;
+    let (status, project) = request_json(
+        app.clone(),
+        Method::POST,
+        "/api/v1/projects",
+        json!({
+            "title": "Plan roadmap",
+            "category": "work",
+            "active_this_week": false
+        }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED);
+    let project_id = project["id"].as_str().unwrap();
+
+    let (status, card) = request_json(
+        app.clone(),
+        Method::PUT,
+        &format!("/api/v1/projects/{project_id}/card"),
+        json!({
+            "title": "Plan annual roadmap",
+            "description": "Shape it clearly",
+            "category": "personal",
+            "status": "active",
+            "time_horizon": "quarter",
+            "start_date": "2026-05-15",
+            "target_date": "2026-08-01",
+            "level_of_success": "epic",
+            "why_link_text": "Calmer month",
+            "drag_points_notes": "Too many commitments",
+            "gates_notes": "Use planning strengths",
+            "budget_notes": "Two focus blocks",
+            "active_this_week": false,
+            "success_pack": {
+                "guides": "Charlie",
+                "peers": "",
+                "supporters": "Morgan",
+                "beneficiaries": "Family"
+            }
+        }),
+    )
+    .await;
+
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(card["project"]["title"], "Plan annual roadmap");
+    assert_eq!(card["project"]["start_date"], "2026-05-15");
+    assert_eq!(card["success_pack"]["guides"], "Charlie");
+    assert!(card["success_pack"]["peers"].is_null());
+
+    let (status, chunk) = request_json(
+        app.clone(),
+        Method::POST,
+        &format!("/api/v1/projects/{project_id}/chunks"),
+        json!({
+            "verb_noun": "Draft first roadmap",
+            "description": "Starter chunk",
+            "duration_minutes": 45,
+            "frog": true
+        }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED);
+    assert_eq!(chunk["project_id"], project_id);
+    assert_eq!(chunk["when_bucket"], "week");
+
+    let (status, card) = request_json(
+        app,
+        Method::GET,
+        &format!("/api/v1/projects/{project_id}/card"),
+        Value::Null,
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(card["chunks"].as_array().unwrap().len(), 1);
+    assert_eq!(card["chunks"][0]["verb_noun"], "Draft first roadmap");
+}
+
+#[tokio::test]
 async fn tasks_crud_and_lifecycle_work_under_api_v1() {
     let app = test_app().await;
 

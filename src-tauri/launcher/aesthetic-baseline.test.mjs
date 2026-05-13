@@ -15,12 +15,48 @@ test("launcher uses the adaptive SFO neon aesthetic baseline", () => {
   assert.match(launcherCss, /--sfo-blue:\s*#1987ff;/);
   assert.match(launcherCss, /--sfo-cyan:\s*#2da0ff;/);
   assert.match(launcherCss, /--sfo-glow:/);
-  assert.match(indexHtml, /SFO Rust client/);
+  assert.match(indexHtml, /Start Finishing Organiser/);
+  assert.doesNotMatch(indexHtml, /SFO Rust client/);
 
   assert.doesNotMatch(launcherCss, /--paper:/);
   assert.doesNotMatch(launcherCss, /--moss:/);
   assert.doesNotMatch(launcherCss, /--clay:/);
   assert.doesNotMatch(launcherCss, /Iowan Old Style/);
+});
+
+test("app header is compact and leaves room for workflow content", () => {
+  const launcherCss = readFileSync(launcherCssPath, "utf8");
+  const indexHtml = readFileSync(indexHtmlPath, "utf8");
+
+  assert.match(indexHtml, /<section class="app-header"/);
+  assert.match(launcherCss, /\.app-header\s*\{[\s\S]*min-height:\s*0/);
+  assert.match(launcherCss, /\.app-header\s*\{[\s\S]*padding:\s*16px 18px/);
+  assert.doesNotMatch(indexHtml, /Calm command centre/);
+});
+
+test("typography is calmer and small text remains readable", () => {
+  const launcherCss = readFileSync(launcherCssPath, "utf8");
+
+  assert.match(launcherCss, /\.workflow-tab\s*\{[\s\S]*font-size:\s*18px/);
+  assert.match(launcherCss, /\.workflow-tab\s*\{[\s\S]*font-weight:\s*650/);
+  assert.match(launcherCss, /h2\s*\{[\s\S]*font-weight:\s*650/);
+  assert.match(launcherCss, /h3\s*\{[\s\S]*font-weight:\s*650/);
+  assert.match(launcherCss, /\.status-detail\s*\{[\s\S]*font-size:\s*14px/);
+  assert.match(launcherCss, /\.panel-note\s*\{[\s\S]*font-size:\s*15px/);
+  assert.match(launcherCss, /\.review-panel-title span\s*\{[^}]*font-size:\s*20px/);
+  assert.match(launcherCss, /label\s*\{[\s\S]*font-size:\s*13px/);
+});
+
+test("routine action buttons use restrained glass styling", () => {
+  const launcherCss = readFileSync(launcherCssPath, "utf8");
+
+  assert.match(launcherCss, /\.primary-button\s*\{[\s\S]*background:\s*rgba\(10, 14, 35, 0\.78\)/);
+  assert.match(launcherCss, /\.primary-button\s*\{[\s\S]*border:\s*1px solid rgba\(45, 160, 255, 0\.42\)/);
+  assert.match(launcherCss, /\.mini-button\s*\{[\s\S]*background:\s*rgba\(10, 14, 35, 0\.72\)/);
+  assert.doesNotMatch(
+    launcherCss,
+    /\.mini-button\s*\{[\s\S]*background:\s*linear-gradient/,
+  );
 });
 
 test("launcher keeps corner radii restrained", () => {
