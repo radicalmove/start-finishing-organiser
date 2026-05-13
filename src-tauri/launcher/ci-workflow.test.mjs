@@ -13,6 +13,7 @@ test("GitHub CI mirrors the local verification contract", () => {
   assert.match(workflow, /push:/);
   assert.match(workflow, /branches:\n\s+- main/);
   assert.doesNotMatch(workflow, /codex\/\*\*/);
+  assert.match(workflow, /FORCE_JAVASCRIPT_ACTIONS_TO_NODE24:\s*"true"/);
   assert.match(workflow, /runs-on:\s*macos-latest/);
   assert.match(workflow, /actions\/checkout@v4/);
   assert.match(workflow, /actions\/setup-node@v4/);
