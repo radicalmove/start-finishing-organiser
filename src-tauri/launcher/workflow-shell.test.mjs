@@ -170,6 +170,20 @@ test("launcher wires weekly review actions", () => {
   assert.match(launcherJs, /\/api\/v1\/tasks\/\$\{encodeURIComponent\(itemId\)\}/);
 });
 
+test("project shaping forms require finish dates and chunk titles", () => {
+  const launcherJs = readFileSync(launcherJsPath, "utf8");
+
+  assert.match(launcherJs, /function requiredTextInput/);
+  assert.ok(
+    launcherJs.includes('formField("Target date", requiredTextInput("target_date"'),
+    "project card target date should be required before submit",
+  );
+  assert.ok(
+    launcherJs.includes('formField("Next chunk", requiredTextInput("verb_noun"'),
+    "roadmap chunk title should be required before submit",
+  );
+});
+
 test("review workflow is structured as a weekly checklist", () => {
   const indexHtml = readFileSync(indexHtmlPath, "utf8");
   const launcherCss = readFileSync(launcherCssPath, "utf8");

@@ -641,7 +641,7 @@ function projectCardForm(project, successPack) {
       formField("Size", selectInput("size", PROJECT_SIZE_OPTIONS, project.size || "")),
       formField("Horizon", selectInput("time_horizon", [["", "Unspecified"], ["week", "Week"], ["month", "Month"], ["quarter", "Quarter"], ["year", "Year"], ["later", "Later"]], project.time_horizon || "")),
       formField("Start date", textInput("start_date", project.start_date, "Optional", "date")),
-      formField("Target date", textInput("target_date", project.target_date, "Required", "date")),
+      formField("Target date", requiredTextInput("target_date", project.target_date, "Required", "date")),
       formField("Success level", selectInput("level_of_success", SUCCESS_LEVEL_OPTIONS, project.level_of_success || "")),
       checkboxField("Active this week", "active_this_week", Boolean(project.active_this_week)),
       checkboxField("Allow non-action title", "verb_check_ack", false),
@@ -713,7 +713,7 @@ function projectChunkPanel(project, chunks) {
   form.className = "project-chunk-form";
   form.dataset.projectId = project.id || "";
   form.append(
-    formField("Next chunk", textInput("verb_noun", "", "Draft next small chunk")),
+    formField("Next chunk", requiredTextInput("verb_noun", "", "Draft next small chunk")),
     formField("Minutes", textInput("duration_minutes", "", "Optional", "number")),
   );
   const button = document.createElement("button");
@@ -1199,6 +1199,12 @@ function textInput(name, value, placeholder, type = "text") {
   if (name === "capture_text") {
     input.required = true;
   }
+  return input;
+}
+
+function requiredTextInput(name, value, placeholder, type = "text") {
+  const input = textInput(name, value, placeholder, type);
+  input.required = true;
   return input;
 }
 
