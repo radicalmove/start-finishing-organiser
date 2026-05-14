@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 
 const indexHtmlPath = new URL("./index.html", import.meta.url);
+const clientJsPath = new URL("./client.js", import.meta.url);
 const launcherJsPath = new URL("./launcher.js", import.meta.url);
 const launcherCssPath = new URL("./launcher.css", import.meta.url);
 
@@ -29,6 +30,23 @@ test("connection settings are scoped to the Settings workflow", () => {
 
   assert.ok(settingsPanelStart >= 0, "settings workflow exists");
   assert.ok(connectionCard > settingsPanelStart, "connection card lives inside settings");
+});
+
+test("launcher exposes persistent global search in the header", () => {
+  const indexHtml = readFileSync(indexHtmlPath, "utf8");
+  const clientJs = readFileSync(clientJsPath, "utf8");
+  const launcherJs = readFileSync(launcherJsPath, "utf8");
+  const launcherCss = readFileSync(launcherCssPath, "utf8");
+
+  assert.match(indexHtml, /id="global-search-input"/);
+  assert.match(indexHtml, /id="global-search-include-recycle"/);
+  assert.match(indexHtml, /id="global-search-results"/);
+  assert.match(launcherJs, /buildSearchApiPath/);
+  assert.match(launcherJs, /performGlobalSearch/);
+  assert.match(clientJs, /\/api\/v1\/search/);
+  assert.match(launcherJs, /data-search-result-workflow/);
+  assert.match(launcherCss, /\.global-search/);
+  assert.match(launcherCss, /\.search-results-panel/);
 });
 
 test("launcher wires workflow navigation state", () => {

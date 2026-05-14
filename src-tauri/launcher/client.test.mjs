@@ -8,6 +8,8 @@ import {
   buildCaptureWorkflowViewModel,
   buildGuidedCapturePayload,
   buildGuidedCaptureFeedback,
+  buildGlobalSearchViewModel,
+  buildSearchApiPath,
   buildInboxActionFeedback,
   buildParkRoutePayload,
   buildProjectCardPayload,
@@ -66,6 +68,60 @@ test("buildJsonHeaders includes bearer token only when provided", () => {
     "Content-Type": "application/json",
     Authorization: "Bearer secret-token",
   });
+});
+
+test("global search path trims queries and controls recycle inclusion", () => {
+  assert.equal(buildSearchApiPath(" passport ", false), "/api/v1/search?q=passport");
+  assert.equal(
+    buildSearchApiPath("passport renewal", true),
+    "/api/v1/search?q=passport+renewal&include_recycle_bin=true",
+  );
+  assert.equal(buildSearchApiPath("", true), "");
+});
+
+test("global search view model groups active and recycled results", () => {
+  const model = buildGlobalSearchViewModel({
+    query: "passport",
+    include_recycle_bin: true,
+    items: [
+      {
+        id: "p1",
+        kind: "project",
+        title: "Renew passport project",
+        location: "Project",
+      },
+      {
+        id: "t1",
+        kind: "task",
+        title: "Renew passport",
+        location: "Inbox",
+      },
+      {
+        id: "w1",
+        kind: "waiting",
+        title: "Passport office reply",
+        location: "Waiting On",
+      },
+      {
+        id: "r1",
+        kind: "recycle_bin",
+        title: "Passport duplicate",
+        location: "Recycle Bin",
+        recycled: true,
+      },
+    ],
+  });
+
+  assert.equal(model.hasQuery, true);
+  assert.equal(model.totalCountLabel, "4 results");
+  assert.deepEqual(model.groups.map((group) => group.label), [
+    "Projects",
+    "Tasks",
+    "Waiting On",
+    "Recycle Bin",
+  ]);
+  assert.equal(model.groups[3].items[0].badge, "Recycle Bin");
+  assert.equal(model.groups[3].items[0].recycled, true);
 });
 
 test("settings round-trip through storage", async () => {

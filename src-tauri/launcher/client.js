@@ -185,6 +185,44 @@ export async function requestJson(fetchImpl, settings, path, options = {}) {
   return payload;
 }
 
+export function buildSearchApiPath(query, includeRecycleBin = false) {
+  const text = String(query || "").trim();
+  if (!text) return "";
+
+  const params = new URLSearchParams();
+  params.set("q", text);
+  if (includeRecycleBin) {
+    params.set("include_recycle_bin", "true");
+  }
+  return `/api/v1/search?${params.toString()}`;
+}
+
+export function buildGlobalSearchViewModel(payload = {}) {
+  const query = String(payload.query || "").trim();
+  const items = (payload.items || []).map(searchResultView);
+  const groups = [];
+  for (const kind of ["project", "task", "waiting", "recycle_bin"]) {
+    const groupItems = items.filter((item) => item.kind === kind);
+    if (groupItems.length) {
+      groups.push({
+        kind,
+        label: searchGroupLabel(kind),
+        items: groupItems,
+      });
+    }
+  }
+
+  return {
+    query,
+    includeRecycleBin: Boolean(payload.include_recycle_bin),
+    hasQuery: Boolean(query),
+    items,
+    groups,
+    totalCountLabel: `${items.length} ${items.length === 1 ? "result" : "results"}`,
+    emptyText: query ? "No matching SFO items." : "Type to search SFO.",
+  };
+}
+
 export function buildBootstrapViewModel(summary) {
   const todayLabel = summary?.today || "Today";
   const currentTime = trimSeconds(summary?.current_time || "");
@@ -689,6 +727,43 @@ function reviewProjectView(project) {
     description: project.description || project.why_link_text || "",
     category: project.category || "",
   };
+}
+
+function searchResultView(item) {
+  const kind = item.kind || "task";
+  const location = item.location || searchGroupLabel(kind);
+  const recycled = Boolean(item.recycled);
+  return {
+    id: item.id || "",
+    kind,
+    title: item.title || "Untitled item",
+    description: item.description || "",
+    location,
+    recycled,
+    badge: recycled ? "Recycle Bin" : location,
+    workflow: searchResultWorkflow(kind, location),
+  };
+}
+
+function searchGroupLabel(kind) {
+  return (
+    {
+      project: "Projects",
+      task: "Tasks",
+      waiting: "Waiting On",
+      recycle_bin: "Recycle Bin",
+    }[kind] || "Results"
+  );
+}
+
+function searchResultWorkflow(kind, location) {
+  if (kind === "project" || kind === "recycle_bin") return "review";
+  if (kind === "waiting") return "today";
+  if (["Inbox"].includes(location)) return "process";
+  if (["Learning", "Enjoy", "Parked", "Parked until", "Completed Task"].includes(location)) {
+    return "review";
+  }
+  return "today";
 }
 
 function reviewTaskView(task, actionLabel) {

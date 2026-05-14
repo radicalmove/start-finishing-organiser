@@ -7,16 +7,16 @@ use chrono::{NaiveDate, NaiveTime, Utc};
 use serde::{Deserialize, Serialize};
 use sfo_core::{
     BackupManifest, Block, BlockCreate, BlockId, BlockUpdate, BootstrapSummary, DailyFocus,
-    DailyFocusUpdate, GuidedCaptureRequest, GuidedCaptureResponse, ImportDryRunReport,
-    ImportDryRunRequest, InboxContainers, InboxRouteRequest, Page, Project, ProjectCard,
-    ProjectCardUpdate, ProjectChunkCreate, ProjectCreate, ProjectId, ProjectUpdate,
+    DailyFocusUpdate, GlobalSearchResults, GuidedCaptureRequest, GuidedCaptureResponse,
+    ImportDryRunReport, ImportDryRunRequest, InboxContainers, InboxRouteRequest, Page, Project,
+    ProjectCard, ProjectCardUpdate, ProjectChunkCreate, ProjectCreate, ProjectId, ProjectUpdate,
     PythonSqliteImportReport, PythonSqliteImportRequest, QuickCapture, Task, TaskCreate, TaskId,
     TaskUpdate, WaitingId, WaitingOn, WaitingOnCreate, WaitingOnUpdate, WeeklyReviewSummary,
     WeeklyReviewTask,
 };
 use sfo_services::{
-    BootstrapService, CaptureService, InboxService, PlanningService, ScheduleService, ServiceError,
-    SystemService, WaitingService, WeeklyReviewService,
+    BootstrapService, CaptureService, InboxService, PlanningService, ScheduleService,
+    SearchService, ServiceError, SystemService, WaitingService, WeeklyReviewService,
 };
 use std::str::FromStr;
 
@@ -37,6 +37,12 @@ struct BootstrapQuery {
 #[derive(Debug, Deserialize)]
 struct WeeklyReviewQuery {
     date: Option<NaiveDate>,
+}
+
+#[derive(Debug, Deserialize)]
+struct SearchQuery {
+    q: Option<String>,
+    include_recycle_bin: Option<bool>,
 }
 
 #[derive(Debug, Serialize)]
@@ -110,6 +116,7 @@ pub fn router() -> Router<AppState> {
     Router::new()
         .route("/auth/status", get(auth_status))
         .route("/bootstrap", get(bootstrap))
+        .route("/search", get(global_search))
         .route("/daily-focus", put(save_daily_focus))
         .route("/projects", get(list_projects).post(create_project))
         .route(
@@ -188,6 +195,21 @@ async fn weekly_review(
     let review_date = query.date.unwrap_or_else(|| Utc::now().date_naive());
     let service = WeeklyReviewService::new(state.db);
     Ok(Json(service.summary(review_date).await?))
+}
+
+async fn global_search(
+    State(state): State<AppState>,
+    Query(query): Query<SearchQuery>,
+) -> Result<Json<GlobalSearchResults>, ApiError> {
+    let service = SearchService::new(state.db);
+    Ok(Json(
+        service
+            .global_search(
+                query.q.as_deref().unwrap_or(""),
+                query.include_recycle_bin.unwrap_or(false),
+            )
+            .await?,
+    ))
 }
 
 async fn move_task_to_week(

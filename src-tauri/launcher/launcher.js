@@ -4,6 +4,8 @@ import {
   buildConnectionGuidance,
   buildGuidedCaptureFeedback,
   buildGuidedCapturePayload,
+  buildGlobalSearchViewModel,
+  buildSearchApiPath,
   buildInboxActionFeedback,
   buildParkRoutePayload,
   buildProcessWorkflowViewModel,
@@ -110,6 +112,10 @@ const elements = {
   workflowPanels: [...document.querySelectorAll("[data-workflow-panel]")],
   actionFeedback: document.getElementById("action-feedback"),
   refreshDashboard: document.getElementById("refresh-dashboard"),
+  globalSearchForm: document.getElementById("global-search-form"),
+  globalSearchInput: document.getElementById("global-search-input"),
+  globalSearchIncludeRecycle: document.getElementById("global-search-include-recycle"),
+  globalSearchResults: document.getElementById("global-search-results"),
   todayLabel: document.getElementById("today-label"),
   captureTitle: document.getElementById("capture-title"),
   captureDescription: document.getElementById("capture-description"),
@@ -164,6 +170,7 @@ let lastAuthRequired = null;
 let activeWorkflow = "today";
 let startupReconnectTimer = null;
 let startupReconnectAttempts = 0;
+let globalSearchTimer = null;
 
 function setWorkflow(workflow) {
   const nextWorkflow = WORKFLOWS.some((item) => item.id === workflow) ? workflow : "today";
@@ -246,6 +253,108 @@ function renderConnectionGuidance(authRequired = lastAuthRequired) {
 function setGuidance(labelElement, detailElement, label, detail) {
   labelElement.textContent = label;
   detailElement.textContent = detail;
+}
+
+function scheduleGlobalSearch() {
+  if (globalSearchTimer) {
+    window.clearTimeout(globalSearchTimer);
+  }
+  globalSearchTimer = window.setTimeout(() => {
+    globalSearchTimer = null;
+    performGlobalSearch();
+  }, 220);
+}
+
+async function performGlobalSearch() {
+  const path = buildSearchApiPath(
+    elements.globalSearchInput.value,
+    elements.globalSearchIncludeRecycle.checked,
+  );
+  if (!path) {
+    hideGlobalSearchResults();
+    return;
+  }
+
+  renderGlobalSearchResults(
+    buildGlobalSearchViewModel({
+      query: elements.globalSearchInput.value.trim(),
+      include_recycle_bin: elements.globalSearchIncludeRecycle.checked,
+      items: [],
+    }),
+    true,
+  );
+
+  try {
+    const payload = await requestJson(window.fetch.bind(window), settings, path);
+    renderGlobalSearchResults(buildGlobalSearchViewModel(payload));
+  } catch (err) {
+    elements.globalSearchResults.replaceChildren(emptyState(`Search failed: ${err.message}`));
+    elements.globalSearchResults.classList.remove("hidden");
+  }
+}
+
+function renderGlobalSearchResults(model, loading = false) {
+  elements.globalSearchResults.replaceChildren();
+  if (!model.hasQuery) {
+    hideGlobalSearchResults();
+    return;
+  }
+
+  const heading = document.createElement("div");
+  heading.className = "search-results-heading";
+  const label = document.createElement("span");
+  label.textContent = loading ? "Searching..." : model.totalCountLabel;
+  const scope = document.createElement("span");
+  scope.textContent = model.includeRecycleBin ? "Recycle included" : "Active items";
+  heading.append(label, scope);
+  elements.globalSearchResults.append(heading);
+
+  if (!loading && !model.groups.length) {
+    elements.globalSearchResults.append(emptyState(model.emptyText));
+  }
+
+  for (const group of model.groups) {
+    const section = document.createElement("section");
+    section.className = "search-results-group";
+    const title = document.createElement("h4");
+    title.textContent = group.label;
+    section.append(title);
+    for (const item of group.items) {
+      section.append(searchResultButton(item));
+    }
+    elements.globalSearchResults.append(section);
+  }
+
+  elements.globalSearchResults.classList.remove("hidden");
+}
+
+function searchResultButton(item) {
+  const button = document.createElement("button");
+  button.className = "search-result-row";
+  button.type = "button";
+  button.dataset.searchResultWorkflow = item.workflow;
+  button.dataset.searchResultId = item.id;
+  button.classList.toggle("is-recycled", item.recycled);
+
+  const title = document.createElement("span");
+  title.className = "search-result-title";
+  title.textContent = item.title;
+  const meta = document.createElement("span");
+  meta.className = "search-result-meta";
+  meta.textContent = item.badge;
+  button.append(title, meta);
+  if (item.description) {
+    const description = document.createElement("span");
+    description.className = "search-result-description";
+    description.textContent = item.description;
+    button.append(description);
+  }
+  return button;
+}
+
+function hideGlobalSearchResults() {
+  elements.globalSearchResults.replaceChildren();
+  elements.globalSearchResults.classList.add("hidden");
 }
 
 async function connectAndLoad(options = {}) {
@@ -1669,6 +1778,52 @@ for (const tab of elements.workflowTabs) {
     }
   });
 }
+
+elements.globalSearchForm.addEventListener("submit", (event) => {
+  event.preventDefault();
+  performGlobalSearch();
+});
+
+elements.globalSearchInput.addEventListener("input", () => {
+  scheduleGlobalSearch();
+});
+
+elements.globalSearchIncludeRecycle.addEventListener("change", () => {
+  if (elements.globalSearchInput.value.trim()) {
+    performGlobalSearch();
+  }
+});
+
+elements.globalSearchResults.addEventListener("click", async (event) => {
+  const button = event.target.closest("[data-search-result-workflow]");
+  if (!button) return;
+
+  const workflow = button.dataset.searchResultWorkflow || "today";
+  hideGlobalSearchResults();
+  elements.globalSearchInput.blur();
+  setWorkflow(workflow);
+  try {
+    await refreshWorkflowData(workflow);
+  } catch (err) {
+    setConnectionState(
+      "error",
+      "Search navigation failed",
+      err instanceof Error ? err.message : String(err),
+    );
+  }
+});
+
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape") {
+    hideGlobalSearchResults();
+  }
+});
+
+document.addEventListener("click", (event) => {
+  if (!event.target.closest(".global-search")) {
+    hideGlobalSearchResults();
+  }
+});
 
 elements.connectionForm.addEventListener("submit", async (event) => {
   event.preventDefault();

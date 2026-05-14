@@ -7,6 +7,7 @@ pub mod inbox;
 pub mod planning;
 pub mod ritual;
 pub mod schedule;
+pub mod search;
 pub mod waiting;
 pub mod weekly_review;
 

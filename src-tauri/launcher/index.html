@@ -16,6 +16,17 @@
             <h1>Today’s operating system</h1>
           </div>
         </div>
+        <form class="global-search" id="global-search-form" role="search">
+          <label class="global-search-field" for="global-search-input">
+            <span>Search</span>
+            <input id="global-search-input" name="q" placeholder="Search tasks, projects, waiting..." autocomplete="off" />
+          </label>
+          <label class="global-search-recycle">
+            <input id="global-search-include-recycle" type="checkbox" />
+            <span>Include recycle bin</span>
+          </label>
+          <div class="search-results-panel hidden" id="global-search-results" aria-live="polite"></div>
+        </form>
         <div class="status-card" aria-live="polite">
           <div class="status-dot" id="status-dot"></div>
           <div>
