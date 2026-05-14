@@ -1109,6 +1109,101 @@ textarea:focus {
     rgba(4, 6, 18, 0.58);
 }
 
+.park-calendar {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid rgba(83, 161, 255, 0.28);
+  border-radius: var(--sfo-radius-md);
+  background:
+    radial-gradient(circle at top, rgba(45, 160, 255, 0.1), transparent 16rem),
+    rgba(5, 3, 15, 0.4);
+}
+
+.park-calendar-header {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr) 48px;
+  gap: 10px;
+  align-items: center;
+}
+
+.park-calendar-month {
+  color: white;
+  font-size: 22px;
+  font-weight: 650;
+  letter-spacing: -0.03em;
+  text-align: center;
+}
+
+.park-calendar-nav,
+.park-calendar-day {
+  border: 1px solid var(--sfo-line);
+  border-radius: var(--sfo-radius-sm);
+  color: var(--sfo-text);
+  background: rgba(10, 14, 35, 0.74);
+  cursor: pointer;
+}
+
+.park-calendar-nav {
+  min-height: 44px;
+  font-size: 20px;
+  font-weight: 750;
+}
+
+.park-calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.park-calendar-weekday {
+  color: var(--sfo-muted);
+  font-size: 12px;
+  font-weight: 750;
+  letter-spacing: 0.08em;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.park-calendar-blank {
+  min-height: 56px;
+}
+
+.park-calendar-day {
+  min-height: 56px;
+  padding: 0;
+  font-size: 19px;
+  font-weight: 650;
+}
+
+.park-calendar-day:hover,
+.park-calendar-nav:hover {
+  border-color: var(--sfo-line-strong);
+  background: rgba(17, 24, 58, 0.9);
+}
+
+.park-calendar-day.is-today {
+  border-color: rgba(73, 246, 163, 0.34);
+}
+
+.park-calendar-day.is-selected {
+  border-color: rgba(45, 160, 255, 0.62);
+  color: white;
+  background:
+    linear-gradient(135deg, rgba(255, 43, 209, 0.2), rgba(25, 135, 255, 0.2)),
+    rgba(10, 14, 35, 0.86);
+  box-shadow: 0 0 20px rgba(45, 160, 255, 0.18);
+}
+
+.park-time-field {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.park-time-field input {
+  min-height: 56px;
+  font-size: 20px;
+}
+
 .park-choice-actions {
   display: flex;
   flex-wrap: wrap;

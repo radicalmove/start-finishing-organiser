@@ -141,7 +141,12 @@ test("launcher makes Park an explicit optional date-time choice", () => {
   assert.match(launcherJs, /Park without date/);
   assert.match(launcherJs, /Park until date\/time/);
   assert.match(launcherJs, /buildParkRoutePayload/);
+  assert.match(launcherJs, /parkCalendarControl/);
+  assert.match(launcherJs, /data-park-calendar-action/);
+  assert.doesNotMatch(launcherJs, /datetime-local/);
   assert.match(launcherCss, /\.park-choice-panel/);
+  assert.match(launcherCss, /\.park-calendar-day/);
+  assert.match(launcherCss, /min-height:\s*56px/);
 });
 
 test("launcher wires weekly review actions", () => {

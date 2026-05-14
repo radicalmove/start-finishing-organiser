@@ -87,6 +87,7 @@ const BLOCK_TYPE_OPTIONS = [
 ];
 const STARTUP_CONNECT_RETRY_MS = 1000;
 const STARTUP_CONNECT_MAX_ATTEMPTS = 30;
+const PARK_CALENDAR_WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 const elements = {
   statusDot: document.getElementById("status-dot"),
@@ -1000,14 +1001,6 @@ function parkChoicePanel(item) {
     "Choose whether this disappears until a specific date and time, or stays parked for Review.";
   heading.append(title, description);
 
-  const dateLabel = document.createElement("label");
-  dateLabel.textContent = "Return to Inbox";
-  const dateInput = document.createElement("input");
-  dateInput.type = "datetime-local";
-  dateInput.name = "park_until";
-  dateInput.required = true;
-  dateLabel.append(dateInput);
-
   const actions = document.createElement("div");
   actions.className = "park-choice-actions";
   const parkUntil = document.createElement("button");
@@ -1033,8 +1026,153 @@ function parkChoicePanel(item) {
   cancel.textContent = "Cancel";
 
   actions.append(parkUntil, parkWithoutDate, cancel);
-  panel.append(heading, dateLabel, actions);
+  panel.append(heading, parkCalendarControl(), actions);
   return panel;
+}
+
+function parkCalendarControl(referenceDate = new Date()) {
+  const selectedDate = new Date(referenceDate);
+  selectedDate.setDate(selectedDate.getDate() + 1);
+  selectedDate.setHours(9, 0, 0, 0);
+
+  const calendar = document.createElement("section");
+  calendar.className = "park-calendar";
+  calendar.dataset.parkCalendar = "true";
+  calendar.dataset.viewMonth = parkMonthKey(selectedDate);
+  calendar.dataset.selectedDate = parkDateKey(selectedDate);
+
+  const header = document.createElement("div");
+  header.className = "park-calendar-header";
+  header.append(
+    parkCalendarButton("Previous month", "previous-month", "<"),
+    elementWithClass("strong", "park-calendar-month", ""),
+    parkCalendarButton("Next month", "next-month", ">"),
+  );
+
+  const grid = document.createElement("div");
+  grid.className = "park-calendar-grid";
+
+  const timeLabel = document.createElement("label");
+  timeLabel.className = "park-time-field";
+  const timeText = document.createElement("span");
+  timeText.textContent = "Return time";
+  const timeInput = document.createElement("input");
+  timeInput.type = "time";
+  timeInput.name = "park_time";
+  timeInput.value = "09:00";
+  timeInput.required = true;
+  timeLabel.append(timeText, timeInput);
+
+  const hidden = document.createElement("input");
+  hidden.type = "hidden";
+  hidden.name = "park_until";
+
+  calendar.append(header, grid, timeLabel, hidden);
+  renderParkCalendar(calendar);
+  return calendar;
+}
+
+function parkCalendarButton(label, action, text) {
+  const button = document.createElement("button");
+  button.className = "park-calendar-nav";
+  button.type = "button";
+  button.dataset.parkCalendarAction = action;
+  button.ariaLabel = label;
+  button.textContent = text;
+  return button;
+}
+
+function renderParkCalendar(calendar) {
+  const [year, month] = calendar.dataset.viewMonth.split("-").map(Number);
+  const selectedDate = calendar.dataset.selectedDate;
+  const monthDate = new Date(year, month - 1, 1);
+  const monthTitle = calendar.querySelector(".park-calendar-month");
+  const grid = calendar.querySelector(".park-calendar-grid");
+  if (!monthTitle || !grid) return;
+
+  monthTitle.textContent = new Intl.DateTimeFormat(undefined, {
+    month: "long",
+    year: "numeric",
+  }).format(monthDate);
+
+  grid.replaceChildren();
+  for (const weekday of PARK_CALENDAR_WEEKDAYS) {
+    const label = document.createElement("span");
+    label.className = "park-calendar-weekday";
+    label.textContent = weekday;
+    grid.append(label);
+  }
+
+  const firstWeekday = (monthDate.getDay() + 6) % 7;
+  for (let index = 0; index < firstWeekday; index += 1) {
+    const blank = document.createElement("span");
+    blank.className = "park-calendar-blank";
+    grid.append(blank);
+  }
+
+  const daysInMonth = new Date(year, month, 0).getDate();
+  const today = parkDateKey(new Date());
+  for (let day = 1; day <= daysInMonth; day += 1) {
+    const date = new Date(year, month - 1, day);
+    const dateKey = parkDateKey(date);
+    const button = document.createElement("button");
+    button.className = "park-calendar-day";
+    button.type = "button";
+    button.dataset.parkCalendarAction = "select-date";
+    button.dataset.date = dateKey;
+    button.textContent = String(day);
+    button.classList.toggle("is-selected", dateKey === selectedDate);
+    button.classList.toggle("is-today", dateKey === today);
+    grid.append(button);
+  }
+
+  syncParkCalendarValue(calendar);
+}
+
+function handleParkCalendarAction(button) {
+  const calendar = button.closest("[data-park-calendar]");
+  if (!calendar) return;
+
+  if (button.dataset.parkCalendarAction === "select-date") {
+    calendar.dataset.selectedDate = button.dataset.date;
+    calendar.dataset.viewMonth = button.dataset.date.slice(0, 7);
+    renderParkCalendar(calendar);
+    calendar.querySelector('[name="park_time"]')?.focus();
+    return;
+  }
+
+  const offset = button.dataset.parkCalendarAction === "previous-month" ? -1 : 1;
+  const [year, month] = calendar.dataset.viewMonth.split("-").map(Number);
+  const nextMonth = new Date(year, month - 1 + offset, 1);
+  calendar.dataset.viewMonth = parkMonthKey(nextMonth);
+  renderParkCalendar(calendar);
+}
+
+function syncParkCalendarValue(calendar) {
+  if (!calendar) return;
+  const hidden = calendar.querySelector('[name="park_until"]');
+  const timeInput = calendar.querySelector('[name="park_time"]');
+  if (!hidden) return;
+  hidden.value = `${calendar.dataset.selectedDate}T${timeInput?.value || "09:00"}`;
+}
+
+function parkMonthKey(date) {
+  return `${date.getFullYear()}-${padDatePart(date.getMonth() + 1)}`;
+}
+
+function parkDateKey(date) {
+  return `${date.getFullYear()}-${padDatePart(date.getMonth() + 1)}-${padDatePart(date.getDate())}`;
+}
+
+function padDatePart(value) {
+  return String(value).padStart(2, "0");
+}
+
+function elementWithClass(tagName, className, textContent) {
+  const element = document.createElement(tagName);
+  element.className = className;
+  element.textContent = textContent;
+  return element;
 }
 
 function showParkChoicePanel(itemId) {
@@ -1042,7 +1180,7 @@ function showParkChoicePanel(itemId) {
     const selected = panel.dataset.parkPanel === itemId;
     panel.classList.toggle("hidden", !selected);
     if (selected) {
-      panel.querySelector('[name="park_until"]')?.focus();
+      panel.querySelector(".park-calendar-day.is-selected")?.focus();
     }
   }
 }
@@ -1920,6 +2058,13 @@ elements.processWorkflow.addEventListener("click", async (event) => {
     }
   }
 
+  const calendarButton = event.target.closest("[data-park-calendar-action]");
+  if (calendarButton) {
+    event.preventDefault();
+    handleParkCalendarAction(calendarButton);
+    return;
+  }
+
   const parkButton = event.target.closest("[data-park-action]");
   if (parkButton && parkButton.dataset.parkAction !== "until") {
     if (parkButton.dataset.parkAction === "cancel") {
@@ -1987,8 +2132,20 @@ elements.processWorkflow.addEventListener("click", async (event) => {
 });
 
 elements.processWorkflow.addEventListener("change", (event) => {
-  if (!event.target.matches('[name="decision"]')) return;
-  syncGuidedForm(event.target.closest("form"));
+  if (event.target.matches('[name="decision"]')) {
+    syncGuidedForm(event.target.closest("form"));
+    return;
+  }
+
+  if (event.target.matches('[name="park_time"]')) {
+    syncParkCalendarValue(event.target.closest("[data-park-calendar]"));
+  }
+});
+
+elements.processWorkflow.addEventListener("input", (event) => {
+  if (event.target.matches('[name="park_time"]')) {
+    syncParkCalendarValue(event.target.closest("[data-park-calendar]"));
+  }
 });
 
 elements.processWorkflow.addEventListener("submit", async (event) => {
