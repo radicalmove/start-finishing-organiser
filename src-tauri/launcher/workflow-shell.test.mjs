@@ -206,6 +206,7 @@ test("review workflow is structured as a weekly checklist", () => {
   assert.match(launcherCss, /\.review-panel-title/);
   assert.match(launcherCss, /\.review-list\.is-scrollable/);
   assert.match(launcherCss, /max-height:\s*340px/);
+  assert.match(launcherCss, /\.review-step-grid\.three-up\s+\.review-task-row/);
   assert.match(launcherCss, /\.review-step/);
   assert.match(launcherCss, /\.review-step-grid/);
 });

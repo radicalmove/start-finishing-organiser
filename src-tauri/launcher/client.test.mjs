@@ -252,6 +252,12 @@ test("weekly review view model exposes focus counts and review queues", () => {
           verb_noun: "Maybe buy scanner",
           created_at: "2026-05-07T08:00:00Z",
         },
+        {
+          id: "pk2",
+          verb_noun: "Renew passport",
+          parked_until: "2099-01-01T09:00:00Z",
+          created_at: "2026-05-07T08:00:00Z",
+        },
       ],
       recycle_bin: [
         {
@@ -276,13 +282,16 @@ test("weekly review view model exposes focus counts and review queues", () => {
   assert.equal(model.completedTasksCountLabel, "1");
   assert.equal(model.learningItemsCountLabel, "1");
   assert.equal(model.enjoyItemsCountLabel, "1");
-  assert.equal(model.parkedItemsCountLabel, "1");
+  assert.equal(model.parkedItemsCountLabel, "2");
   assert.equal(model.recycleBinItemsCountLabel, "1");
   assert.equal(model.learningItems[0].title, "Read GTD article");
   assert.equal(model.learningItems[0].meta, "Captured 2026-05-09");
   assert.equal(model.learningItems[0].description, "Maybe useful");
   assert.equal(model.enjoyItems[0].actionLabel, "Move to Inbox");
   assert.equal(model.parkedItems[0].title, "Maybe buy scanner");
+  assert.equal(model.parkedItems[1].title, "Renew passport");
+  assert.match(model.parkedItems[1].meta, /^Returns /);
+  assert.doesNotMatch(model.parkedItems[1].meta, /^Captured /);
   assert.equal(model.recycleBinItems[0].title, "Old loose end");
   assert.equal(model.recycleBinItems[0].description, "No longer useful");
   assert.equal(model.recycleBinItems[0].actionLabel, "Restore");

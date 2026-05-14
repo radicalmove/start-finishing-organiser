@@ -210,7 +210,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn park_until_hides_future_items_and_returns_due_items_to_inbox() {
+    async fn park_until_keeps_future_items_visible_and_returns_due_items_to_inbox() {
         let (planning, inbox) = services().await;
         let future_item = planning
             .quick_capture(QuickCapture {
@@ -257,10 +257,11 @@ mod tests {
         let containers = inbox.containers().await.expect("containers");
 
         assert_eq!(containers.counts.unprocessed, 1);
-        assert_eq!(containers.counts.park_let_go, 0);
+        assert_eq!(containers.counts.park_let_go, 1);
         assert_eq!(containers.unprocessed[0].id, due_item.id);
         assert!(containers.unprocessed[0].parked_until.is_none());
-        assert!(containers.parked.is_empty());
+        assert_eq!(containers.parked[0].id, future_item.id);
+        assert_eq!(containers.parked[0].parked_until, Some(future_until));
     }
 
     #[tokio::test]

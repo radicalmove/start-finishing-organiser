@@ -91,12 +91,10 @@ async fn active_container_items(
         SELECT * FROM tasks
         WHERE intake_container = ?
           AND status IN ('pending', 'in_progress')
-          AND (intake_container != ? OR parked_until IS NULL)
         ORDER BY created_at DESC
         "#,
     )
     .bind(container)
-    .bind(INBOX_INTENT_PARK_LET_GO)
     .fetch_all(pool)
     .await?;
 
@@ -137,11 +135,9 @@ async fn count_active_container(pool: &sqlx::SqlitePool, container: &str) -> Res
         SELECT COUNT(*) FROM tasks
         WHERE intake_container = ?
           AND status IN ('pending', 'in_progress')
-          AND (intake_container != ? OR parked_until IS NULL)
         "#,
     )
     .bind(container)
-    .bind(INBOX_INTENT_PARK_LET_GO)
     .fetch_one(pool)
     .await?;
     Ok(count)
@@ -250,13 +246,46 @@ mod tests {
         recycled.status = TaskStatus::Archived;
         update_task(&pool, &recycled).await.expect("update recycle");
 
+        let mut scheduled_parked = create_task(
+            &pool,
+            TaskCreate {
+                verb_noun: "Scheduled parked thing".to_string(),
+                project_id: None,
+                description: None,
+                in_inbox: false,
+                when_bucket: WhenBucket::Later,
+                block_type: None,
+                duration_minutes: None,
+                priority: None,
+                frog: false,
+                alignment: None,
+                first_action: None,
+                scheduled_for: None,
+                owner_type: Default::default(),
+            },
+        )
+        .await
+        .expect("scheduled parked task");
+        scheduled_parked.intake_intent = INBOX_INTENT_PARK_LET_GO.to_string();
+        scheduled_parked.intake_container = INBOX_INTENT_PARK_LET_GO.to_string();
+        scheduled_parked.parked_until = Some("2099-01-01T09:00:00Z".parse().unwrap());
+        update_task(&pool, &scheduled_parked)
+            .await
+            .expect("update scheduled parked");
+
         let containers = containers(&pool).await.expect("containers");
 
         assert_eq!(containers.counts.unprocessed, 1);
         assert_eq!(containers.counts.learn_explore, 1);
+        assert_eq!(containers.counts.park_let_go, 1);
         assert_eq!(containers.counts.recycle_bin, 1);
         assert_eq!(containers.unprocessed[0].id, unprocessed.id);
         assert_eq!(containers.learning[0].id, learning.id);
+        assert_eq!(containers.parked[0].id, scheduled_parked.id);
+        assert_eq!(
+            containers.parked[0].parked_until,
+            scheduled_parked.parked_until
+        );
         assert_eq!(containers.recycle_bin[0].id, recycled.id);
     }
 }

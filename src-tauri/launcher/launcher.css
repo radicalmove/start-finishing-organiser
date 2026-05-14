@@ -653,6 +653,15 @@ h3 {
   align-items: center;
 }
 
+.review-step-grid.three-up .review-task-row {
+  grid-template-columns: 1fr;
+  align-items: stretch;
+}
+
+.review-step-grid.three-up .review-task-actions {
+  justify-content: flex-start;
+}
+
 .settings-panel {
   background:
     radial-gradient(circle at 18% 0%, rgba(255, 200, 87, 0.08), transparent 18rem),

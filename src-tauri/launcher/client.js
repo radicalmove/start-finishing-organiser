@@ -706,11 +706,16 @@ function reviewTaskView(task, actionLabel) {
 }
 
 function routedInboxItemView(item) {
+  const capturedLabel = item.created_at ? `Captured ${String(item.created_at).slice(0, 10)}` : "";
+  const parkedUntilLabel = item.parked_until
+    ? `Returns ${formatDateTimeDisplayLabel(item.parked_until)}`
+    : "";
+
   return {
     id: item.id || "",
     title: item.verb_noun || item.title || "Untitled item",
     description: item.description || "",
-    meta: item.created_at ? `Captured ${String(item.created_at).slice(0, 10)}` : "",
+    meta: compactJoin([parkedUntilLabel, capturedLabel]),
     actionLabel: "Move to Inbox",
   };
 }
@@ -797,6 +802,27 @@ function formatWeekRangeDisplayLabel(value) {
   return `${start.weekday} ${start.day} ${start.monthLabel} - ${end.weekday} ${end.day} ${end.monthLabel} ${end.year}`;
 }
 
+function formatDateTimeDisplayLabel(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return String(value || "").trim();
+
+  const dateLabel = formatDateDisplayLabel(localDateKey(date));
+  const timeLabel = formatClockLabel(localTimeKey(date));
+  return compactJoin([dateLabel, timeLabel], " ");
+}
+
+function localDateKey(date) {
+  return [
+    date.getFullYear(),
+    padDatePart(date.getMonth() + 1),
+    padDatePart(date.getDate()),
+  ].join("-");
+}
+
+function localTimeKey(date) {
+  return [padDatePart(date.getHours()), padDatePart(date.getMinutes())].join(":");
+}
+
 function dateDisplayParts(value) {
   const match = String(value || "").match(/^(\d{4})-(\d{2})-(\d{2})$/);
   if (!match) return null;
@@ -822,6 +848,10 @@ function dateDisplayParts(value) {
     "Dec",
   ][month - 1];
   return { day, month, monthLabel, weekday, year };
+}
+
+function padDatePart(value) {
+  return String(value).padStart(2, "0");
 }
 
 function formatClockLabel(value) {

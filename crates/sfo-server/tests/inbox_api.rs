@@ -145,7 +145,7 @@ async fn inbox_recycle_and_restore_work_under_api_v1() {
 }
 
 #[tokio::test]
-async fn inbox_park_until_hides_future_items_and_returns_due_items_under_api_v1() {
+async fn inbox_park_until_keeps_future_items_visible_and_returns_due_items_under_api_v1() {
     let app = test_app().await;
     let (future_status, future_task) = request_json(
         app.clone(),
@@ -193,8 +193,12 @@ async fn inbox_park_until_hides_future_items_and_returns_due_items_under_api_v1(
         request_json(app, Method::GET, "/api/v1/inbox/containers", Value::Null).await;
     assert_eq!(containers_status, StatusCode::OK);
     assert_eq!(containers["counts"]["unprocessed"], 1);
-    assert_eq!(containers["counts"]["park_let_go"], 0);
+    assert_eq!(containers["counts"]["park_let_go"], 1);
     assert_eq!(containers["unprocessed"][0]["id"], due_task_id);
     assert_eq!(containers["unprocessed"][0]["parked_until"], Value::Null);
-    assert!(containers["parked"].as_array().unwrap().is_empty());
+    assert_eq!(containers["parked"][0]["id"], future_task_id);
+    assert_eq!(
+        containers["parked"][0]["parked_until"],
+        "2099-01-01T09:00:00Z"
+    );
 }
