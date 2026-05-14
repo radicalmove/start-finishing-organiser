@@ -129,7 +129,10 @@ pub fn router() -> Router<AppState> {
             patch(update_project).delete(delete_project),
         )
         .route("/tasks", get(list_tasks).post(create_task))
-        .route("/tasks/{task_id}", patch(update_task).delete(delete_task))
+        .route(
+            "/tasks/{task_id}",
+            get(get_task).patch(update_task).delete(delete_task),
+        )
         .route("/tasks/{task_id}/complete", post(complete_task))
         .route("/tasks/{task_id}/reopen", post(reopen_task))
         .route("/tasks/{task_id}/archive", post(archive_task))
@@ -152,7 +155,10 @@ pub fn router() -> Router<AppState> {
         .route("/inbox/{task_id}/restore", post(restore_inbox_item))
         .route("/capture/guided", post(guided_capture))
         .route("/waiting", get(list_waiting).post(create_waiting))
-        .route("/waiting/{waiting_id}", patch(update_waiting))
+        .route(
+            "/waiting/{waiting_id}",
+            get(get_waiting).patch(update_waiting),
+        )
         .route("/waiting/{waiting_id}/resolve", post(resolve_waiting))
         .route(
             "/import/python-sqlite/dry-run",
@@ -322,6 +328,15 @@ async fn create_task(
     Ok((StatusCode::CREATED, Json(task)))
 }
 
+async fn get_task(
+    State(state): State<AppState>,
+    Path(task_id): Path<String>,
+) -> Result<Json<Task>, ApiError> {
+    let service = PlanningService::new(state.db);
+    let task = service.get_task(parse_task_id(&task_id)?).await?;
+    Ok(Json(task))
+}
+
 async fn update_task(
     State(state): State<AppState>,
     Path(task_id): Path<String>,
@@ -454,6 +469,17 @@ async fn create_waiting(
     let service = WaitingService::new(state.db);
     let item = service.create_waiting_on(payload).await?;
     Ok((StatusCode::CREATED, Json(item)))
+}
+
+async fn get_waiting(
+    State(state): State<AppState>,
+    Path(waiting_id): Path<String>,
+) -> Result<Json<WaitingOn>, ApiError> {
+    let service = WaitingService::new(state.db);
+    let item = service
+        .get_waiting_on(parse_waiting_id(&waiting_id)?)
+        .await?;
+    Ok(Json(item))
 }
 
 async fn update_waiting(

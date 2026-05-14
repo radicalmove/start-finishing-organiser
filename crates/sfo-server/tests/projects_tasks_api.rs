@@ -228,6 +228,12 @@ async fn tasks_crud_and_lifecycle_work_under_api_v1() {
     assert_eq!(task["verb_noun"], "Draft test plan");
 
     let task_id = task["id"].as_str().unwrap();
+    let (status, fetched) = get_json(app.clone(), &format!("/api/v1/tasks/{task_id}")).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(fetched["id"], task["id"]);
+    assert_eq!(fetched["verb_noun"], "Draft test plan");
+    assert_eq!(fetched["when_bucket"], "today");
+
     let (status, updated) = request_json(
         app.clone(),
         Method::PATCH,

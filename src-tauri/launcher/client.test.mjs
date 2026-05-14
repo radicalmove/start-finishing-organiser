@@ -8,7 +8,9 @@ import {
   buildCaptureWorkflowViewModel,
   buildGuidedCapturePayload,
   buildGuidedCaptureFeedback,
+  buildItemDetailApiPath,
   buildGlobalSearchViewModel,
+  buildItemDetailViewModel,
   buildSearchApiPath,
   buildInboxActionFeedback,
   buildParkRoutePayload,
@@ -122,6 +124,199 @@ test("global search view model groups active and recycled results", () => {
   ]);
   assert.equal(model.groups[3].items[0].badge, "Recycle Bin");
   assert.equal(model.groups[3].items[0].recycled, true);
+});
+
+test("item detail view model summarizes search results with an open action", () => {
+  const detail = buildItemDetailViewModel({
+    id: "t1",
+    kind: "task",
+    title: "Print calendar",
+    description: "Monthly printout",
+    location: "Inbox",
+    created_at: "2026-05-13T08:30:00Z",
+  });
+
+  assert.equal(detail.title, "Print calendar");
+  assert.equal(detail.kindLabel, "Task");
+  assert.equal(detail.badge, "Inbox");
+  assert.equal(detail.workflow, "process");
+  assert.equal(detail.actionLabel, "Open in Process");
+  assert.deepEqual(
+    detail.rows.map((row) => row.label),
+    ["Type", "Location", "Captured"],
+  );
+});
+
+test("item detail API path loads full task and project records", () => {
+  assert.equal(buildItemDetailApiPath({ id: "task 1", kind: "task" }), "/api/v1/tasks/task%201");
+  assert.equal(
+    buildItemDetailApiPath({ id: "recycled/task", kind: "recycle_bin" }),
+    "/api/v1/tasks/recycled%2Ftask",
+  );
+  assert.equal(
+    buildItemDetailApiPath({ id: "project 1", kind: "project" }),
+    "/api/v1/projects/project%201/card",
+  );
+  assert.equal(buildItemDetailApiPath({ id: "w1", kind: "waiting" }), "/api/v1/waiting/w1");
+  assert.equal(buildItemDetailApiPath({ kind: "task" }), "");
+});
+
+test("item detail view model enriches from full task payloads", () => {
+  const detail = buildItemDetailViewModel(
+    {
+      id: "t1",
+      kind: "task",
+      title: "Print calendar",
+      location: "Today",
+    },
+    {
+      id: "t1",
+      verb_noun: "Print calendar",
+      description: "Monthly printout",
+      status: "pending",
+      when_bucket: "month",
+      block_type: "admin",
+      duration_minutes: 15,
+      frog: true,
+      parked_until: "2026-06-01T08:00:00",
+      created_at: "2026-05-13T08:30:00",
+    },
+  );
+
+  assert.equal(detail.description, "Monthly printout");
+  assert.deepEqual(
+    detail.actions.map((action) => `${action.id}: ${action.label} -> ${action.path || action.workflow}`),
+    [
+      "complete-task: Complete -> /api/v1/tasks/t1/complete",
+      "open-workflow: Open in Today -> today",
+    ],
+  );
+  assert.deepEqual(
+    detail.rows.map((row) => `${row.label}: ${row.value}`),
+    [
+      "Type: Task",
+      "Location: Today",
+      "Status: Pending",
+      "Bucket: Month",
+      "Block: Admin",
+      "Duration: 15 min",
+      "Frog: Yes",
+      "Parked until: Mon 1 Jun 2026 8:00AM",
+      "Captured: Wed 13 May 2026 8:30AM",
+    ],
+  );
+});
+
+test("item detail view model offers reopen and restore actions for done and recycled tasks", () => {
+  const doneTask = buildItemDetailViewModel(
+    { id: "done", kind: "task", title: "Finished", location: "Completed Task" },
+    { id: "done", verb_noun: "Finished", status: "done", completed_at: "2026-05-13T09:00:00" },
+  );
+  const recycledTask = buildItemDetailViewModel(
+    { id: "old", kind: "recycle_bin", title: "Old idea", location: "Recycle Bin", recycled: true },
+    {
+      id: "old",
+      verb_noun: "Old idea",
+      status: "archived",
+      archived_from_inbox: true,
+      created_at: "2026-05-13T09:00:00",
+    },
+  );
+
+  assert.deepEqual(
+    doneTask.actions.map((action) => `${action.id}: ${action.path || action.workflow}`),
+    ["reopen-task: /api/v1/tasks/done/reopen", "open-workflow: review"],
+  );
+  assert.deepEqual(
+    recycledTask.actions.map((action) => `${action.id}: ${action.path || action.workflow}`),
+    ["restore-task: /api/v1/tasks/old/restore", "open-workflow: review"],
+  );
+});
+
+test("item detail view model enriches from project card payloads", () => {
+  const detail = buildItemDetailViewModel(
+    {
+      id: "p1",
+      kind: "project",
+      title: "Old title",
+      location: "Project",
+    },
+    {
+      project: {
+        id: "p1",
+        title: "Review app UX",
+        description: "Make the app easier to understand",
+        category: "work",
+        status: "active",
+        start_date: "2026-05-01",
+        target_date: "2026-06-01",
+        level_of_success: "moderate",
+        active_this_week: true,
+        created_at: "2026-05-10T10:00:00",
+      },
+      chunks: [{ id: "c1" }, { id: "c2" }],
+    },
+  );
+
+  assert.equal(detail.title, "Review app UX");
+  assert.equal(detail.description, "Make the app easier to understand");
+  assert.deepEqual(
+    detail.actions.map((action) => `${action.id}: ${action.label}`),
+    ["open-shape-card: Open Shape Card", "open-workflow: Open in Review"],
+  );
+  assert.deepEqual(
+    detail.rows.map((row) => `${row.label}: ${row.value}`),
+    [
+      "Type: Project",
+      "Location: Project",
+      "Status: Active",
+      "Category: Work",
+      "Start date: Fri 1 May 2026",
+      "Target date: Mon 1 Jun 2026",
+      "Success level: Moderate",
+      "Active this week: Yes",
+      "Roadmap chunks: 2",
+      "Captured: Sun 10 May 2026 10:00AM",
+    ],
+  );
+});
+
+test("item detail view model enriches from waiting payloads", () => {
+  const detail = buildItemDetailViewModel(
+    {
+      id: "w1",
+      kind: "waiting",
+      title: "Waiting on Bob for draft",
+      location: "Waiting On",
+    },
+    {
+      id: "w1",
+      description: "Waiting on Bob for draft",
+      person: "Bob",
+      project_id: "project-1",
+      last_followup: "2026-05-10",
+      created_at: "2026-05-13T09:00:00",
+    },
+  );
+
+  assert.equal(detail.title, "Waiting on Bob for draft");
+  assert.equal(detail.description, "Bob");
+  assert.equal(detail.workflow, "today");
+  assert.deepEqual(
+    detail.actions.map((action) => `${action.id}: ${action.path || action.workflow}`),
+    ["resolve-waiting: /api/v1/waiting/w1/resolve", "open-workflow: today"],
+  );
+  assert.deepEqual(
+    detail.rows.map((row) => `${row.label}: ${row.value}`),
+    [
+      "Type: Waiting On",
+      "Location: Waiting On",
+      "Person: Bob",
+      "Project: project-1",
+      "Last follow-up: Sun 10 May 2026",
+      "Captured: Wed 13 May 2026 9:00AM",
+    ],
+  );
 });
 
 test("settings round-trip through storage", async () => {
@@ -329,9 +524,14 @@ test("weekly review view model exposes focus counts and review queues", () => {
   assert.equal(model.reviewLabel, "Week of Mon 4 May - Sun 10 May 2026");
   assert.equal(model.focusCounts.work.label, "3 / 4 work");
   assert.equal(model.weeklyProjects[0].title, "Ship Rust review");
+  assert.equal(model.weeklyProjects[0].kind, "project");
+  assert.equal(model.weeklyProjects[0].location, "Project");
   assert.equal(model.focusCandidates[1].toggleLabel, "Add to week");
   assert.equal(model.resurfaceDue[0].actionLabel, "Move to Week");
+  assert.equal(model.resurfaceDue[0].kind, "task");
+  assert.equal(model.resurfaceDue[0].location, "Review");
   assert.equal(model.completedTasks[0].actionLabel, "Archive");
+  assert.equal(model.completedTasks[0].location, "Completed Task");
   assert.equal(model.weeklyProjectsCountLabel, "1");
   assert.equal(model.focusCandidatesCountLabel, "2");
   assert.equal(model.resurfaceDueCountLabel, "1");
@@ -343,14 +543,19 @@ test("weekly review view model exposes focus counts and review queues", () => {
   assert.equal(model.learningItems[0].title, "Read GTD article");
   assert.equal(model.learningItems[0].meta, "Captured 2026-05-09");
   assert.equal(model.learningItems[0].description, "Maybe useful");
+  assert.equal(model.learningItems[0].location, "Learning");
   assert.equal(model.enjoyItems[0].actionLabel, "Move to Inbox");
   assert.equal(model.parkedItems[0].title, "Maybe buy scanner");
+  assert.equal(model.parkedItems[0].location, "Parked");
   assert.equal(model.parkedItems[1].title, "Renew passport");
+  assert.equal(model.parkedItems[1].location, "Parked until");
   assert.match(model.parkedItems[1].meta, /^Returns /);
   assert.doesNotMatch(model.parkedItems[1].meta, /^Captured /);
   assert.equal(model.recycleBinItems[0].title, "Old loose end");
   assert.equal(model.recycleBinItems[0].description, "No longer useful");
   assert.equal(model.recycleBinItems[0].actionLabel, "Restore");
+  assert.equal(model.recycleBinItems[0].kind, "recycle_bin");
+  assert.equal(model.recycleBinItems[0].recycled, true);
 });
 
 test("weekly review view model keeps routed review buckets empty by default", () => {
@@ -493,7 +698,14 @@ test("bootstrap view model favors current work and bounded counts", () => {
   const model = buildBootstrapViewModel({
     today: "2026-05-06",
     current_time: "09:30:45.123456",
-    weekly_projects: [{ title: "Ship client shell", category: "work" }],
+    weekly_projects: [
+      {
+        id: "project-1",
+        title: "Ship client shell",
+        description: "Desktop and iPhone shell",
+        category: "work",
+      },
+    ],
     inbox: {
       unprocessed: 2,
       learn_explore: 1,
@@ -505,9 +717,11 @@ test("bootstrap view model favors current work and bounded counts", () => {
       {
         id: "task-1",
         verb_noun: "Write shell tests",
+        description: "Pin the visible behavior",
         block_type: "focus",
         frog: true,
         status: "pending",
+        created_at: "2026-05-06T08:00:00Z",
       },
       {
         id: "task-2",
@@ -567,12 +781,19 @@ test("bootstrap view model favors current work and bounded counts", () => {
   assert.equal(model.recycleBinTotal, 5);
   assert.equal(model.todayTasks[0].meta, "focus · Frog");
   assert.equal(model.todayTasks[0].id, "task-1");
+  assert.equal(model.todayTasks[0].kind, "task");
+  assert.equal(model.todayTasks[0].location, "Today");
+  assert.equal(model.todayTasks[0].createdAt, "2026-05-06T08:00:00Z");
   assert.equal(model.todayTasks[0].completed, false);
   assert.equal(model.todayTasks[0].lifecycleAction, "complete");
   assert.equal(model.todayTasks[1].completed, true);
   assert.equal(model.todayTasks[1].lifecycleAction, "reopen");
   assert.equal(model.todayTasks[1].completedAt, "2026-05-06T09:45:00Z");
   assert.equal(model.weeklyProjects[0].title, "Ship client shell");
+  assert.equal(model.weeklyProjects[0].id, "project-1");
+  assert.equal(model.weeklyProjects[0].kind, "project");
+  assert.equal(model.weeklyProjects[0].location, "Project");
+  assert.equal(model.weeklyProjects[0].description, "Desktop and iPhone shell");
   assert.equal(model.dailyFocus.oneThing, "Ship the Rust client shell");
   assert.equal(model.dailyFocus.frog, "Make the first uncomfortable call");
   assert.equal(model.rituals.nextLabel, "Midday reset");

@@ -89,6 +89,18 @@ async fn waiting_items_can_be_created_listed_updated_and_resolved() {
     assert_eq!(list["items"][0]["id"], waiting["id"]);
 
     let waiting_id = waiting["id"].as_str().expect("waiting id");
+    let (get_status, fetched) = request_json(
+        app.clone(),
+        Method::GET,
+        &format!("/api/v1/waiting/{waiting_id}"),
+        Value::Null,
+    )
+    .await;
+    assert_eq!(get_status, StatusCode::OK);
+    assert_eq!(fetched["id"], waiting["id"]);
+    assert_eq!(fetched["description"], "Waiting on Bob for draft");
+    assert_eq!(fetched["person"], "Bob");
+
     let (update_status, updated) = request_json(
         app.clone(),
         Method::PATCH,

@@ -35,6 +35,10 @@ impl WaitingService {
             .map_err(Into::into)
     }
 
+    pub async fn get_waiting_on(&self, id: WaitingId) -> Result<WaitingOn, ServiceError> {
+        self.waiting_or_not_found(id).await
+    }
+
     pub async fn update_waiting_on(
         &self,
         id: WaitingId,

@@ -197,6 +197,23 @@ export function buildSearchApiPath(query, includeRecycleBin = false) {
   return `/api/v1/search?${params.toString()}`;
 }
 
+export function buildItemDetailApiPath(item = {}) {
+  const id = String(item.id || "").trim();
+  if (!id) return "";
+
+  const encodedId = encodeURIComponent(id);
+  if (item.kind === "project") {
+    return `/api/v1/projects/${encodedId}/card`;
+  }
+  if (item.kind === "task" || item.kind === "recycle_bin") {
+    return `/api/v1/tasks/${encodedId}`;
+  }
+  if (item.kind === "waiting") {
+    return `/api/v1/waiting/${encodedId}`;
+  }
+  return "";
+}
+
 export function buildGlobalSearchViewModel(payload = {}) {
   const query = String(payload.query || "").trim();
   const items = (payload.items || []).map(searchResultView);
@@ -223,25 +240,112 @@ export function buildGlobalSearchViewModel(payload = {}) {
   };
 }
 
+export function buildItemDetailViewModel(item = {}, detailPayload = null) {
+  const enrichedItem = mergeItemDetailPayload(item, detailPayload);
+  const result = searchResultView(enrichedItem);
+  const workflowLabel = workflowDisplayLabel(result.workflow);
+  const rows = [
+    { label: "Type", value: itemKindLabel(result.kind) },
+    { label: "Location", value: result.badge },
+    ...richItemDetailRows(enrichedItem, detailPayload),
+    { label: "Captured", value: formatSearchTimestamp(result.createdAt) },
+  ].filter((row) => row.value);
+
+  return {
+    id: result.id,
+    kind: result.kind,
+    kindLabel: itemKindLabel(result.kind),
+    title: result.title,
+    description: result.description,
+    badge: result.badge,
+    recycled: result.recycled,
+    workflow: result.workflow,
+    workflowLabel,
+    actionLabel: `Open in ${workflowLabel}`,
+    actions: buildItemDetailActions({ ...enrichedItem, ...result, workflowLabel }),
+    rows,
+  };
+}
+
+export function buildItemDetailActions(detail = {}) {
+  const id = String(detail.id || "").trim();
+  const encodedId = encodeURIComponent(id);
+  const workflow = detail.workflow || "today";
+  const workflowLabel = detail.workflowLabel || workflowDisplayLabel(workflow);
+  const actions = [];
+
+  if (id && detail.kind === "project") {
+    actions.push({
+      id: "open-shape-card",
+      label: "Open Shape Card",
+      workflow: "review",
+      projectId: id,
+      primary: true,
+    });
+  } else if (id && detail.kind === "waiting") {
+    actions.push({
+      id: "resolve-waiting",
+      label: "Resolve",
+      path: `/api/v1/waiting/${encodedId}/resolve`,
+      method: "POST",
+      primary: true,
+    });
+  } else if (id && (detail.kind === "recycle_bin" || detail.recycled)) {
+    actions.push({
+      id: "restore-task",
+      label: "Restore",
+      path: `/api/v1/tasks/${encodedId}/restore`,
+      method: "POST",
+      primary: true,
+    });
+  } else if (id && detail.kind === "task") {
+    const done = detail.status === "done" || Boolean(detail.completed_at || detail.completedAt);
+    actions.push({
+      id: done ? "reopen-task" : "complete-task",
+      label: done ? "Reopen" : "Complete",
+      path: `/api/v1/tasks/${encodedId}/${done ? "reopen" : "complete"}`,
+      method: "POST",
+      primary: true,
+    });
+  }
+
+  actions.push({
+    id: "open-workflow",
+    label: `Open in ${workflowLabel}`,
+    workflow,
+    primary: !actions.length,
+  });
+
+  return actions;
+}
+
 export function buildBootstrapViewModel(summary) {
   const todayLabel = summary?.today || "Today";
   const currentTime = trimSeconds(summary?.current_time || "");
   const inbox = summary?.inbox || {};
   const weeklyProjects = (summary?.weekly_projects || []).map((project) => ({
+    id: project.id || "",
+    kind: "project",
     title: project.title || "Untitled project",
+    description: project.description || project.why_link_text || "",
     meta: compactJoin([project.category, project.time_horizon]),
+    location: "Project",
+    createdAt: project.created_at || project.createdAt || "",
   }));
   const todayTasks = (summary?.today_tasks || []).map((task) => {
     const completed = task.status === "done" || Boolean(task.completed_at);
     return {
       id: task.id || "",
+      kind: "task",
       title: task.verb_noun || "Untitled task",
-      description: task.description || "No notes yet.",
+      description: task.description || "",
       meta: compactJoin([
         task.block_type,
         task.frog ? "Frog" : "",
         task.alignment,
       ]),
+      location: "Today",
+      createdAt: task.created_at || task.createdAt || "",
       status: task.status || "pending",
       completed,
       completedAt: task.completed_at || "",
@@ -382,9 +486,15 @@ export function buildWeeklyReviewViewModel(summary, inboxContainers = {}) {
   const completedTasks = (summary?.completed_tasks || []).map((task) =>
     reviewTaskView(task, "Archive"),
   );
-  const learningItems = (inboxContainers?.learning || []).map(routedInboxItemView);
-  const enjoyItems = (inboxContainers?.enjoy || []).map(routedInboxItemView);
-  const parkedItems = (inboxContainers?.parked || []).map(routedInboxItemView);
+  const learningItems = (inboxContainers?.learning || []).map((item) =>
+    routedInboxItemView(item, "Learning"),
+  );
+  const enjoyItems = (inboxContainers?.enjoy || []).map((item) =>
+    routedInboxItemView(item, "Enjoy"),
+  );
+  const parkedItems = (inboxContainers?.parked || []).map((item) =>
+    routedInboxItemView(item, "Parked"),
+  );
   const recycleBinItems = (inboxContainers?.recycle_bin || []).map(recycleBinItemView);
 
   return {
@@ -718,6 +828,7 @@ function focusCountView(count, fallbackCategory) {
 function reviewProjectView(project) {
   return {
     id: project.id || "",
+    kind: "project",
     title: project.title || "Untitled project",
     meta: compactJoin([
       project.category,
@@ -726,6 +837,8 @@ function reviewProjectView(project) {
     ]),
     description: project.description || project.why_link_text || "",
     category: project.category || "",
+    location: "Project",
+    createdAt: project.created_at || project.createdAt || "",
   };
 }
 
@@ -742,7 +855,144 @@ function searchResultView(item) {
     recycled,
     badge: recycled ? "Recycle Bin" : location,
     workflow: searchResultWorkflow(kind, location),
+    createdAt: item.created_at || item.createdAt || "",
   };
+}
+
+function mergeItemDetailPayload(item, payload) {
+  if (!payload) return item;
+
+  if (payload.project) {
+    const project = payload.project || {};
+    return {
+      ...item,
+      ...project,
+      id: project.id || item.id || "",
+      kind: "project",
+      title: project.title || item.title || "Untitled project",
+      description: project.description || project.why_link_text || item.description || "",
+      location: item.location || "Project",
+      createdAt: project.created_at || project.createdAt || item.createdAt || "",
+      roadmapChunksCount: Array.isArray(payload.chunks) ? payload.chunks.length : null,
+    };
+  }
+
+  if (payload.verb_noun || payload.when_bucket || payload.status) {
+    return {
+      ...item,
+      ...payload,
+      id: payload.id || item.id || "",
+      kind: item.kind === "recycle_bin" ? "recycle_bin" : "task",
+      title: payload.verb_noun || item.title || "Untitled task",
+      description: payload.description || item.description || "",
+      location: item.location || taskDetailLocation(payload),
+      createdAt: payload.created_at || payload.createdAt || item.createdAt || "",
+    };
+  }
+
+  if (payload.description && (item.kind === "waiting" || payload.person || payload.last_followup)) {
+    return {
+      ...item,
+      ...payload,
+      id: payload.id || item.id || "",
+      kind: "waiting",
+      title: payload.description || item.title || "Waiting On item",
+      description: payload.person || item.description || "",
+      location: item.location || "Waiting On",
+      createdAt: payload.created_at || payload.createdAt || item.createdAt || "",
+    };
+  }
+
+  return item;
+}
+
+function richItemDetailRows(item, payload) {
+  if (!payload) return [];
+  if (item.kind === "waiting") {
+    return [
+      { label: "Person", value: item.person },
+      { label: "Project", value: item.project_id },
+      { label: "Last follow-up", value: formatDetailDate(item.last_followup) },
+    ];
+  }
+
+  if (item.kind === "project") {
+    return [
+      { label: "Status", value: titleCase(item.status) },
+      { label: "Category", value: titleCase(item.category) },
+      { label: "Start date", value: formatDetailDate(item.start_date) },
+      { label: "Target date", value: formatDetailDate(item.target_date) },
+      { label: "Success level", value: titleCase(item.level_of_success) },
+      { label: "Active this week", value: booleanDetail(item.active_this_week) },
+      { label: "Roadmap chunks", value: numberDetail(item.roadmapChunksCount) },
+    ];
+  }
+
+  return [
+    { label: "Status", value: titleCase(item.status) },
+    { label: "Bucket", value: titleCase(item.when_bucket) },
+    { label: "Block", value: titleCase(item.block_type) },
+    { label: "Duration", value: minutesDetail(item.duration_minutes) },
+    { label: "Frog", value: booleanDetail(item.frog) },
+    { label: "Scheduled", value: formatDetailDate(item.scheduled_for) },
+    { label: "Resurfaces", value: formatDetailDate(item.resurface_on) },
+    { label: "Parked until", value: formatDetailDate(item.parked_until) },
+    { label: "Completed", value: formatDetailDate(item.completed_at) },
+  ];
+}
+
+function itemKindLabel(kind) {
+  return (
+    {
+      project: "Project",
+      task: "Task",
+      waiting: "Waiting On",
+      recycle_bin: "Recycled Task",
+    }[kind] || titleCase(kind || "item")
+  );
+}
+
+function workflowDisplayLabel(workflow) {
+  return WORKFLOWS.find((item) => item.id === workflow)?.label || titleCase(workflow || "today");
+}
+
+function formatSearchTimestamp(value) {
+  const text = String(value || "").trim();
+  if (!text) return "";
+  return formatDateTimeDisplayLabel(text);
+}
+
+function taskDetailLocation(task) {
+  if (task.archived_from_inbox && task.status === "archived") return "Recycle Bin";
+  if (task.in_inbox) return "Inbox";
+  if (task.intake_container === "learn_explore") return "Learning";
+  if (task.intake_container === "enjoy_recover") return "Enjoy";
+  if (task.intake_container === "park_let_go" && task.parked_until) return "Parked until";
+  if (task.intake_container === "park_let_go") return "Parked";
+  if (task.status === "done") return "Completed Task";
+  return "Task";
+}
+
+function formatDetailDate(value) {
+  const text = String(value || "").trim();
+  if (!text) return "";
+  if (/^\d{4}-\d{2}-\d{2}$/.test(text)) {
+    return formatDateDisplayLabel(text);
+  }
+  return formatDateTimeDisplayLabel(text);
+}
+
+function booleanDetail(value) {
+  return value === true ? "Yes" : "";
+}
+
+function minutesDetail(value) {
+  const minutes = Number(value || 0);
+  return Number.isFinite(minutes) && minutes > 0 ? `${minutes} min` : "";
+}
+
+function numberDetail(value) {
+  return Number.isFinite(value) ? String(value) : "";
 }
 
 function searchGroupLabel(kind) {
@@ -769,6 +1019,7 @@ function searchResultWorkflow(kind, location) {
 function reviewTaskView(task, actionLabel) {
   return {
     id: task.id || "",
+    kind: "task",
     title: task.title || task.verb_noun || "Untitled task",
     description: task.description || "",
     meta: compactJoin([
@@ -776,11 +1027,12 @@ function reviewTaskView(task, actionLabel) {
       task.resurface_on ? `due ${task.resurface_on}` : "",
       task.completed_at ? `completed ${String(task.completed_at).slice(0, 10)}` : "",
     ]),
+    location: actionLabel === "Archive" ? "Completed Task" : "Review",
     actionLabel,
   };
 }
 
-function routedInboxItemView(item) {
+function routedInboxItemView(item, location = "Task") {
   const capturedLabel = item.created_at ? `Captured ${String(item.created_at).slice(0, 10)}` : "";
   const parkedUntilLabel = item.parked_until
     ? `Returns ${formatDateTimeDisplayLabel(item.parked_until)}`
@@ -788,16 +1040,23 @@ function routedInboxItemView(item) {
 
   return {
     id: item.id || "",
+    kind: "task",
     title: item.verb_noun || item.title || "Untitled item",
     description: item.description || "",
     meta: compactJoin([parkedUntilLabel, capturedLabel]),
+    location: item.parked_until ? "Parked until" : location,
+    createdAt: item.created_at || item.createdAt || "",
+    recycled: false,
     actionLabel: "Move to Inbox",
   };
 }
 
 function recycleBinItemView(item) {
   return {
-    ...routedInboxItemView(item),
+    ...routedInboxItemView(item, "Recycle Bin"),
+    kind: "recycle_bin",
+    location: "Recycle Bin",
+    recycled: true,
     actionLabel: "Restore",
   };
 }

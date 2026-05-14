@@ -49,6 +49,43 @@ test("launcher exposes persistent global search in the header", () => {
   assert.match(launcherCss, /\.search-results-panel/);
 });
 
+test("launcher exposes an item detail drawer for search results", () => {
+  const indexHtml = readFileSync(indexHtmlPath, "utf8");
+  const clientJs = readFileSync(clientJsPath, "utf8");
+  const launcherJs = readFileSync(launcherJsPath, "utf8");
+  const launcherCss = readFileSync(launcherCssPath, "utf8");
+
+  assert.match(indexHtml, /id="item-detail-drawer"/);
+  assert.match(indexHtml, /id="item-detail-title"/);
+  assert.match(indexHtml, /id="item-detail-load-state"/);
+  assert.match(indexHtml, /id="item-detail-actions"/);
+  assert.match(clientJs, /buildItemDetailViewModel/);
+  assert.match(clientJs, /buildItemDetailApiPath/);
+  assert.match(clientJs, /buildItemDetailActions/);
+  assert.match(launcherJs, /openItemDetail/);
+  assert.match(launcherJs, /loadItemDetail/);
+  assert.match(launcherJs, /performItemDetailAction/);
+  assert.match(launcherJs, /openProjectShapeCard/);
+  assert.match(launcherJs, /requestJson\(window\.fetch\.bind\(window\), settings, path\)/);
+  assert.match(launcherJs, /data-item-detail-action-id/);
+  assert.match(launcherJs, /searchResultKind/);
+  assert.match(launcherJs, /itemDetailOpen/);
+  assert.match(launcherCss, /\.item-detail-drawer/);
+  assert.match(launcherCss, /\.item-detail-backdrop/);
+});
+
+test("launcher makes normal task and project rows open item details", () => {
+  const launcherJs = readFileSync(launcherJsPath, "utf8");
+  const launcherCss = readFileSync(launcherCssPath, "utf8");
+
+  assert.match(launcherJs, /attachItemDetail/);
+  assert.match(launcherJs, /data-item-detail/);
+  assert.match(launcherJs, /itemDetailFromElement/);
+  assert.match(launcherJs, /closest\("\[data-item-detail\]"\)/);
+  assert.match(launcherJs, /isItemDetailInteractiveTarget/);
+  assert.match(launcherCss, /\.has-item-detail/);
+});
+
 test("launcher wires workflow navigation state", () => {
   const launcherJs = readFileSync(launcherJsPath, "utf8");
 

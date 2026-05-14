@@ -5,6 +5,8 @@ import {
   buildGuidedCaptureFeedback,
   buildGuidedCapturePayload,
   buildGlobalSearchViewModel,
+  buildItemDetailApiPath,
+  buildItemDetailViewModel,
   buildSearchApiPath,
   buildInboxActionFeedback,
   buildParkRoutePayload,
@@ -116,6 +118,15 @@ const elements = {
   globalSearchInput: document.getElementById("global-search-input"),
   globalSearchIncludeRecycle: document.getElementById("global-search-include-recycle"),
   globalSearchResults: document.getElementById("global-search-results"),
+  itemDetailBackdrop: document.getElementById("item-detail-backdrop"),
+  itemDetailDrawer: document.getElementById("item-detail-drawer"),
+  itemDetailKind: document.getElementById("item-detail-kind"),
+  itemDetailTitle: document.getElementById("item-detail-title"),
+  itemDetailDescription: document.getElementById("item-detail-description"),
+  itemDetailLoadState: document.getElementById("item-detail-load-state"),
+  itemDetailRows: document.getElementById("item-detail-rows"),
+  itemDetailActions: document.getElementById("item-detail-actions"),
+  itemDetailOpen: document.getElementById("item-detail-open"),
   todayLabel: document.getElementById("today-label"),
   captureTitle: document.getElementById("capture-title"),
   captureDescription: document.getElementById("capture-description"),
@@ -171,6 +182,8 @@ let activeWorkflow = "today";
 let startupReconnectTimer = null;
 let startupReconnectAttempts = 0;
 let globalSearchTimer = null;
+let itemDetailOpen = false;
+let currentItemDetail = null;
 
 function setWorkflow(workflow) {
   const nextWorkflow = WORKFLOWS.some((item) => item.id === workflow) ? workflow : "today";
@@ -334,6 +347,12 @@ function searchResultButton(item) {
   button.type = "button";
   button.dataset.searchResultWorkflow = item.workflow;
   button.dataset.searchResultId = item.id;
+  button.dataset.searchResultKind = item.kind;
+  button.dataset.searchResultTitle = item.title;
+  button.dataset.searchResultDescription = item.description || "";
+  button.dataset.searchResultLocation = item.location || "";
+  button.dataset.searchResultRecycled = String(Boolean(item.recycled));
+  button.dataset.searchResultCreatedAt = item.createdAt || "";
   button.classList.toggle("is-recycled", item.recycled);
 
   const title = document.createElement("span");
@@ -355,6 +374,201 @@ function searchResultButton(item) {
 function hideGlobalSearchResults() {
   elements.globalSearchResults.replaceChildren();
   elements.globalSearchResults.classList.add("hidden");
+}
+
+function openItemDetail(item) {
+  const detail = buildItemDetailViewModel(item);
+  currentItemDetail = detail;
+  itemDetailOpen = true;
+  document.body.dataset.itemDetailOpen = "true";
+  renderItemDetail(detail);
+  elements.itemDetailBackdrop.classList.remove("hidden");
+  elements.itemDetailDrawer.classList.remove("hidden");
+  elements.itemDetailDrawer.setAttribute("aria-hidden", "false");
+  loadItemDetail(detail);
+}
+
+function closeItemDetail() {
+  itemDetailOpen = false;
+  currentItemDetail = null;
+  delete document.body.dataset.itemDetailOpen;
+  elements.itemDetailLoadState.textContent = "";
+  elements.itemDetailBackdrop.classList.add("hidden");
+  elements.itemDetailDrawer.classList.add("hidden");
+  elements.itemDetailDrawer.setAttribute("aria-hidden", "true");
+}
+
+function renderItemDetail(detail) {
+  elements.itemDetailKind.textContent = detail.kindLabel;
+  elements.itemDetailTitle.textContent = detail.title;
+  elements.itemDetailDescription.textContent = detail.description || "No notes yet.";
+  elements.itemDetailDescription.classList.toggle("is-empty", !detail.description);
+  elements.itemDetailRows.replaceChildren();
+  elements.itemDetailActions.replaceChildren();
+
+  for (const row of detail.rows) {
+    const item = document.createElement("div");
+    const label = document.createElement("span");
+    label.textContent = row.label;
+    const value = document.createElement("strong");
+    value.textContent = row.value;
+    item.append(label, value);
+    elements.itemDetailRows.append(item);
+  }
+
+  for (const action of detail.actions || []) {
+    const button = document.createElement("button");
+    button.className = action.primary ? "primary-button" : "mini-button quiet";
+    button.type = "button";
+    button.dataset.itemDetailActionId = action.id;
+    button.dataset.workflowTarget = action.workflow || "";
+    button.dataset.actionPath = action.path || "";
+    button.dataset.actionMethod = action.method || "POST";
+    button.dataset.projectId = action.projectId || "";
+    button.textContent = action.label;
+    elements.itemDetailActions.append(button);
+  }
+}
+
+async function loadItemDetail(detail) {
+  const path = buildItemDetailApiPath(detail);
+  if (!path) {
+    elements.itemDetailLoadState.textContent = "";
+    return;
+  }
+
+  elements.itemDetailLoadState.textContent = "Loading full details...";
+  try {
+    const payload = await requestJson(window.fetch.bind(window), settings, path);
+    if (!itemDetailOpen || currentItemDetail?.id !== detail.id) return;
+
+    const enrichedDetail = buildItemDetailViewModel(detail, payload);
+    currentItemDetail = enrichedDetail;
+    renderItemDetail(enrichedDetail);
+    elements.itemDetailLoadState.textContent = "Full details loaded.";
+  } catch (err) {
+    if (!itemDetailOpen || currentItemDetail?.id !== detail.id) return;
+    elements.itemDetailLoadState.textContent = `Could not load full details: ${
+      err instanceof Error ? err.message : String(err)
+    }`;
+  }
+}
+
+async function performItemDetailAction(button) {
+  const actionId = button.dataset.itemDetailActionId || "";
+  const detail = currentItemDetail;
+  if (!detail) return;
+
+  if (actionId === "open-workflow") {
+    closeItemDetail();
+    await openItemDetailWorkflow(button.dataset.workflowTarget || detail.workflow || "today");
+    return;
+  }
+
+  if (actionId === "open-shape-card") {
+    closeItemDetail();
+    await openProjectShapeCard(button.dataset.projectId || detail.id);
+    return;
+  }
+
+  const path = button.dataset.actionPath || "";
+  if (!path) return;
+
+  button.disabled = true;
+  try {
+    await requestJson(window.fetch.bind(window), settings, path, {
+      method: button.dataset.actionMethod || "POST",
+    });
+    closeItemDetail();
+    await refreshWorkflowData(activeWorkflow);
+    showActionFeedback(itemDetailActionFeedback(actionId, detail.title));
+  } catch (err) {
+    setConnectionState(
+      "error",
+      "Item detail action failed",
+      err instanceof Error ? err.message : String(err),
+    );
+  } finally {
+    button.disabled = false;
+  }
+}
+
+async function openItemDetailWorkflow(workflow) {
+  setWorkflow(workflow);
+  await refreshWorkflowData(workflow);
+}
+
+async function openProjectShapeCard(projectId) {
+  await openItemDetailWorkflow("review");
+  const shapeButton = [...document.querySelectorAll("[data-review-action='toggle-project-card']")]
+    .find((button) => button.dataset.projectId === projectId);
+
+  if (!shapeButton) {
+    showActionFeedback({
+      message: "Opened Review. This project is not currently visible in the review lists.",
+    });
+    return;
+  }
+
+  shapeButton.click();
+  shapeButton.scrollIntoView({ block: "center", behavior: "smooth" });
+}
+
+function itemDetailActionFeedback(actionId, title) {
+  const itemTitle = title || "this item";
+  const messages = {
+    "complete-task": `Completed "${itemTitle}".`,
+    "reopen-task": `Reopened "${itemTitle}".`,
+    "restore-task": `Restored "${itemTitle}".`,
+    "resolve-waiting": `Resolved "${itemTitle}".`,
+  };
+  return { message: messages[actionId] || `Updated "${itemTitle}".` };
+}
+
+function searchResultDetail(button) {
+  return {
+    id: button.dataset.searchResultId || "",
+    kind: button.dataset.searchResultKind || "task",
+    title: button.dataset.searchResultTitle || "",
+    description: button.dataset.searchResultDescription || "",
+    location: button.dataset.searchResultLocation || "",
+    recycled: button.dataset.searchResultRecycled === "true",
+    createdAt: button.dataset.searchResultCreatedAt || "",
+  };
+}
+
+function attachItemDetail(element, item = {}) {
+  element.classList.add("has-item-detail");
+  element.dataset.itemDetail = "true";
+  element.dataset.itemDetailId = item.id || "";
+  element.dataset.itemDetailKind = item.kind || "task";
+  element.dataset.itemDetailTitle = item.title || "Untitled item";
+  element.dataset.itemDetailDescription = item.description || "";
+  element.dataset.itemDetailLocation = item.location || "";
+  element.dataset.itemDetailRecycled = String(Boolean(item.recycled));
+  element.dataset.itemDetailCreatedAt = item.createdAt || item.created_at || "";
+  element.tabIndex = 0;
+  element.setAttribute("role", "button");
+  element.setAttribute("aria-label", `Open ${item.title || "item"} details`);
+  return element;
+}
+
+function itemDetailFromElement(element) {
+  return {
+    id: element.dataset.itemDetailId || "",
+    kind: element.dataset.itemDetailKind || "task",
+    title: element.dataset.itemDetailTitle || "",
+    description: element.dataset.itemDetailDescription || "",
+    location: element.dataset.itemDetailLocation || "",
+    recycled: element.dataset.itemDetailRecycled === "true",
+    createdAt: element.dataset.itemDetailCreatedAt || "",
+  };
+}
+
+function isItemDetailInteractiveTarget(target) {
+  return Boolean(
+    target.closest("button, input, select, textarea, summary, form, a, [data-item-detail-close]"),
+  );
 }
 
 async function connectAndLoad(options = {}) {
@@ -691,6 +905,7 @@ function reviewProjectCard(project, action = "") {
     description.textContent = project.description;
     body.append(description);
   }
+  attachItemDetail(body, project);
   card.append(body);
 
   const actions = document.createElement("div");
@@ -839,6 +1054,7 @@ function projectChunkPanel(project, chunks) {
 function reviewTaskRow(task, action) {
   const row = document.createElement("div");
   row.className = "review-task-row";
+  attachItemDetail(row, task);
 
   const body = document.createElement("div");
   body.className = "review-task-body";
@@ -872,6 +1088,7 @@ function reviewTaskRow(task, action) {
 function reviewInboxItemRow(item) {
   const row = document.createElement("div");
   row.className = "review-task-row";
+  attachItemDetail(row, item);
 
   const body = document.createElement("div");
   body.className = "review-task-body";
@@ -914,6 +1131,7 @@ function reviewInboxItemRow(item) {
 function reviewRecycleBinItemRow(item) {
   const row = document.createElement("div");
   row.className = "review-task-row";
+  attachItemDetail(row, item);
 
   const body = document.createElement("div");
   body.className = "review-task-body";
@@ -1659,6 +1877,7 @@ function renderItems(container, items, emptyText) {
   for (const item of items.slice(0, 6)) {
     const row = document.createElement("div");
     row.className = "list-row";
+    attachItemDetail(row, item);
     const title = document.createElement("strong");
     title.textContent = item.title;
     const meta = document.createElement("span");
@@ -1679,6 +1898,7 @@ function renderTodayTasks(container, tasks) {
     const row = document.createElement("div");
     row.className = "list-row today-task-row";
     row.classList.toggle("is-complete", Boolean(task.completed));
+    attachItemDetail(row, task);
 
     const body = document.createElement("div");
     body.className = "list-row-body";
@@ -1798,24 +2018,25 @@ elements.globalSearchResults.addEventListener("click", async (event) => {
   const button = event.target.closest("[data-search-result-workflow]");
   if (!button) return;
 
-  const workflow = button.dataset.searchResultWorkflow || "today";
   hideGlobalSearchResults();
   elements.globalSearchInput.blur();
-  setWorkflow(workflow);
-  try {
-    await refreshWorkflowData(workflow);
-  } catch (err) {
-    setConnectionState(
-      "error",
-      "Search navigation failed",
-      err instanceof Error ? err.message : String(err),
-    );
-  }
+  openItemDetail(searchResultDetail(button));
 });
 
 document.addEventListener("keydown", (event) => {
   if (event.key === "Escape") {
     hideGlobalSearchResults();
+    if (itemDetailOpen) {
+      closeItemDetail();
+    }
+  }
+
+  if (event.key === "Enter" || event.key === " ") {
+    const trigger = event.target.closest?.("[data-item-detail]");
+    if (!trigger || isItemDetailInteractiveTarget(event.target)) return;
+
+    event.preventDefault();
+    openItemDetail(itemDetailFromElement(trigger));
   }
 });
 
@@ -1823,6 +2044,24 @@ document.addEventListener("click", (event) => {
   if (!event.target.closest(".global-search")) {
     hideGlobalSearchResults();
   }
+});
+
+document.addEventListener("click", async (event) => {
+  if (event.target.closest("[data-item-detail-close]")) {
+    closeItemDetail();
+    return;
+  }
+
+  const actionButton = event.target.closest("[data-item-detail-action-id]");
+  if (!actionButton) return;
+  await performItemDetailAction(actionButton);
+});
+
+document.addEventListener("click", (event) => {
+  const trigger = event.target.closest("[data-item-detail]");
+  if (!trigger || isItemDetailInteractiveTarget(event.target)) return;
+
+  openItemDetail(itemDetailFromElement(trigger));
 });
 
 elements.connectionForm.addEventListener("submit", async (event) => {

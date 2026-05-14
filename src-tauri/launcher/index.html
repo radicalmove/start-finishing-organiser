@@ -338,6 +338,32 @@
         </section>
       </section>
     </main>
+
+    <div class="item-detail-backdrop hidden" id="item-detail-backdrop" data-item-detail-close></div>
+    <aside
+      class="item-detail-drawer hidden"
+      id="item-detail-drawer"
+      role="dialog"
+      aria-modal="true"
+      aria-hidden="true"
+      aria-labelledby="item-detail-title"
+    >
+      <div class="item-detail-topline">
+        <div>
+          <div class="eyebrow" id="item-detail-kind">Item</div>
+          <h2 id="item-detail-title">Selected item</h2>
+        </div>
+        <button class="mini-button quiet" type="button" data-item-detail-close>Close</button>
+      </div>
+      <p class="item-detail-description" id="item-detail-description"></p>
+      <p class="item-detail-load-state" id="item-detail-load-state" aria-live="polite"></p>
+      <div class="item-detail-rows" id="item-detail-rows"></div>
+      <div class="item-detail-actions" id="item-detail-actions">
+        <button class="primary-button" id="item-detail-open" type="button" data-item-detail-action-id="open-workflow">
+          Open item
+        </button>
+      </div>
+    </aside>
     <script type="module" src="launcher.js"></script>
   </body>
 </html>
