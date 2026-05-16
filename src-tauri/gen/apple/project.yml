@@ -29,18 +29,20 @@ targets:
     platform: iOS
     sources:
       - path: Sources
-      - path: Assets.xcassets
+      - path: Assets.xcassets/AppIcon.appiconset/AppIcon-60x60@2x.png
+        buildPhase: resources
+      - path: Assets.xcassets/AppIcon.appiconset/AppIcon-60x60@3x.png
+        buildPhase: resources
       - path: Externals
       - path: sfo_iOS
       - path: assets
         buildPhase: resources
         type: folder
-      - path: LaunchScreen.storyboard
     info:
       path: sfo_iOS/Info.plist
       properties:
         LSRequiresIPhoneOS: true
-        UILaunchStoryboardName: LaunchScreen
+        UILaunchScreen: {}
         UIRequiredDeviceCapabilities: [arm64, metal]
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait

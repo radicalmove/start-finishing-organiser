@@ -2,6 +2,8 @@ export const DEFAULT_SERVER_URL = "http://127.0.0.1:8088";
 
 const SERVER_URL_KEY = "sfo.rust.serverUrl";
 const API_TOKEN_KEY = "sfo.rust.apiToken";
+const SFO_PARK_REMINDER_ID_BASE = 650000000;
+const SFO_PARK_REMINDER_ID_SPAN = 50000000;
 const PERSONAL_PROJECT_PATTERN =
   /\b(appointment|optometrist|doctor|dentist|health|family|home|house|kid|kids|school|holiday|trip|birthday|personal|exercise|training|winter family)\b/i;
 
@@ -50,6 +52,140 @@ export function buildJsonHeaders(apiToken) {
 
 export function getTauriInvoke(globalObject = globalThis) {
   return globalObject?.__TAURI__?.core?.invoke || null;
+}
+
+export function getTauriNotification(globalObject = globalThis) {
+  return globalObject?.__TAURI__?.notification || null;
+}
+
+export function sfoParkReminderNotificationId(taskId) {
+  const input = String(taskId || "parked-item");
+  let hash = 0;
+  for (let index = 0; index < input.length; index += 1) {
+    hash = (hash * 31 + input.charCodeAt(index)) >>> 0;
+  }
+  return SFO_PARK_REMINDER_ID_BASE + (hash % SFO_PARK_REMINDER_ID_SPAN);
+}
+
+export function buildParkReminderNotifications(inboxContainers = {}, now = new Date()) {
+  const nowDate = now instanceof Date ? now : new Date(now);
+  const nowTime = Number.isNaN(nowDate.getTime()) ? Date.now() : nowDate.getTime();
+  const parkedItems = Array.isArray(inboxContainers.parked) ? inboxContainers.parked : [];
+
+  return parkedItems.flatMap((item) => {
+    const parkedUntil = item?.parked_until ? new Date(item.parked_until) : null;
+    if (!parkedUntil || Number.isNaN(parkedUntil.getTime()) || parkedUntil.getTime() <= nowTime) {
+      return [];
+    }
+
+    const taskId = String(item.id || "");
+    if (!taskId) return [];
+
+    const body = String(item.verb_noun || item.title || "Parked item").trim() || "Parked item";
+    return [
+      {
+        id: sfoParkReminderNotificationId(taskId),
+        taskId,
+        title: "SFO reminder",
+        body,
+        scheduledFor: parkedUntil.toISOString(),
+      },
+    ];
+  });
+}
+
+export async function scheduleParkReminderNotifications(
+  notificationApi,
+  inboxContainers = {},
+  now = new Date(),
+) {
+  if (!notificationApi) {
+    return { status: "unavailable", scheduled: 0 };
+  }
+
+  const reminders = buildParkReminderNotifications(inboxContainers, now);
+  const desiredIds = reminders.map((reminder) => reminder.id);
+  if (!reminders.length) {
+    await cancelStaleParkReminderNotifications(notificationApi, desiredIds);
+    return { status: "empty", scheduled: 0 };
+  }
+
+  const permissionGranted = await ensureNotificationPermission(notificationApi);
+  if (!permissionGranted) {
+    return { status: "permission_denied", scheduled: 0 };
+  }
+
+  await cancelStaleParkReminderNotifications(notificationApi, desiredIds);
+  for (const reminder of reminders) {
+    await Promise.resolve(
+      notificationApi.sendNotification(buildParkReminderNotificationOptions(notificationApi, reminder)),
+    );
+  }
+
+  return { status: "scheduled", scheduled: reminders.length };
+}
+
+async function ensureNotificationPermission(notificationApi) {
+  let permissionGranted =
+    typeof notificationApi.isPermissionGranted === "function"
+      ? await notificationApi.isPermissionGranted()
+      : true;
+
+  if (!permissionGranted && typeof notificationApi.requestPermission === "function") {
+    permissionGranted = (await notificationApi.requestPermission()) === "granted";
+  }
+
+  return Boolean(permissionGranted);
+}
+
+async function cancelStaleParkReminderNotifications(notificationApi, desiredIds = []) {
+  if (typeof notificationApi.cancel !== "function") return;
+
+  const desired = new Set(desiredIds);
+  const cancelIds = new Set(desiredIds);
+  if (typeof notificationApi.pending === "function") {
+    try {
+      const pending = await notificationApi.pending();
+      for (const item of pending || []) {
+        const id = Number(item?.id);
+        if (isSfoParkReminderNotificationId(id) && !desired.has(id)) {
+          cancelIds.add(id);
+        }
+      }
+    } catch {
+      // Stale cleanup should not prevent scheduling current reminders.
+    }
+  }
+
+  if (cancelIds.size) {
+    await notificationApi.cancel([...cancelIds].sort((left, right) => left - right));
+  }
+}
+
+function buildParkReminderNotificationOptions(notificationApi, reminder) {
+  const date = new Date(reminder.scheduledFor);
+  return {
+    id: reminder.id,
+    title: reminder.title,
+    body: reminder.body,
+    group: "sfo-parked-reminders",
+    schedule:
+      typeof notificationApi.Schedule?.at === "function"
+        ? notificationApi.Schedule.at(date, false, false)
+        : { at: { date, repeating: false, allowWhileIdle: false }, interval: undefined, every: undefined },
+    extra: {
+      sfo_kind: "parked_until",
+      task_id: reminder.taskId,
+    },
+  };
+}
+
+function isSfoParkReminderNotificationId(id) {
+  return (
+    Number.isInteger(id) &&
+    id >= SFO_PARK_REMINDER_ID_BASE &&
+    id < SFO_PARK_REMINDER_ID_BASE + SFO_PARK_REMINDER_ID_SPAN
+  );
 }
 
 export async function loadSettings(storage, invoke = null) {
@@ -262,9 +398,100 @@ export function buildItemDetailViewModel(item = {}, detailPayload = null) {
     workflow: result.workflow,
     workflowLabel,
     actionLabel: `Open in ${workflowLabel}`,
+    edit: buildItemDetailEditModel({ ...enrichedItem, ...result }),
     actions: buildItemDetailActions({ ...enrichedItem, ...result, workflowLabel }),
     rows,
   };
+}
+
+export function buildItemDetailEditModel(detail = {}) {
+  const id = String(detail.id || "").trim();
+  if (!id || detail.kind === "project" || detail.kind === "recycle_bin" || detail.recycled) {
+    return null;
+  }
+
+  const encodedId = encodeURIComponent(id);
+  if (detail.kind === "task") {
+    return {
+      kind: "task",
+      path: `/api/v1/tasks/${encodedId}`,
+      method: "PATCH",
+      submitLabel: "Save Task",
+      fields: [
+        {
+          name: "verb_noun",
+          label: "Task",
+          type: "text",
+          value: detail.title || "",
+          required: true,
+          placeholder: "What needs doing?",
+        },
+        {
+          name: "description",
+          label: "Notes",
+          type: "textarea",
+          value: detail.description || "",
+          required: false,
+          placeholder: "Any useful context...",
+        },
+      ],
+    };
+  }
+
+  if (detail.kind === "waiting") {
+    return {
+      kind: "waiting",
+      path: `/api/v1/waiting/${encodedId}`,
+      method: "PATCH",
+      submitLabel: "Save Waiting Item",
+      fields: [
+        {
+          name: "description",
+          label: "Waiting for",
+          type: "textarea",
+          value: detail.title || "",
+          required: true,
+          placeholder: "What are you waiting for?",
+        },
+        {
+          name: "person",
+          label: "Person",
+          type: "text",
+          value: detail.person || detail.description || "",
+          required: false,
+          placeholder: "Who owns the next move?",
+        },
+      ],
+    };
+  }
+
+  return null;
+}
+
+export function buildItemDetailUpdatePayload(edit = {}, values = {}) {
+  if (edit.kind === "task") {
+    const title = optionalText(values.verb_noun);
+    if (!title) {
+      throw new Error("Task title is required");
+    }
+    return {
+      verb_noun: title,
+      description: optionalText(values.description) || "",
+    };
+  }
+
+  if (edit.kind === "waiting") {
+    const description = optionalText(values.description);
+    if (!description) {
+      throw new Error("Waiting item is required");
+    }
+    return {
+      description,
+      person: optionalText(values.person),
+    };
+  }
+
+  throw new Error("This item cannot be edited here");
 }
 
 export function buildItemDetailActions(detail = {}) {

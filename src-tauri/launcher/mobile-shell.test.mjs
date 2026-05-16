@@ -52,6 +52,36 @@ test("mobile process view puts the actionable queue before inbox stats", () => {
   assert.match(launcherCss, /@media \(max-width: 1024px\)[\s\S]*\.inbox-processing-panel\s*\{[\s\S]*order:\s*-1/);
 });
 
+test("mobile global search does not reserve desktop vertical space", () => {
+  const launcherCss = readFileSync(launcherCssPath, "utf8");
+
+  assert.match(
+    launcherCss,
+    /@media \(max-width: 1024px\)[\s\S]*\.global-search\s*\{[\s\S]*flex:\s*0 1 auto/,
+  );
+  assert.match(
+    launcherCss,
+    /@media \(max-width: 430px\)[\s\S]*\.global-search-field input\s*\{[\s\S]*min-height:\s*44px/,
+  );
+});
+
+test("mobile process controls stay inside iPhone SE width", () => {
+  const launcherCss = readFileSync(launcherCssPath, "utf8");
+
+  assert.match(
+    launcherCss,
+    /@media \(max-width: 430px\)[\s\S]*\.process-active-actions\s*\{[\s\S]*grid-template-columns:\s*1fr/,
+  );
+  assert.match(
+    launcherCss,
+    /@media \(max-width: 430px\)[\s\S]*\.park-calendar-grid\s*\{[\s\S]*gap:\s*4px/,
+  );
+  assert.match(
+    launcherCss,
+    /@media \(max-width: 430px\)[\s\S]*\.park-calendar-day\s*\{[\s\S]*min-height:\s*44px/,
+  );
+});
+
 test("mobile review view stays readable with five workflow tabs", () => {
   const launcherCss = readFileSync(launcherCssPath, "utf8");
 

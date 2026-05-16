@@ -214,6 +214,7 @@ pub fn run() {
     }
 
     let app = builder
+        .plugin(tauri_plugin_notification::init())
         .invoke_handler(tauri::generate_handler![
             get_api_token,
             set_api_token,

@@ -49,6 +49,17 @@ test("launcher exposes persistent global search in the header", () => {
   assert.match(launcherCss, /\.search-results-panel/);
 });
 
+test("launcher keeps recycle-bin search behind collapsed options", () => {
+  const indexHtml = readFileSync(indexHtmlPath, "utf8");
+  const launcherCss = readFileSync(launcherCssPath, "utf8");
+
+  assert.match(indexHtml, /<details class="global-search-options"/);
+  assert.match(indexHtml, /<summary>Search options<\/summary>/);
+  assert.match(indexHtml, /id="global-search-include-recycle"/);
+  assert.match(launcherCss, /\.global-search-options/);
+  assert.match(launcherCss, /\.global-search-options\[open\]/);
+});
+
 test("launcher exposes an item detail drawer for search results", () => {
   const indexHtml = readFileSync(indexHtmlPath, "utf8");
   const clientJs = readFileSync(clientJsPath, "utf8");
@@ -59,18 +70,22 @@ test("launcher exposes an item detail drawer for search results", () => {
   assert.match(indexHtml, /id="item-detail-title"/);
   assert.match(indexHtml, /id="item-detail-load-state"/);
   assert.match(indexHtml, /id="item-detail-actions"/);
+  assert.match(indexHtml, /id="item-detail-edit-form"/);
   assert.match(clientJs, /buildItemDetailViewModel/);
   assert.match(clientJs, /buildItemDetailApiPath/);
   assert.match(clientJs, /buildItemDetailActions/);
+  assert.match(clientJs, /buildItemDetailUpdatePayload/);
   assert.match(launcherJs, /openItemDetail/);
   assert.match(launcherJs, /loadItemDetail/);
   assert.match(launcherJs, /performItemDetailAction/);
+  assert.match(launcherJs, /saveItemDetailEdit/);
   assert.match(launcherJs, /openProjectShapeCard/);
   assert.match(launcherJs, /requestJson\(window\.fetch\.bind\(window\), settings, path\)/);
   assert.match(launcherJs, /data-item-detail-action-id/);
   assert.match(launcherJs, /searchResultKind/);
   assert.match(launcherJs, /itemDetailOpen/);
   assert.match(launcherCss, /\.item-detail-drawer/);
+  assert.match(launcherCss, /\.item-detail-edit/);
   assert.match(launcherCss, /\.item-detail-backdrop/);
 });
 
@@ -184,6 +199,19 @@ test("launcher renders guided process as progressive steps", () => {
   assert.match(launcherJs, /dataset\.guidedStep/);
   assert.match(launcherJs, /function setGuidedStep\(/);
   assert.match(launcherJs, /data-guided-action/);
+});
+
+test("guided process cards preserve sentence-case explanatory text", () => {
+  const launcherCss = readFileSync(launcherCssPath, "utf8");
+
+  assert.match(
+    launcherCss,
+    /\.decision-card-body\s*\{[\s\S]*letter-spacing:\s*0;[\s\S]*text-transform:\s*none;/,
+  );
+  assert.match(
+    launcherCss,
+    /\.decision-card-body small\s*\{[\s\S]*text-transform:\s*none;/,
+  );
 });
 
 test("launcher makes Park an explicit optional date-time choice", () => {

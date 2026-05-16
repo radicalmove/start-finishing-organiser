@@ -170,6 +170,7 @@ textarea {
 }
 
 .global-search-field span,
+.global-search-options > summary,
 .global-search-recycle {
   color: var(--sfo-muted);
   font-size: 12px;
@@ -185,6 +186,38 @@ textarea {
   background:
     radial-gradient(circle at top left, rgba(45, 160, 255, 0.1), transparent 12rem),
     rgba(5, 3, 15, 0.56);
+}
+
+.global-search-options {
+  width: fit-content;
+}
+
+.global-search-options > summary {
+  display: inline-flex;
+  min-height: 28px;
+  align-items: center;
+  border: 0;
+  color: var(--sfo-muted);
+  cursor: pointer;
+  list-style: none;
+}
+
+.global-search-options > summary::-webkit-details-marker {
+  display: none;
+}
+
+.global-search-options > summary::after {
+  margin-left: 7px;
+  color: var(--sfo-cyan);
+  content: "+";
+}
+
+.global-search-options[open] > summary::after {
+  content: "-";
+}
+
+.global-search-options[open] .global-search-recycle {
+  margin-top: 7px;
 }
 
 .global-search-recycle {
@@ -293,7 +326,7 @@ textarea {
   right: 18px;
   bottom: max(18px, var(--safe-bottom));
   display: grid;
-  grid-template-rows: auto auto auto 1fr auto;
+  grid-template-rows: auto auto auto auto 1fr auto;
   gap: 18px;
   width: min(420px, calc(100vw - 36px));
   padding: 22px;
@@ -337,6 +370,44 @@ textarea {
   margin: -8px 0 0;
   color: var(--sfo-muted);
   font-size: 13px;
+}
+
+.item-detail-edit[hidden] {
+  display: none;
+}
+
+.item-detail-edit-fields {
+  display: grid;
+  gap: 12px;
+}
+
+.item-detail-edit-field {
+  display: grid;
+  gap: 7px;
+}
+
+.item-detail-edit-field span {
+  color: var(--sfo-cyan);
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.item-detail-edit-field input,
+.item-detail-edit-field textarea {
+  width: 100%;
+  border: 1px solid rgba(83, 161, 255, 0.28);
+  border-radius: var(--sfo-radius-sm);
+  padding: 12px 13px;
+  color: var(--sfo-text);
+  background: rgba(4, 7, 22, 0.72);
+  font: inherit;
+}
+
+.item-detail-edit-field textarea {
+  min-height: 84px;
+  resize: vertical;
 }
 
 .item-detail-rows {
@@ -1554,6 +1625,8 @@ textarea:focus {
   border-radius: var(--sfo-radius-md);
   color: var(--sfo-muted);
   background: rgba(5, 3, 15, 0.38);
+  letter-spacing: 0;
+  text-transform: none;
   transition:
     border-color 160ms ease,
     background 160ms ease,
@@ -1570,6 +1643,8 @@ textarea:focus {
   color: var(--sfo-muted);
   font-size: 14px;
   line-height: 1.4;
+  letter-spacing: 0;
+  text-transform: none;
 }
 
 .decision-card input:checked + .decision-card-body {
@@ -1793,6 +1868,7 @@ textarea:focus {
   }
 
   .global-search {
+    flex: 0 1 auto;
     width: 100%;
     max-width: none;
     min-width: 0;
@@ -1902,6 +1978,28 @@ textarea:focus {
 
   .app-title-lockup {
     gap: 9px;
+  }
+
+  .global-search {
+    gap: 6px;
+  }
+
+  .global-search-field {
+    gap: 4px;
+  }
+
+  .global-search-field input {
+    min-height: 44px;
+    padding: 0 12px;
+  }
+
+  .global-search-options > summary {
+    min-height: 30px;
+    font-size: 11px;
+  }
+
+  .global-search-options[open] .global-search-recycle {
+    margin-top: 5px;
   }
 
   .app-mark {
@@ -2037,6 +2135,7 @@ textarea:focus {
 
   .process-active-actions {
     margin-top: 10px;
+    grid-template-columns: 1fr;
   }
 
   .inbox-actions {
@@ -2054,6 +2153,84 @@ textarea:focus {
 
   .guided-form {
     padding: 10px;
+  }
+
+  .guided-stepper {
+    gap: 6px;
+  }
+
+  .guided-step-pill {
+    min-height: 34px;
+    font-size: 12px;
+  }
+
+  .decision-step legend {
+    font-size: 12px;
+    line-height: 1.35;
+  }
+
+  .decision-card-body {
+    min-height: 0;
+  }
+
+  .decision-card-body strong {
+    font-size: 16px;
+  }
+
+  .decision-card-body small {
+    font-size: 13px;
+  }
+
+  .park-choice-panel {
+    gap: 10px;
+    padding: 12px;
+  }
+
+  .park-calendar {
+    gap: 8px;
+    padding: 10px;
+  }
+
+  .park-calendar-header {
+    grid-template-columns: 42px minmax(0, 1fr) 42px;
+    gap: 8px;
+  }
+
+  .park-calendar-month {
+    font-size: 21px;
+  }
+
+  .park-calendar-nav {
+    min-height: 42px;
+    font-size: 18px;
+  }
+
+  .park-calendar-grid {
+    gap: 4px;
+  }
+
+  .park-calendar-weekday {
+    font-size: 9px;
+    letter-spacing: 0.02em;
+  }
+
+  .park-calendar-blank {
+    min-height: 44px;
+  }
+
+  .park-calendar-day {
+    min-height: 44px;
+    font-size: 16px;
+  }
+
+  .park-time-field input {
+    min-height: 48px;
+    font-size: 18px;
+  }
+
+  .park-choice-actions {
+    display: grid;
+    grid-template-columns: 1fr;
   }
 
   .project-card-grid,

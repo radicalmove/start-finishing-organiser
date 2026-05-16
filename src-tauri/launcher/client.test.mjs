@@ -9,11 +9,13 @@ import {
   buildGuidedCapturePayload,
   buildGuidedCaptureFeedback,
   buildItemDetailApiPath,
+  buildItemDetailUpdatePayload,
   buildGlobalSearchViewModel,
   buildItemDetailViewModel,
   buildSearchApiPath,
   buildInboxActionFeedback,
   buildParkRoutePayload,
+  buildParkReminderNotifications,
   buildProjectCardPayload,
   buildTodayTaskActionFeedback,
   buildWeeklyReviewActionFeedback,
@@ -26,11 +28,14 @@ import {
   defaultGuidedProjectTargetDate,
   guidedDecisionCopy,
   guidedProcessStepPlan,
+  getTauriNotification,
   inferGuidedProjectCategory,
   getTauriInvoke,
   loadSettings,
   normalizeServerUrl,
+  scheduleParkReminderNotifications,
   saveSettings,
+  sfoParkReminderNotificationId,
 } from "./client.js";
 
 function memoryStorage(seed = {}) {
@@ -207,6 +212,47 @@ test("item detail view model enriches from full task payloads", () => {
   );
 });
 
+test("item detail view model exposes safe task edit payloads", () => {
+  const detail = buildItemDetailViewModel(
+    {
+      id: "t1",
+      kind: "task",
+      title: "Print calendar",
+      location: "Today",
+    },
+    {
+      id: "t1",
+      verb_noun: "Print calendar",
+      description: "Monthly printout",
+      status: "pending",
+      when_bucket: "month",
+    },
+  );
+
+  assert.equal(detail.edit.kind, "task");
+  assert.equal(detail.edit.path, "/api/v1/tasks/t1");
+  assert.equal(detail.edit.method, "PATCH");
+  assert.equal(detail.edit.submitLabel, "Save Task");
+  assert.deepEqual(
+    detail.edit.fields.map((field) => `${field.name}:${field.type}:${field.value}`),
+    ["verb_noun:text:Print calendar", "description:textarea:Monthly printout"],
+  );
+  assert.deepEqual(
+    buildItemDetailUpdatePayload(detail.edit, {
+      verb_noun: "  Print June calendar  ",
+      description: "  ",
+    }),
+    {
+      verb_noun: "Print June calendar",
+      description: "",
+    },
+  );
+  assert.throws(
+    () => buildItemDetailUpdatePayload(detail.edit, { verb_noun: "   " }),
+    /Task title is required/,
+  );
+});
+
 test("item detail view model offers reopen and restore actions for done and recycled tasks", () => {
   const doneTask = buildItemDetailViewModel(
     { id: "done", kind: "task", title: "Finished", location: "Completed Task" },
@@ -260,6 +306,7 @@ test("item detail view model enriches from project card payloads", () => {
 
   assert.equal(detail.title, "Review app UX");
   assert.equal(detail.description, "Make the app easier to understand");
+  assert.equal(detail.edit, null);
   assert.deepEqual(
     detail.actions.map((action) => `${action.id}: ${action.label}`),
     ["open-shape-card: Open Shape Card", "open-workflow: Open in Review"],
@@ -302,6 +349,22 @@ test("item detail view model enriches from waiting payloads", () => {
   assert.equal(detail.title, "Waiting on Bob for draft");
   assert.equal(detail.description, "Bob");
   assert.equal(detail.workflow, "today");
+  assert.equal(detail.edit.kind, "waiting");
+  assert.equal(detail.edit.path, "/api/v1/waiting/w1");
+  assert.deepEqual(
+    buildItemDetailUpdatePayload(detail.edit, {
+      description: "  Waiting on Bob for final draft  ",
+      person: "  ",
+    }),
+    {
+      description: "Waiting on Bob for final draft",
+      person: null,
+    },
+  );
+  assert.throws(
+    () => buildItemDetailUpdatePayload(detail.edit, { description: "   " }),
+    /Waiting item is required/,
+  );
   assert.deepEqual(
     detail.actions.map((action) => `${action.id}: ${action.path || action.workflow}`),
     ["resolve-waiting: /api/v1/waiting/w1/resolve", "open-workflow: today"],
@@ -389,6 +452,113 @@ test("getTauriInvoke finds the global Tauri core invoke function", () => {
 
   assert.equal(getTauriInvoke({ __TAURI__: { core: { invoke } } }), invoke);
   assert.equal(getTauriInvoke({}), null);
+});
+
+test("getTauriNotification finds the global Tauri notification API", () => {
+  const notification = { sendNotification() {} };
+
+  assert.equal(getTauriNotification({ __TAURI__: { notification } }), notification);
+  assert.equal(getTauriNotification({ __TAURI__: {} }), null);
+});
+
+test("park reminder notifications include only future parked-until items", () => {
+  const reminders = buildParkReminderNotifications(
+    {
+      parked: [
+        {
+          id: "future-task",
+          verb_noun: "Print calendar",
+          description: "Monthly printout",
+          parked_until: "2026-05-15T05:30:00Z",
+        },
+        {
+          id: "past-task",
+          verb_noun: "Old reminder",
+          parked_until: "2026-05-14T05:30:00Z",
+        },
+        {
+          id: "undated-task",
+          verb_noun: "Parked without date",
+          parked_until: null,
+        },
+      ],
+    },
+    new Date("2026-05-15T04:00:00Z"),
+  );
+
+  assert.equal(reminders.length, 1);
+  assert.equal(reminders[0].taskId, "future-task");
+  assert.equal(reminders[0].id, sfoParkReminderNotificationId("future-task"));
+  assert.equal(reminders[0].title, "SFO reminder");
+  assert.equal(reminders[0].body, "Print calendar");
+  assert.equal(reminders[0].scheduledFor, "2026-05-15T05:30:00.000Z");
+});
+
+test("scheduleParkReminderNotifications no-ops outside the Tauri notification API", async () => {
+  const result = await scheduleParkReminderNotifications(null, {
+    parked: [{ id: "task-1", verb_noun: "Print calendar", parked_until: "2026-05-15T05:30:00Z" }],
+  });
+
+  assert.deepEqual(result, { status: "unavailable", scheduled: 0 });
+});
+
+test("scheduleParkReminderNotifications requests permission and reconciles native notifications", async () => {
+  const sent = [];
+  const canceled = [];
+  const currentId = sfoParkReminderNotificationId("future-task");
+  const staleId = currentId === 650000001 ? 650000002 : 650000001;
+  const notification = {
+    Schedule: {
+      at(date, repeating, allowWhileIdle) {
+        return { at: { date, repeating, allowWhileIdle } };
+      },
+    },
+    async isPermissionGranted() {
+      return false;
+    },
+    async requestPermission() {
+      return "granted";
+    },
+    async pending() {
+      return [{ id: staleId }, { id: 12345 }];
+    },
+    async cancel(ids) {
+      canceled.push(ids);
+    },
+    sendNotification(options) {
+      sent.push(options);
+    },
+  };
+
+  const result = await scheduleParkReminderNotifications(
+    notification,
+    {
+      parked: [
+        {
+          id: "future-task",
+          verb_noun: "Print calendar",
+          description: "Monthly printout",
+          parked_until: "2026-05-15T05:30:00Z",
+        },
+      ],
+    },
+    new Date("2026-05-15T04:00:00Z"),
+  );
+
+  assert.equal(result.status, "scheduled");
+  assert.equal(result.scheduled, 1);
+  assert.deepEqual(canceled.flat(), [staleId, currentId]);
+  assert.equal(sent.length, 1);
+  assert.equal(sent[0].id, currentId);
+  assert.equal(sent[0].title, "SFO reminder");
+  assert.equal(sent[0].body, "Print calendar");
+  assert.equal(sent[0].schedule.at.date.toISOString(), "2026-05-15T05:30:00.000Z");
+  assert.equal(sent[0].schedule.at.repeating, false);
+  assert.equal(sent[0].schedule.at.allowWhileIdle, false);
+  assert.deepEqual(sent[0].extra, {
+    sfo_kind: "parked_until",
+    task_id: "future-task",
+  });
 });
 
 test("workflow metadata exposes the intended app paths", () => {

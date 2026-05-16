@@ -6,6 +6,7 @@ import {
   buildGuidedCapturePayload,
   buildGlobalSearchViewModel,
   buildItemDetailApiPath,
+  buildItemDetailUpdatePayload,
   buildItemDetailViewModel,
   buildSearchApiPath,
   buildInboxActionFeedback,
@@ -19,6 +20,7 @@ import {
   buildWeeklyReviewViewModel,
   clearSettings,
   defaultGuidedProjectTargetDate,
+  getTauriNotification,
   getTauriInvoke,
   guidedDecisionCopy,
   guidedProcessStepPlan,
@@ -26,6 +28,7 @@ import {
   loadSettings,
   requestJson,
   saveSettings,
+  scheduleParkReminderNotifications,
 } from "./client.js";
 
 const INBOX_ROUTE_ACTIONS = {
@@ -124,6 +127,8 @@ const elements = {
   itemDetailTitle: document.getElementById("item-detail-title"),
   itemDetailDescription: document.getElementById("item-detail-description"),
   itemDetailLoadState: document.getElementById("item-detail-load-state"),
+  itemDetailEditForm: document.getElementById("item-detail-edit-form"),
+  itemDetailEditFields: document.getElementById("item-detail-edit-fields"),
   itemDetailRows: document.getElementById("item-detail-rows"),
   itemDetailActions: document.getElementById("item-detail-actions"),
   itemDetailOpen: document.getElementById("item-detail-open"),
@@ -173,6 +178,7 @@ const elements = {
 };
 
 const tauriInvoke = getTauriInvoke(window);
+const tauriNotification = getTauriNotification(window);
 let settings = {
   serverUrl: elements.serverUrl.value,
   apiToken: "",
@@ -405,6 +411,7 @@ function renderItemDetail(detail) {
   elements.itemDetailDescription.classList.toggle("is-empty", !detail.description);
   elements.itemDetailRows.replaceChildren();
   elements.itemDetailActions.replaceChildren();
+  renderItemDetailEditForm(detail.edit);
 
   for (const row of detail.rows) {
     const item = document.createElement("div");
@@ -430,6 +437,41 @@ function renderItemDetail(detail) {
   }
 }
 
+function renderItemDetailEditForm(edit) {
+  elements.itemDetailEditFields.replaceChildren();
+  elements.itemDetailEditForm.hidden = !edit;
+  elements.itemDetailEditForm.dataset.editPath = edit?.path || "";
+  elements.itemDetailEditForm.dataset.editMethod = edit?.method || "PATCH";
+
+  if (!edit) return;
+
+  for (const field of edit.fields || []) {
+    const label = document.createElement("label");
+    label.className = "item-detail-edit-field";
+    const text = document.createElement("span");
+    text.textContent = field.label;
+    const input =
+      field.type === "textarea" ? document.createElement("textarea") : document.createElement("input");
+    input.name = field.name;
+    input.value = field.value || "";
+    input.placeholder = field.placeholder || "";
+    input.required = Boolean(field.required);
+    if (field.type !== "textarea") {
+      input.type = field.type || "text";
+    } else {
+      input.rows = 3;
+    }
+    label.append(text, input);
+    elements.itemDetailEditFields.append(label);
+  }
+
+  const submit = document.createElement("button");
+  submit.className = "ghost-button";
+  submit.type = "submit";
+  submit.textContent = edit.submitLabel || "Save";
+  elements.itemDetailEditFields.append(submit);
+}
+
 async function loadItemDetail(detail) {
   const path = buildItemDetailApiPath(detail);
   if (!path) {
@@ -451,6 +493,36 @@ async function loadItemDetail(detail) {
     elements.itemDetailLoadState.textContent = `Could not load full details: ${
       err instanceof Error ? err.message : String(err)
     }`;
+  }
+}
+
+async function saveItemDetailEdit(event) {
+  event.preventDefault();
+  const detail = currentItemDetail;
+  const edit = detail?.edit;
+  if (!detail || !edit) return;
+
+  const submitButton = elements.itemDetailEditForm.querySelector("button[type='submit']");
+  submitButton.disabled = true;
+  try {
+    const values = Object.fromEntries(new FormData(elements.itemDetailEditForm).entries());
+    const payload = buildItemDetailUpdatePayload(edit, values);
+    elements.itemDetailLoadState.textContent = "Saving changes...";
+    const updated = await requestJson(window.fetch.bind(window), settings, edit.path, {
+      method: edit.method || "PATCH",
+      body: payload,
+    });
+    if (!itemDetailOpen || currentItemDetail?.id !== detail.id) return;
+
+    const enrichedDetail = buildItemDetailViewModel(detail, updated);
+    currentItemDetail = enrichedDetail;
+    renderItemDetail(enrichedDetail);
+    elements.itemDetailLoadState.textContent = "Saved.";
+    await refreshWorkflowData(activeWorkflow);
+  } catch (err) {
+    elements.itemDetailLoadState.textContent = err instanceof Error ? err.message : String(err);
+  } finally {
+    submitButton.disabled = false;
   }
 }
 
@@ -605,6 +677,7 @@ async function connectAndLoad(options = {}) {
       defaultGuidedProjectTargetDate(dashboardModel.todayLabel),
     );
     renderWeeklyReview(buildWeeklyReviewViewModel(weeklyReview, inboxContainers));
+    await syncNativeParkReminders(inboxContainers);
     if (startupReconnectTimer) {
       window.clearTimeout(startupReconnectTimer);
       startupReconnectTimer = null;
@@ -676,6 +749,7 @@ async function refreshDashboardAndReview() {
   ]);
   renderDashboard(buildBootstrapViewModel(summary));
   renderWeeklyReview(buildWeeklyReviewViewModel(weeklyReview, inboxContainers));
+  await syncNativeParkReminders(inboxContainers);
 }
 
 async function refreshDashboardAndProcess() {
@@ -691,6 +765,7 @@ async function refreshDashboardAndProcess() {
     buildProjectOptions(projectsPage),
     defaultGuidedProjectTargetDate(dashboardModel.todayLabel),
   );
+  await syncNativeParkReminders(inboxContainers);
 }
 
 async function refreshWorkflowData(workflow) {
@@ -710,6 +785,15 @@ async function reloadWeeklyReview() {
     requestJson(window.fetch.bind(window), settings, "/api/v1/inbox/containers"),
   ]);
   renderWeeklyReview(buildWeeklyReviewViewModel(weeklyReview, inboxContainers));
+  await syncNativeParkReminders(inboxContainers);
+}
+
+async function syncNativeParkReminders(inboxContainers) {
+  try {
+    await scheduleParkReminderNotifications(tauriNotification, inboxContainers);
+  } catch (err) {
+    console.warn("SFO park reminder scheduling failed", err);
+  }
 }
 
 function renderDashboard(model) {
@@ -2063,6 +2147,8 @@ document.addEventListener("click", (event) => {
 
   openItemDetail(itemDetailFromElement(trigger));
 });
+
+elements.itemDetailEditForm.addEventListener("submit", saveItemDetailEdit);
 
 elements.connectionForm.addEventListener("submit", async (event) => {
   event.preventDefault();

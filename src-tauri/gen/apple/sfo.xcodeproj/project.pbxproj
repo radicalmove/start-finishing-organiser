@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		0F1A2B3C4D5E6F708192A0B1 /* AppIcon-60x60@2x.png in Resources */ = {isa = PBXBuildFile; fileRef = 0F1A2B3C4D5E6F708192A0C1 /* AppIcon-60x60@2x.png */; };
+		0F1A2B3C4D5E6F708192A0B2 /* AppIcon-60x60@3x.png in Resources */ = {isa = PBXBuildFile; fileRef = 0F1A2B3C4D5E6F708192A0C2 /* AppIcon-60x60@3x.png */; };
 		1B0598A7868142C221E5F9E3 /* Metal.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 3B05D44E089F992168CA9252 /* Metal.framework */; };
 		25733C42C35534E166688D16 /* libapp.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 54D18623C7EBAF87E4100CAB /* libapp.a */; };
 		5898A89DD7F23B8DF3F8571F /* WebKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4A83EFC1229E4D4C10697F22 /* WebKit.framework */; };
@@ -23,6 +25,8 @@
 
 /* Begin PBXFileReference section */
 		0CDBECBE11013D5BFA7F937E /* Security.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Security.framework; path = System/Library/Frameworks/Security.framework; sourceTree = SDKROOT; };
+		0F1A2B3C4D5E6F708192A0C1 /* AppIcon-60x60@2x.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "Assets.xcassets/AppIcon.appiconset/AppIcon-60x60@2x.png"; sourceTree = "<group>"; };
+		0F1A2B3C4D5E6F708192A0C2 /* AppIcon-60x60@3x.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "Assets.xcassets/AppIcon.appiconset/AppIcon-60x60@3x.png"; sourceTree = "<group>"; };
 		0D37923F49D1A95D28DFB95E /* main.rs */ = {isa = PBXFileReference; path = main.rs; sourceTree = "<group>"; };
 		20D06B7C890CE599235B668B /* sfo_iOS.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = sfo_iOS.entitlements; sourceTree = "<group>"; };
 		24107924EED7A9ED1EB85AFC /* bindings.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = bindings.h; sourceTree = "<group>"; };
@@ -208,8 +212,8 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				A67F1FA606958669E29EE910 /* Assets.xcassets in Resources */,
-				87E14B2A8283EDDD8F228C9D /* LaunchScreen.storyboard in Resources */,
+				0F1A2B3C4D5E6F708192A0B1 /* AppIcon-60x60@2x.png in Resources */,
+				0F1A2B3C4D5E6F708192A0B2 /* AppIcon-60x60@3x.png in Resources */,
 				B9E01D379EA2E1533DA49CCC /* assets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
