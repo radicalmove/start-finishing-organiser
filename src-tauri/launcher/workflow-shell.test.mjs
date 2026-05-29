@@ -212,6 +212,18 @@ test("launcher renders guided process as progressive steps", () => {
   assert.match(launcherJs, /data-guided-action/);
 });
 
+test("launcher starts Process clarification with a compact choice", () => {
+  const launcherJs = readFileSync(launcherJsPath, "utf8");
+
+  assert.match(launcherJs, /summary\.textContent = "Clarify this item"/);
+  assert.match(launcherJs, /legend\.textContent = "What is this\?"/);
+  assert.match(launcherJs, /decisionHelpDetails\(\)/);
+  assert.match(launcherJs, /summary\.textContent = "Help me choose"/);
+  assert.match(launcherJs, /for \(const \[value, labelText\] of DECISION_OPTIONS\)/);
+  assert.doesNotMatch(launcherJs, /Step 1 · choose the right kind of follow-up/);
+  assert.doesNotMatch(launcherJs, /decisionCopyPanel\(\),/);
+});
+
 test("guided process cards preserve sentence-case explanatory text", () => {
   const launcherCss = readFileSync(launcherCssPath, "utf8");
 

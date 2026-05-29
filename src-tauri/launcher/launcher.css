@@ -1418,6 +1418,10 @@ textarea:focus {
   min-width: 0;
 }
 
+.guided-form[data-guided-step="type"] .guided-step-heading {
+  display: none;
+}
+
 .park-choice-panel {
   display: grid;
   gap: 14px;
@@ -1632,7 +1636,7 @@ textarea:focus {
 .decision-card-body {
   display: grid;
   gap: 5px;
-  min-height: 116px;
+  min-height: 68px;
   padding: 14px;
   border: 1px solid var(--sfo-line);
   border-radius: var(--sfo-radius-md);
@@ -1649,7 +1653,8 @@ textarea:focus {
 
 .decision-card-body strong {
   color: var(--sfo-text);
-  font-size: 17px;
+  font-size: 18px;
+  line-height: 1.1;
 }
 
 .decision-card-body small {
@@ -1684,6 +1689,44 @@ textarea:focus {
 
 .decision-copy strong {
   color: var(--sfo-cyan);
+}
+
+.decision-help {
+  grid-column: 1 / -1;
+  margin-top: -2px;
+}
+
+.decision-help summary {
+  width: fit-content;
+  color: var(--sfo-cyan);
+  font-size: 14px;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.decision-help-grid {
+  display: grid;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.decision-help-row {
+  display: grid;
+  gap: 4px;
+  padding: 11px 12px;
+  border: 1px solid var(--sfo-line);
+  border-radius: var(--sfo-radius-sm);
+  background: rgba(5, 3, 15, 0.34);
+}
+
+.decision-help-row strong {
+  color: var(--sfo-text);
+}
+
+.decision-help-row span {
+  color: var(--sfo-muted);
+  font-size: 14px;
+  line-height: 1.35;
 }
 
 .checkbox-field {
@@ -2202,21 +2245,36 @@ textarea:focus {
     font-size: 12px;
   }
 
+  .guided-form[data-guided-step="type"] .guided-stepper {
+    display: none;
+  }
+
   .decision-step legend {
-    font-size: 12px;
+    font-size: 16px;
     line-height: 1.35;
+    letter-spacing: 0;
+    text-transform: none;
   }
 
   .decision-card-body {
     min-height: 0;
+    padding: 12px;
   }
 
   .decision-card-body strong {
-    font-size: 16px;
+    font-size: 18px;
   }
 
   .decision-card-body small {
     font-size: 13px;
+  }
+
+  .decision-help {
+    margin-top: 0;
+  }
+
+  .decision-help-grid {
+    gap: 8px;
   }
 
   .park-choice-panel {

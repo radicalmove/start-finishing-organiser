@@ -116,6 +116,23 @@ test("mobile process controls stay inside iPhone SE width", () => {
   );
 });
 
+test("mobile process clarification hides secondary chrome on the first choice", () => {
+  const launcherCss = readFileSync(launcherCssPath, "utf8");
+
+  assert.match(
+    launcherCss,
+    /@media \(max-width: 430px\)[\s\S]*\.guided-form\[data-guided-step="type"\] \.guided-stepper\s*\{[\s\S]*display:\s*none/,
+  );
+  assert.match(
+    launcherCss,
+    /@media \(max-width: 430px\)[\s\S]*\.decision-help\s*\{[\s\S]*margin-top:\s*0/,
+  );
+  assert.match(
+    launcherCss,
+    /@media \(max-width: 430px\)[\s\S]*\.decision-help-grid\s*\{[\s\S]*gap:\s*8px/,
+  );
+});
+
 test("mobile park calendar uses compact weekday labels", () => {
   const launcherJs = readFileSync(new URL("./launcher.js", import.meta.url), "utf8");
 

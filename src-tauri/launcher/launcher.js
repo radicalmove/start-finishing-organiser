@@ -1310,7 +1310,7 @@ function guidedCaptureDetails(item, projectOptions, projectTargetDate) {
   details.className = "guided-details";
 
   const summary = document.createElement("summary");
-  summary.textContent = "Clarify into Task / Project / OPP";
+  summary.textContent = "Clarify this item";
 
   const form = document.createElement("form");
   form.className = "guided-form";
@@ -1323,7 +1323,7 @@ function guidedCaptureDetails(item, projectOptions, projectTargetDate) {
     guidedStepSection(
       "type",
       decisionChoiceField(),
-      decisionCopyPanel(),
+      decisionHelpDetails(),
     ),
     guidedStepSection(
       "describe",
@@ -1709,11 +1709,11 @@ function decisionChoiceField() {
   const fieldset = document.createElement("fieldset");
   fieldset.className = "decision-step";
   const legend = document.createElement("legend");
-  legend.textContent = "Step 1 · choose the right kind of follow-up";
+  legend.textContent = "What is this?";
   const grid = document.createElement("div");
   grid.className = "decision-card-grid";
 
-  for (const [value, labelText, descriptionText] of DECISION_OPTIONS) {
+  for (const [value, labelText] of DECISION_OPTIONS) {
     const label = document.createElement("label");
     label.className = "decision-card";
     const input = document.createElement("input");
@@ -1726,9 +1726,7 @@ function decisionChoiceField() {
     body.className = "decision-card-body";
     const title = document.createElement("strong");
     title.textContent = labelText;
-    const description = document.createElement("small");
-    description.textContent = descriptionText;
-    body.append(title, description);
+    body.append(title);
     label.append(input, body);
     grid.append(label);
   }
@@ -1737,18 +1735,27 @@ function decisionChoiceField() {
   return fieldset;
 }
 
-function decisionCopyPanel(decision = "task") {
-  const copy = guidedDecisionCopy(decision);
-  const panel = document.createElement("div");
-  panel.className = "decision-copy";
-  const heading = document.createElement("strong");
-  heading.dataset.decisionCopyHeading = "true";
-  heading.textContent = copy.heading;
-  const description = document.createElement("span");
-  description.dataset.decisionCopyDescription = "true";
-  description.textContent = copy.description;
-  panel.append(heading, description);
-  return panel;
+function decisionHelpDetails() {
+  const details = document.createElement("details");
+  details.className = "decision-help";
+  const summary = document.createElement("summary");
+  summary.textContent = "Help me choose";
+  const grid = document.createElement("div");
+  grid.className = "decision-help-grid";
+
+  for (const [, labelText, descriptionText] of DECISION_OPTIONS) {
+    const item = document.createElement("div");
+    item.className = "decision-help-row";
+    const title = document.createElement("strong");
+    title.textContent = labelText;
+    const description = document.createElement("span");
+    description.textContent = descriptionText;
+    item.append(title, description);
+    grid.append(item);
+  }
+
+  details.append(summary, grid);
+  return details;
 }
 
 function formField(labelText, control, className = "") {
