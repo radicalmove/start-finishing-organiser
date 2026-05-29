@@ -94,7 +94,15 @@ const BLOCK_TYPE_OPTIONS = [
 ];
 const STARTUP_CONNECT_RETRY_MS = 1000;
 const STARTUP_CONNECT_MAX_ATTEMPTS = 30;
-const PARK_CALENDAR_WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+const PARK_CALENDAR_WEEKDAYS = [
+  { label: "M", title: "Monday" },
+  { label: "T", title: "Tuesday" },
+  { label: "W", title: "Wednesday" },
+  { label: "T", title: "Thursday" },
+  { label: "F", title: "Friday" },
+  { label: "S", title: "Saturday" },
+  { label: "S", title: "Sunday" },
+];
 
 const elements = {
   statusDot: document.getElementById("status-dot"),
@@ -1510,7 +1518,9 @@ function renderParkCalendar(calendar) {
   for (const weekday of PARK_CALENDAR_WEEKDAYS) {
     const label = document.createElement("span");
     label.className = "park-calendar-weekday";
-    label.textContent = weekday;
+    label.textContent = weekday.label;
+    label.title = weekday.title;
+    label.setAttribute("aria-label", weekday.title);
     grid.append(label);
   }
 

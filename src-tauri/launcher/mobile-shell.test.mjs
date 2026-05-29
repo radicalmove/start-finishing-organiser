@@ -14,6 +14,15 @@ test("mobile shell opts into iOS safe-area layout", () => {
   assert.match(launcherCss, /body::after/);
 });
 
+test("mobile shell paints the full iOS viewport behind safe areas", () => {
+  const launcherCss = readFileSync(launcherCssPath, "utf8");
+
+  assert.match(launcherCss, /--sfo-app-background:/);
+  assert.match(launcherCss, /html\s*\{[\s\S]*background:\s*var\(--sfo-app-background\)/);
+  assert.match(launcherCss, /body\s*\{[\s\S]*min-height:\s*100svh/);
+  assert.match(launcherCss, /@supports \(min-height: 100dvh\)[\s\S]*body\s*\{[\s\S]*min-height:\s*100dvh/);
+});
+
 test("mobile shell applies phone layout to iOS WebView viewport widths", () => {
   const launcherCss = readFileSync(launcherCssPath, "utf8");
 
@@ -65,6 +74,31 @@ test("mobile global search does not reserve desktop vertical space", () => {
   );
 });
 
+test("iPhone header collapses connection status to a top-right indicator", () => {
+  const launcherCss = readFileSync(launcherCssPath, "utf8");
+
+  assert.match(
+    launcherCss,
+    /@media \(max-width: 430px\)[\s\S]*\.status-card\s*\{[\s\S]*position:\s*absolute/,
+  );
+  assert.match(
+    launcherCss,
+    /@media \(max-width: 430px\)[\s\S]*\.status-card\s*\{[\s\S]*right:\s*10px/,
+  );
+  assert.match(
+    launcherCss,
+    /@media \(max-width: 430px\)[\s\S]*\.status-card\s*\{[\s\S]*width:\s*28px/,
+  );
+  assert.match(
+    launcherCss,
+    /@media \(max-width: 430px\)[\s\S]*\.status-card\s*\{[\s\S]*border-radius:\s*var\(--sfo-radius-sm\)/,
+  );
+  assert.match(
+    launcherCss,
+    /@media \(max-width: 430px\)[\s\S]*\.status-card > div:last-child\s*\{[\s\S]*clip-path:\s*inset\(50%\)/,
+  );
+});
+
 test("mobile process controls stay inside iPhone SE width", () => {
   const launcherCss = readFileSync(launcherCssPath, "utf8");
 
@@ -80,6 +114,14 @@ test("mobile process controls stay inside iPhone SE width", () => {
     launcherCss,
     /@media \(max-width: 430px\)[\s\S]*\.park-calendar-day\s*\{[\s\S]*min-height:\s*44px/,
   );
+});
+
+test("mobile park calendar uses compact weekday labels", () => {
+  const launcherJs = readFileSync(new URL("./launcher.js", import.meta.url), "utf8");
+
+  assert.match(launcherJs, /label:\s*"M"[\s\S]*title:\s*"Monday"/);
+  assert.match(launcherJs, /label:\s*"T"[\s\S]*title:\s*"Tuesday"/);
+  assert.match(launcherJs, /setAttribute\("aria-label", weekday\.title\)/);
 });
 
 test("mobile review view stays readable with five workflow tabs", () => {

@@ -70,7 +70,6 @@ test("iOS Xcode project packages standalone iPhone app icon files", () => {
   assert.doesNotMatch(resourcesPhase, /Assets\.xcassets in Resources/);
   assert.match(resourcesPhase, /AppIcon-60x60@2x\.png in Resources/);
   assert.match(resourcesPhase, /AppIcon-60x60@3x\.png in Resources/);
-  assert.doesNotMatch(resourcesPhase, /LaunchScreen\.storyboard in Resources/);
   assert.match(infoPlist, /<key>CFBundleIcons<\/key>/);
   assert.match(infoPlist, /<string>AppIcon-60x60@2x\.png<\/string>/);
   assert.match(infoPlist, /<string>AppIcon-60x60@3x\.png<\/string>/);
@@ -91,12 +90,18 @@ test("iOS app icon uses full-bleed artwork without a white matte", () => {
   }
 });
 
-test("iOS package declares a storyboard-free launch screen for full-size phone layout", () => {
+test("iOS package uses storyboard-free launch screen for local build reliability", () => {
   const projectYml = readFileSync(projectYmlPath, "utf8");
+  const xcodeProject = readFileSync(xcodeProjectPath, "utf8").replaceAll('\\"', '"');
   const infoPlist = readFileSync(iosInfoPlistPath, "utf8");
+  const resourcesPhase = xcodeProject.match(
+    /\/\* Begin PBXResourcesBuildPhase section \*\/[\s\S]*?\/\* End PBXResourcesBuildPhase section \*\//,
+  )?.[0];
 
   assert.match(projectYml, /UILaunchScreen:\s*\{\}/);
+  assert.doesNotMatch(projectYml, /path: LaunchScreen\.storyboard/);
   assert.doesNotMatch(projectYml, /UILaunchStoryboardName/);
+  assert.doesNotMatch(resourcesPhase, /LaunchScreen\.storyboard in Resources/);
   assert.match(infoPlist, /<key>UILaunchScreen<\/key>\s*<dict\/>/);
   assert.doesNotMatch(infoPlist, /UILaunchStoryboardName/);
 });
