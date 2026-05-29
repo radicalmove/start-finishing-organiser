@@ -32,6 +32,7 @@ import {
   inferGuidedProjectCategory,
   getTauriInvoke,
   loadSettings,
+  nextParkedItemRefreshDelay,
   normalizeServerUrl,
   scheduleParkReminderNotifications,
   saveSettings,
@@ -559,6 +560,23 @@ test("scheduleParkReminderNotifications requests permission and reconciles nativ
     sfo_kind: "parked_until",
     task_id: "future-task",
   });
+});
+
+test("nextParkedItemRefreshDelay targets the earliest future parked-until item", () => {
+  const delay = nextParkedItemRefreshDelay(
+    {
+      parked: [
+        { id: "later", parked_until: "2026-05-15T05:30:00Z" },
+        { id: "soonest", parked_until: "2026-05-15T05:10:00Z" },
+        { id: "past", parked_until: "2026-05-15T04:55:00Z" },
+        { id: "undated", parked_until: null },
+      ],
+    },
+    new Date("2026-05-15T05:00:00Z"),
+  );
+
+  assert.equal(delay, 601000);
+  assert.equal(nextParkedItemRefreshDelay({ parked: [] }, new Date("2026-05-15T05:00:00Z")), null);
 });
 
 test("workflow metadata exposes the intended app paths", () => {

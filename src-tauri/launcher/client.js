@@ -4,6 +4,7 @@ const SERVER_URL_KEY = "sfo.rust.serverUrl";
 const API_TOKEN_KEY = "sfo.rust.apiToken";
 const SFO_PARK_REMINDER_ID_BASE = 650000000;
 const SFO_PARK_REMINDER_ID_SPAN = 50000000;
+const SFO_PARK_REFRESH_GRACE_MS = 1000;
 const PERSONAL_PROJECT_PATTERN =
   /\b(appointment|optometrist|doctor|dentist|health|family|home|house|kid|kids|school|holiday|trip|birthday|personal|exercise|training|winter family)\b/i;
 
@@ -92,6 +93,25 @@ export function buildParkReminderNotifications(inboxContainers = {}, now = new D
       },
     ];
   });
+}
+
+export function nextParkedItemRefreshDelay(inboxContainers = {}, now = new Date()) {
+  const nowDate = now instanceof Date ? now : new Date(now);
+  const nowTime = Number.isNaN(nowDate.getTime()) ? Date.now() : nowDate.getTime();
+  const parkedItems = Array.isArray(inboxContainers.parked) ? inboxContainers.parked : [];
+  let nextTime = null;
+
+  for (const item of parkedItems) {
+    const parkedUntil = item?.parked_until ? new Date(item.parked_until) : null;
+    const parkedTime = parkedUntil?.getTime();
+    if (!parkedUntil || Number.isNaN(parkedTime) || parkedTime <= nowTime) continue;
+    if (nextTime === null || parkedTime < nextTime) {
+      nextTime = parkedTime;
+    }
+  }
+
+  if (nextTime === null) return null;
+  return Math.max(0, nextTime - nowTime + SFO_PARK_REFRESH_GRACE_MS);
 }
 
 export async function scheduleParkReminderNotifications(

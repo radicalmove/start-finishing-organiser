@@ -26,6 +26,7 @@ import {
   guidedProcessStepPlan,
   inferGuidedProjectCategory,
   loadSettings,
+  nextParkedItemRefreshDelay,
   requestJson,
   saveSettings,
   scheduleParkReminderNotifications,
@@ -94,6 +95,7 @@ const BLOCK_TYPE_OPTIONS = [
 ];
 const STARTUP_CONNECT_RETRY_MS = 1000;
 const STARTUP_CONNECT_MAX_ATTEMPTS = 30;
+const PARK_RESURFACE_MAX_TIMER_MS = 2147000000;
 const PARK_CALENDAR_WEEKDAYS = [
   { label: "M", title: "Monday" },
   { label: "T", title: "Tuesday" },
@@ -195,6 +197,7 @@ let lastAuthRequired = null;
 let activeWorkflow = "today";
 let startupReconnectTimer = null;
 let startupReconnectAttempts = 0;
+let parkResurfaceTimer = null;
 let globalSearchTimer = null;
 let itemDetailOpen = false;
 let currentItemDetail = null;
@@ -797,11 +800,35 @@ async function reloadWeeklyReview() {
 }
 
 async function syncNativeParkReminders(inboxContainers) {
+  scheduleParkResurfaceRefresh(inboxContainers);
   try {
     await scheduleParkReminderNotifications(tauriNotification, inboxContainers);
   } catch (err) {
     console.warn("SFO park reminder scheduling failed", err);
   }
+}
+
+function scheduleParkResurfaceRefresh(inboxContainers) {
+  if (parkResurfaceTimer) {
+    window.clearTimeout(parkResurfaceTimer);
+    parkResurfaceTimer = null;
+  }
+
+  const delay = nextParkedItemRefreshDelay(inboxContainers);
+  if (delay === null) return;
+
+  parkResurfaceTimer = window.setTimeout(async () => {
+    parkResurfaceTimer = null;
+    try {
+      await refreshWorkflowData(activeWorkflow);
+    } catch (err) {
+      setConnectionState(
+        "error",
+        "Parked item refresh failed",
+        err instanceof Error ? err.message : String(err),
+      );
+    }
+  }, Math.min(delay, PARK_RESURFACE_MAX_TIMER_MS));
 }
 
 function renderDashboard(model) {

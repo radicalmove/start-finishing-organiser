@@ -173,6 +173,17 @@ test("launcher retries startup connection when the server is not ready yet", () 
   assert.match(launcherJs, /window\.setTimeout\(\(\) => \{/);
 });
 
+test("launcher wakes itself when parked-until items become due", () => {
+  const launcherJs = readFileSync(launcherJsPath, "utf8");
+
+  assert.match(launcherJs, /nextParkedItemRefreshDelay/);
+  assert.match(launcherJs, /let parkResurfaceTimer = null;/);
+  assert.match(launcherJs, /function scheduleParkResurfaceRefresh\(inboxContainers\)/);
+  assert.match(launcherJs, /scheduleParkResurfaceRefresh\(inboxContainers\);/);
+  assert.match(launcherJs, /window\.setTimeout\(async \(\) => \{/);
+  assert.match(launcherJs, /await refreshWorkflowData\(activeWorkflow\);/);
+});
+
 test("launcher clears action feedback when switching workflows", () => {
   const launcherJs = readFileSync(launcherJsPath, "utf8");
 
