@@ -163,6 +163,31 @@ test("mobile Today focus starts as a compact summary and expands only for editin
   );
 });
 
+test("mobile Today prioritizes Now and tasks before collapsible secondary panels", () => {
+  const launcherCss = readFileSync(launcherCssPath, "utf8");
+
+  assert.match(
+    launcherCss,
+    /@media \(max-width: 430px\)[\s\S]*#workflow-today \.now-panel\s*\{[\s\S]*order:\s*1/,
+  );
+  assert.match(
+    launcherCss,
+    /@media \(max-width: 430px\)[\s\S]*#workflow-today \.today-tasks-panel\s*\{[\s\S]*order:\s*2/,
+  );
+  assert.match(
+    launcherCss,
+    /@media \(max-width: 430px\)[\s\S]*\.today-secondary-toggle\s*\{[\s\S]*display:\s*grid/,
+  );
+  assert.match(
+    launcherCss,
+    /@media \(max-width: 430px\)[\s\S]*\.today-secondary-section:not\(\.is-open\) \.today-secondary-content\s*\{[\s\S]*display:\s*none/,
+  );
+  assert.match(
+    launcherCss,
+    /@media \(max-width: 430px\)[\s\S]*\.today-secondary-section\.is-open \.today-secondary-content\s*\{[\s\S]*display:\s*block/,
+  );
+});
+
 test("iPhone header collapses connection status to a top-right indicator", () => {
   const launcherCss = readFileSync(launcherCssPath, "utf8");
 

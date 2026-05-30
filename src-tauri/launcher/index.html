@@ -118,34 +118,79 @@
               <div class="next-block hidden" id="next-block"></div>
             </article>
 
-            <article class="panel">
-              <div class="panel-kicker">Daily Context</div>
-              <div class="context-grid">
-                <div>
-                  <span>Rituals</span>
-                  <strong id="ritual-status">Not started</strong>
+            <section class="today-secondary-section today-context-section" id="today-context-section" data-today-secondary-section>
+              <button
+                class="today-secondary-toggle"
+                type="button"
+                data-today-secondary-toggle
+                aria-expanded="false"
+                aria-controls="today-context-content"
+              >
+                <span>
+                  <strong>Daily Context</strong>
+                  <small>Rituals and Waiting On</small>
+                </span>
+                <span class="today-secondary-toggle-icon" aria-hidden="true">+</span>
+              </button>
+              <article class="panel today-secondary-content today-context-panel" id="today-context-content">
+                <div class="panel-kicker">Daily Context</div>
+                <div class="context-grid">
+                  <div>
+                    <span>Rituals</span>
+                    <strong id="ritual-status">Not started</strong>
+                  </div>
+                  <div>
+                    <span>Waiting On</span>
+                    <strong id="waiting-summary">0 waiting</strong>
+                  </div>
                 </div>
-                <div>
-                  <span>Waiting On</span>
-                  <strong id="waiting-summary">0 waiting</strong>
-                </div>
-              </div>
-            </article>
+              </article>
+            </section>
 
-            <article class="panel">
+            <article class="panel today-tasks-panel">
               <div class="panel-kicker">Today Tasks</div>
               <div class="item-list" id="today-tasks"></div>
             </article>
 
-            <article class="panel">
-              <div class="panel-kicker">Weekly Projects</div>
-              <div class="item-list" id="weekly-projects"></div>
-            </article>
+            <section class="today-secondary-section weekly-projects-section" id="weekly-projects-section" data-today-secondary-section>
+              <button
+                class="today-secondary-toggle"
+                type="button"
+                data-today-secondary-toggle
+                aria-expanded="false"
+                aria-controls="weekly-projects-content"
+              >
+                <span>
+                  <strong>Weekly Projects</strong>
+                  <small>Active project list</small>
+                </span>
+                <span class="today-secondary-toggle-icon" aria-hidden="true">+</span>
+              </button>
+              <article class="panel today-secondary-content weekly-projects-panel" id="weekly-projects-content">
+                <div class="panel-kicker">Weekly Projects</div>
+                <div class="item-list" id="weekly-projects"></div>
+              </article>
+            </section>
 
-            <article class="panel wide-panel">
-              <div class="panel-kicker">Today Blocks</div>
-              <div class="block-strip" id="today-blocks"></div>
-            </article>
+            <section class="today-secondary-section today-blocks-section" id="today-blocks-section" data-today-secondary-section>
+              <button
+                class="today-secondary-toggle"
+                type="button"
+                data-today-secondary-toggle
+                aria-expanded="false"
+                aria-controls="today-blocks-content"
+              >
+                <span>
+                  <strong>Today Blocks</strong>
+                  <small>Protected time blocks</small>
+                </span>
+                <span class="today-secondary-toggle-icon" aria-hidden="true">+</span>
+              </button>
+              <article class="panel wide-panel today-secondary-content today-blocks-panel" id="today-blocks-content">
+                <div class="panel-kicker">Today Blocks</div>
+                <div class="block-strip" id="today-blocks"></div>
+              </article>
+            </section>
           </div>
         </section>
 

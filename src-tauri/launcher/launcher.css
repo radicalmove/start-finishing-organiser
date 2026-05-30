@@ -1280,6 +1280,14 @@ textarea:focus {
   gap: 16px;
 }
 
+.today-secondary-section {
+  display: contents;
+}
+
+.today-secondary-toggle {
+  display: none;
+}
+
 .panel {
   min-height: 210px;
   padding: 22px;
@@ -2364,6 +2372,91 @@ textarea:focus {
   .daily-focus-card.is-editing .daily-focus-form {
     display: grid;
     margin: 10px 0 12px;
+  }
+
+  #workflow-today .now-panel {
+    order: 1;
+  }
+
+  #workflow-today .today-tasks-panel {
+    order: 2;
+  }
+
+  #workflow-today .today-context-section {
+    order: 3;
+  }
+
+  #workflow-today .weekly-projects-section {
+    order: 4;
+  }
+
+  #workflow-today .today-blocks-section {
+    order: 5;
+  }
+
+  .today-secondary-section {
+    display: grid;
+    gap: 8px;
+  }
+
+  .today-secondary-toggle {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 10px;
+    align-items: center;
+    width: 100%;
+    padding: 11px 12px;
+    border: 1px solid var(--sfo-line);
+    border-radius: var(--sfo-radius-md);
+    color: var(--sfo-text);
+    background: rgba(5, 3, 15, 0.46);
+    text-align: left;
+  }
+
+  .today-secondary-toggle > span:first-child {
+    display: grid;
+    gap: 2px;
+    min-width: 0;
+  }
+
+  .today-secondary-toggle strong {
+    color: white;
+    font-size: 15px;
+  }
+
+  .today-secondary-toggle small {
+    overflow: hidden;
+    color: var(--sfo-muted);
+    font-size: 12px;
+    line-height: 1.25;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .today-secondary-toggle-icon {
+    display: grid;
+    width: 30px;
+    height: 30px;
+    place-items: center;
+    border: 1px solid rgba(83, 161, 255, 0.34);
+    border-radius: var(--sfo-radius-sm);
+    color: white;
+    background: rgba(10, 14, 35, 0.72);
+    font-size: 20px;
+    font-weight: 650;
+    line-height: 1;
+  }
+
+  .today-secondary-section:not(.is-open) .today-secondary-content {
+    display: none;
+  }
+
+  .today-secondary-section.is-open .today-secondary-content {
+    display: block;
+  }
+
+  .today-secondary-content {
+    padding: 12px;
   }
 
   #workflow-capture .quick-capture input {

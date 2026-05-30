@@ -354,3 +354,22 @@ test("today focus has a compact summary toggle without replacing the save form",
   assert.match(launcherJs, /function renderDailyFocusSummary\(dailyFocus\)/);
   assert.match(launcherJs, /dailyFocusToggle\.addEventListener\("click"/);
 });
+
+test("today secondary panels have phone collapsible controls while preserving panel content", () => {
+  const indexHtml = readFileSync(indexHtmlPath, "utf8");
+  const launcherJs = readFileSync(launcherJsPath, "utf8");
+
+  for (const id of ["today-context", "weekly-projects", "today-blocks"]) {
+    assert.match(indexHtml, new RegExp(`id="${id}-section"`));
+    assert.match(indexHtml, new RegExp(`aria-controls="${id}-content"`));
+    assert.match(indexHtml, new RegExp(`id="${id}-content"`));
+  }
+
+  assert.match(indexHtml, /class="panel today-tasks-panel"/);
+  assert.match(indexHtml, /data-today-secondary-section/);
+  assert.match(indexHtml, /data-today-secondary-toggle/);
+  assert.match(indexHtml, /class="today-secondary-toggle-icon"[^>]*>\+<\/span>/);
+  assert.match(launcherJs, /todaySecondaryToggles: \[\.\.\.document\.querySelectorAll\("\[data-today-secondary-toggle\]"\)\]/);
+  assert.match(launcherJs, /function setTodaySecondarySection\(section, isOpen\)/);
+  assert.match(launcherJs, /todaySecondaryToggles\) \{/);
+});

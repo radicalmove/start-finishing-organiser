@@ -155,6 +155,7 @@ const elements = {
   dailyFocusForm: document.getElementById("daily-focus-form"),
   oneThingInput: document.getElementById("one-thing-input"),
   frogInput: document.getElementById("frog-input"),
+  todaySecondaryToggles: [...document.querySelectorAll("[data-today-secondary-toggle]")],
   nowTitle: document.getElementById("now-title"),
   nowMeta: document.getElementById("now-meta"),
   nextBlock: document.getElementById("next-block"),
@@ -249,6 +250,16 @@ function renderDailyFocusSummary(dailyFocus) {
     "has-focus",
     Boolean(String(dailyFocus.oneThing || "").trim() || String(dailyFocus.frog || "").trim()),
   );
+}
+
+function setTodaySecondarySection(section, isOpen) {
+  section.classList.toggle("is-open", isOpen);
+  const toggle = section.querySelector("[data-today-secondary-toggle]");
+  const icon = section.querySelector(".today-secondary-toggle-icon");
+  toggle?.setAttribute("aria-expanded", String(isOpen));
+  if (icon) {
+    icon.textContent = isOpen ? "-" : "+";
+  }
 }
 
 function applySettingsToForm() {
@@ -2295,6 +2306,14 @@ elements.quickCaptureForm.addEventListener("submit", async (event) => {
 elements.dailyFocusToggle.addEventListener("click", () => {
   setDailyFocusEditing(!elements.dailyFocusCard.classList.contains("is-editing"));
 });
+
+for (const toggle of elements.todaySecondaryToggles) {
+  toggle.addEventListener("click", () => {
+    const section = toggle.closest("[data-today-secondary-section]");
+    if (!section) return;
+    setTodaySecondarySection(section, !section.classList.contains("is-open"));
+  });
+}
 
 elements.dailyFocusForm.addEventListener("submit", async (event) => {
   event.preventDefault();
