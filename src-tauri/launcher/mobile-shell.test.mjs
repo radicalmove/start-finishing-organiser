@@ -218,7 +218,11 @@ test("mobile process controls stay inside iPhone SE width", () => {
 
   assert.match(
     launcherCss,
-    /@media \(max-width: 430px\)[\s\S]*\.process-active-actions\s*\{[\s\S]*grid-template-columns:\s*1fr/,
+    /@media \(max-width: 430px\)[\s\S]*\.process-active-actions\s*\{[\s\S]*grid-template-columns:\s*repeat\(4, minmax\(0, 1fr\)\)/,
+  );
+  assert.match(
+    launcherCss,
+    /@media \(max-width: 430px\)[\s\S]*\.process-active-actions \.mini-button\s*\{[\s\S]*font-size:\s*12px/,
   );
   assert.match(
     launcherCss,

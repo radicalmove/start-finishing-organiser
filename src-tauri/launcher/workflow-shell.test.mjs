@@ -224,7 +224,7 @@ test("launcher renders guided process as progressive steps", () => {
 test("launcher starts Process clarification with a compact choice", () => {
   const launcherJs = readFileSync(launcherJsPath, "utf8");
 
-  assert.match(launcherJs, /summary\.textContent = "Clarify current item"/);
+  assert.match(launcherJs, /summary\.textContent = "Make this a task"/);
   assert.match(launcherJs, /legend\.textContent = "What is this\?"/);
   assert.match(launcherJs, /decisionHelpDetails\(\)/);
   assert.match(launcherJs, /summary\.textContent = "Help me choose"/);
@@ -283,9 +283,14 @@ test("process workflow copy explains the active item before clarification", () =
   const indexHtml = readFileSync(indexHtmlPath, "utf8");
   const launcherJs = readFileSync(launcherJsPath, "utf8");
 
-  assert.match(indexHtml, /Process next item/);
-  assert.match(indexHtml, /Clarify only if needed/);
+  assert.match(indexHtml, /To Process/);
+  assert.match(indexHtml, /Most likely/);
+  assert.match(indexHtml, /Change to Project or Waiting On if needed\./);
+  assert.match(indexHtml, /id="inbox-items"[\s\S]*id="process-active-actions"/);
   assert.match(launcherJs, /elements\.processActiveHeading\.textContent = item\.title/);
+  assert.match(launcherJs, /learn_explore: "Learn"/);
+  assert.match(launcherJs, /recycle\.textContent = "♻"/);
+  assert.doesNotMatch(indexHtml, /Process next item/);
   assert.doesNotMatch(indexHtml, /Choose what happens to the current inbox item/);
   assert.doesNotMatch(indexHtml, /Choose what happens to this item\./);
   assert.doesNotMatch(indexHtml, /Start with a quick route/);

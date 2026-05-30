@@ -33,7 +33,7 @@ import {
 } from "./client.js";
 
 const INBOX_ROUTE_ACTIONS = {
-  learn_explore: "Learning",
+  learn_explore: "Learn",
   enjoy_recover: "Enjoy",
   park_let_go: "Park",
 };
@@ -930,10 +930,9 @@ function renderProcessWorkflow(model, projectOptions = [], projectTargetDate = "
   elements.processActiveItem.append(activeCard);
   elements.processActiveActions.append(...buildInboxActions(item));
 
-  elements.inboxItems.append(parkChoicePanel(item));
   const details = guidedCaptureDetails(item, projectOptions, projectTargetDate);
   details.open = true;
-  elements.inboxItems.append(details);
+  elements.inboxItems.append(details, parkChoicePanel(item));
 }
 
 function renderWeeklyReview(model) {
@@ -1354,7 +1353,7 @@ function guidedCaptureDetails(item, projectOptions, projectTargetDate) {
   details.className = "guided-details";
 
   const summary = document.createElement("summary");
-  summary.textContent = "Clarify current item";
+  summary.textContent = "Make this a task";
 
   const form = document.createElement("form");
   form.className = "guided-form";
@@ -1464,7 +1463,7 @@ function buildInboxActions(item) {
     button.dataset.itemId = item.id;
     button.dataset.itemTitle = item.title;
     button.dataset.intent = intent;
-    button.dataset.intentLabel = label;
+    button.dataset.intentLabel = intent === "learn_explore" ? "Learning" : label;
     button.textContent = label;
     actions.push(button);
   }
@@ -1475,7 +1474,9 @@ function buildInboxActions(item) {
   recycle.dataset.inboxAction = "recycle";
   recycle.dataset.itemId = item.id;
   recycle.dataset.itemTitle = item.title;
-  recycle.textContent = "Recycle";
+  recycle.ariaLabel = "Recycle";
+  recycle.title = "Recycle";
+  recycle.textContent = "♻";
   actions.push(recycle);
   return actions;
 }

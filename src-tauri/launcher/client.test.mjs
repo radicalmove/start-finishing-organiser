@@ -1048,7 +1048,7 @@ test("inbox processing view model exposes actionable unprocessed items", () => {
         id: "task-1",
         verb_noun: "Read Rust notes",
         description: "Extract anything worth testing",
-        created_at: "2026-05-06T09:00:00Z",
+        created_at: "2026-07-13T10:00:00",
       },
       {
         id: "task-2",
@@ -1065,7 +1065,7 @@ test("inbox processing view model exposes actionable unprocessed items", () => {
     id: "task-1",
     title: "Read Rust notes",
     description: "Extract anything worth testing",
-    meta: "Captured 2026-05-06T09:00:00Z",
+    meta: "Captured Mon 13 July at 10:00am",
   });
   assert.equal(model.items[1].title, "Untitled inbox item");
 });

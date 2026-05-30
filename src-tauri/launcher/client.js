@@ -670,7 +670,7 @@ export function buildInboxProcessingViewModel(containers) {
     id: item.id,
     title: item.verb_noun || "Untitled inbox item",
     description: item.description || "No notes yet.",
-    meta: item.created_at ? `Captured ${item.created_at}` : "",
+    meta: formatCapturedAtLabel(item.created_at),
   }));
 
   return {
@@ -1390,6 +1390,32 @@ function formatDateTimeDisplayLabel(value) {
   const dateLabel = formatDateDisplayLabel(localDateKey(date));
   const timeLabel = formatClockLabel(localTimeKey(date));
   return compactJoin([dateLabel, timeLabel], " ");
+}
+
+function formatCapturedAtLabel(value) {
+  const text = String(value || "").trim();
+  if (!text) return "";
+
+  const date = new Date(text);
+  if (Number.isNaN(date.getTime())) return `Captured ${text}`;
+
+  const weekday = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][date.getDay()];
+  const month = [
+    "January",
+    "February",
+    "March",
+    "April",
+    "May",
+    "June",
+    "July",
+    "August",
+    "September",
+    "October",
+    "November",
+    "December",
+  ][date.getMonth()];
+  const time = formatClockLabel(localTimeKey(date)).toLowerCase();
+  return `Captured ${weekday} ${date.getDate()} ${month} at ${time}`;
 }
 
 function localDateKey(date) {
