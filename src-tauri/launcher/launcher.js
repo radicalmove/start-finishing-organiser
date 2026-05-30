@@ -147,6 +147,11 @@ const elements = {
   captureDescription: document.getElementById("capture-description"),
   quickCaptureForm: document.getElementById("quick-capture-form"),
   quickCaptureInput: document.getElementById("quick-capture-input"),
+  dailyFocusCard: document.getElementById("daily-focus-card"),
+  dailyFocusToggle: document.getElementById("daily-focus-toggle"),
+  dailyFocusOneThingSummary: document.getElementById("daily-focus-one-thing-summary"),
+  dailyFocusFrogSummary: document.getElementById("daily-focus-frog-summary"),
+  dailyFocusToggleIcon: document.getElementById("daily-focus-toggle-icon"),
   dailyFocusForm: document.getElementById("daily-focus-form"),
   oneThingInput: document.getElementById("one-thing-input"),
   frogInput: document.getElementById("frog-input"),
@@ -224,6 +229,26 @@ function setConnectionState(state, message, detail = "") {
   elements.statusDot.dataset.state = state;
   elements.status.textContent = message;
   elements.detail.textContent = detail;
+}
+
+function focusSummaryText(value) {
+  const trimmed = String(value || "").trim();
+  return trimmed || "Not set";
+}
+
+function setDailyFocusEditing(isEditing) {
+  elements.dailyFocusCard.classList.toggle("is-editing", isEditing);
+  elements.dailyFocusToggle.setAttribute("aria-expanded", String(isEditing));
+  elements.dailyFocusToggleIcon.textContent = isEditing ? "-" : "+";
+}
+
+function renderDailyFocusSummary(dailyFocus) {
+  elements.dailyFocusOneThingSummary.textContent = focusSummaryText(dailyFocus.oneThing);
+  elements.dailyFocusFrogSummary.textContent = focusSummaryText(dailyFocus.frog);
+  elements.dailyFocusCard.classList.toggle(
+    "has-focus",
+    Boolean(String(dailyFocus.oneThing || "").trim() || String(dailyFocus.frog || "").trim()),
+  );
 }
 
 function applySettingsToForm() {
@@ -848,6 +873,7 @@ function renderDashboard(model) {
   elements.inboxCounts.replaceChildren();
   elements.oneThingInput.value = model.dailyFocus.oneThing;
   elements.frogInput.value = model.dailyFocus.frog;
+  renderDailyFocusSummary(model.dailyFocus);
   elements.ritualStatus.textContent = ritualStatusText(model.rituals);
   elements.waitingSummary.textContent = model.waiting.label;
   renderTodayTasks(elements.todayTasks, model.todayTasks);
@@ -2266,6 +2292,10 @@ elements.quickCaptureForm.addEventListener("submit", async (event) => {
   }
 });
 
+elements.dailyFocusToggle.addEventListener("click", () => {
+  setDailyFocusEditing(!elements.dailyFocusCard.classList.contains("is-editing"));
+});
+
 elements.dailyFocusForm.addEventListener("submit", async (event) => {
   event.preventDefault();
 
@@ -2280,6 +2310,7 @@ elements.dailyFocusForm.addEventListener("submit", async (event) => {
       },
     });
     await connectAndLoad();
+    setDailyFocusEditing(false);
     showActionFeedback({
       message: "Saved today's focus.",
       undoPath: "",

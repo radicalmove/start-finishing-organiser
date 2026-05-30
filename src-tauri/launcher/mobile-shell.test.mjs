@@ -146,6 +146,23 @@ test("mobile Today header keeps refresh in the heading row", () => {
   );
 });
 
+test("mobile Today focus starts as a compact summary and expands only for editing", () => {
+  const launcherCss = readFileSync(launcherCssPath, "utf8");
+
+  assert.match(
+    launcherCss,
+    /@media \(max-width: 430px\)[\s\S]*\.daily-focus-summary\s*\{[\s\S]*display:\s*grid/,
+  );
+  assert.match(
+    launcherCss,
+    /@media \(max-width: 430px\)[\s\S]*\.daily-focus-card:not\(\.is-editing\) \.daily-focus-form\s*\{[\s\S]*display:\s*none/,
+  );
+  assert.match(
+    launcherCss,
+    /@media \(max-width: 430px\)[\s\S]*\.daily-focus-card\.is-editing \.daily-focus-form\s*\{[\s\S]*display:\s*grid/,
+  );
+});
+
 test("iPhone header collapses connection status to a top-right indicator", () => {
   const launcherCss = readFileSync(launcherCssPath, "utf8");
 

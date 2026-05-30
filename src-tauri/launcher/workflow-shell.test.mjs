@@ -338,3 +338,19 @@ test("today refresh keeps text label and mobile icon with accessible name", () =
   assert.match(indexHtml, /class="refresh-button-label">Refresh<\/span>/);
   assert.match(indexHtml, /class="refresh-button-icon"[^>]*aria-hidden="true"[^>]*>&#8635;<\/span>/);
 });
+
+test("today focus has a compact summary toggle without replacing the save form", () => {
+  const indexHtml = readFileSync(indexHtmlPath, "utf8");
+  const launcherJs = readFileSync(launcherJsPath, "utf8");
+
+  assert.match(indexHtml, /id="daily-focus-card"/);
+  assert.match(indexHtml, /id="daily-focus-toggle"[^>]*aria-controls="daily-focus-form"/);
+  assert.match(indexHtml, /id="daily-focus-one-thing-summary"/);
+  assert.match(indexHtml, /id="daily-focus-frog-summary"/);
+  assert.match(indexHtml, /id="daily-focus-toggle-icon"/);
+  assert.match(indexHtml, /<form class="daily-focus-form" id="daily-focus-form">/);
+  assert.match(launcherJs, /dailyFocusToggle: document\.getElementById\("daily-focus-toggle"\)/);
+  assert.match(launcherJs, /function setDailyFocusEditing\(isEditing\)/);
+  assert.match(launcherJs, /function renderDailyFocusSummary\(dailyFocus\)/);
+  assert.match(launcherJs, /dailyFocusToggle\.addEventListener\("click"/);
+});

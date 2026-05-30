@@ -75,17 +75,40 @@
             </div>
           </div>
 
-          <form class="daily-focus-form" id="daily-focus-form">
-            <label>
-              <span>One Thing</span>
-              <input id="one-thing-input" name="one-thing" placeholder="The one thing that makes today a win" autocomplete="off" />
-            </label>
-            <label>
-              <span>Frog</span>
-              <input id="frog-input" name="frog" placeholder="The uncomfortable thing to face early" autocomplete="off" />
-            </label>
-            <button class="ghost-button" type="submit">Save focus</button>
-          </form>
+          <section class="daily-focus-card" id="daily-focus-card">
+            <button
+              class="daily-focus-summary"
+              id="daily-focus-toggle"
+              type="button"
+              aria-expanded="false"
+              aria-controls="daily-focus-form"
+            >
+              <span class="panel-kicker">Focus</span>
+              <span class="daily-focus-summary-lines">
+                <span>
+                  <strong>One Thing</strong>
+                  <span id="daily-focus-one-thing-summary">Not set</span>
+                </span>
+                <span>
+                  <strong>Frog</strong>
+                  <span id="daily-focus-frog-summary">Not set</span>
+                </span>
+              </span>
+              <span class="daily-focus-toggle-icon" id="daily-focus-toggle-icon" aria-hidden="true">+</span>
+            </button>
+
+            <form class="daily-focus-form" id="daily-focus-form">
+              <label>
+                <span>One Thing</span>
+                <input id="one-thing-input" name="one-thing" placeholder="The one thing that makes today a win" autocomplete="off" />
+              </label>
+              <label>
+                <span>Frog</span>
+                <input id="frog-input" name="frog" placeholder="The uncomfortable thing to face early" autocomplete="off" />
+              </label>
+              <button class="ghost-button" type="submit">Save focus</button>
+            </form>
+          </section>
 
           <div class="dashboard-grid workflow-grid">
             <article class="panel now-panel">

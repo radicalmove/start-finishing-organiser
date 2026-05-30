@@ -1247,6 +1247,10 @@ textarea:focus {
   background: rgba(5, 3, 15, 0.42);
 }
 
+.daily-focus-summary {
+  display: none;
+}
+
 .action-feedback {
   display: flex;
   gap: 12px;
@@ -2286,6 +2290,80 @@ textarea:focus {
     gap: 10px;
     margin-top: 14px;
     padding: 12px;
+  }
+
+  .daily-focus-card {
+    margin: 0 0 12px;
+  }
+
+  .daily-focus-summary {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 8px 10px;
+    width: 100%;
+    padding: 12px;
+    border: 1px solid var(--sfo-line);
+    border-radius: var(--sfo-radius-md);
+    color: var(--sfo-text);
+    background:
+      radial-gradient(circle at top left, rgba(45, 160, 255, 0.12), transparent 12rem),
+      rgba(5, 3, 15, 0.5);
+    text-align: left;
+  }
+
+  .daily-focus-summary .panel-kicker {
+    grid-column: 1 / -1;
+  }
+
+  .daily-focus-summary-lines {
+    display: grid;
+    gap: 6px;
+    min-width: 0;
+  }
+
+  .daily-focus-summary-lines > span {
+    display: grid;
+    gap: 2px;
+    min-width: 0;
+  }
+
+  .daily-focus-summary-lines strong {
+    color: white;
+    font-size: 13px;
+  }
+
+  #daily-focus-one-thing-summary,
+  #daily-focus-frog-summary {
+    overflow: hidden;
+    color: var(--sfo-muted);
+    font-size: 14px;
+    line-height: 1.35;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .daily-focus-toggle-icon {
+    display: grid;
+    width: 34px;
+    height: 34px;
+    align-self: center;
+    place-items: center;
+    border: 1px solid rgba(83, 161, 255, 0.36);
+    border-radius: var(--sfo-radius-sm);
+    color: white;
+    background: rgba(10, 14, 35, 0.72);
+    font-size: 22px;
+    font-weight: 650;
+    line-height: 1;
+  }
+
+  .daily-focus-card:not(.is-editing) .daily-focus-form {
+    display: none;
+  }
+
+  .daily-focus-card.is-editing .daily-focus-form {
+    display: grid;
+    margin: 10px 0 12px;
   }
 
   #workflow-capture .quick-capture input {
