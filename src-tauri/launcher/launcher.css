@@ -616,6 +616,10 @@ h3 {
   display: none;
 }
 
+.refresh-button-icon {
+  display: none;
+}
+
 .workflow-panel {
   position: relative;
   min-height: 280px;
@@ -2201,6 +2205,45 @@ textarea:focus {
   .section-heading,
   .dashboard-topline {
     gap: 9px;
+  }
+
+  #workflow-today .dashboard-topline {
+    flex-direction: row;
+    align-items: flex-end;
+    justify-content: space-between;
+  }
+
+  #workflow-today .dashboard-topline > div:first-child {
+    min-width: 0;
+  }
+
+  #workflow-today .dashboard-topline h2 {
+    margin-bottom: 0;
+  }
+
+  #workflow-today .topline-actions {
+    flex: 0 0 auto;
+    align-self: flex-end;
+  }
+
+  #refresh-dashboard {
+    display: inline-flex;
+    width: 40px;
+    min-height: 40px;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border-radius: var(--sfo-radius-sm);
+  }
+
+  #refresh-dashboard .refresh-button-label {
+    display: none;
+  }
+
+  #refresh-dashboard .refresh-button-icon {
+    display: inline;
+    font-size: 22px;
+    line-height: 1;
   }
 
   .workflow-lede,

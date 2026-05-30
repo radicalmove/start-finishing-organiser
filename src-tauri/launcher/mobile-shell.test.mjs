@@ -117,6 +117,35 @@ test("mobile search options collapse to a plus button beside search", () => {
   );
 });
 
+test("mobile Today header keeps refresh in the heading row", () => {
+  const launcherCss = readFileSync(launcherCssPath, "utf8");
+
+  assert.match(
+    launcherCss,
+    /@media \(max-width: 430px\)[\s\S]*#workflow-today \.dashboard-topline\s*\{[\s\S]*flex-direction:\s*row/,
+  );
+  assert.match(
+    launcherCss,
+    /@media \(max-width: 430px\)[\s\S]*#workflow-today \.dashboard-topline\s*\{[\s\S]*align-items:\s*flex-end/,
+  );
+  assert.match(
+    launcherCss,
+    /@media \(max-width: 430px\)[\s\S]*#refresh-dashboard\s*\{[\s\S]*width:\s*40px/,
+  );
+  assert.match(
+    launcherCss,
+    /@media \(max-width: 430px\)[\s\S]*#refresh-dashboard\s*\{[\s\S]*padding:\s*0/,
+  );
+  assert.match(
+    launcherCss,
+    /@media \(max-width: 430px\)[\s\S]*#refresh-dashboard \.refresh-button-label\s*\{[\s\S]*display:\s*none/,
+  );
+  assert.match(
+    launcherCss,
+    /@media \(max-width: 430px\)[\s\S]*#refresh-dashboard \.refresh-button-icon\s*\{[\s\S]*display:\s*inline/,
+  );
+});
+
 test("iPhone header collapses connection status to a top-right indicator", () => {
   const launcherCss = readFileSync(launcherCssPath, "utf8");
 

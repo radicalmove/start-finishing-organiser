@@ -330,3 +330,11 @@ test("review and today date labels share the same presentation class", () => {
   assert.match(indexHtml, /class="eyebrow workflow-date-label" id="today-label"/);
   assert.match(indexHtml, /class="eyebrow workflow-date-label" id="review-date-label"/);
 });
+
+test("today refresh keeps text label and mobile icon with accessible name", () => {
+  const indexHtml = readFileSync(indexHtmlPath, "utf8");
+
+  assert.match(indexHtml, /id="refresh-dashboard"[^>]*aria-label="Refresh Today"/);
+  assert.match(indexHtml, /class="refresh-button-label">Refresh<\/span>/);
+  assert.match(indexHtml, /class="refresh-button-icon"[^>]*aria-hidden="true"[^>]*>&#8635;<\/span>/);
+});
