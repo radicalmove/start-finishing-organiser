@@ -230,6 +230,52 @@ test("mobile process controls stay inside iPhone SE width", () => {
   );
 });
 
+test("mobile process shows the current item before clarification and inbox count", () => {
+  const launcherCss = readFileSync(launcherCssPath, "utf8");
+
+  assert.match(
+    launcherCss,
+    /@media \(max-width: 430px\)[\s\S]*\.process-active-panel\s*\{[\s\S]*order:\s*1/,
+  );
+  assert.match(
+    launcherCss,
+    /@media \(max-width: 430px\)[\s\S]*\.inbox-processing-panel\s*\{[\s\S]*order:\s*2/,
+  );
+  assert.match(
+    launcherCss,
+    /@media \(max-width: 430px\)[\s\S]*\.inbox-panel\s*\{[\s\S]*order:\s*3/,
+  );
+  assert.match(
+    launcherCss,
+    /@media \(max-width: 430px\)[\s\S]*\.inbox-panel \.big-number\s*\{[\s\S]*font-size:\s*42px/,
+  );
+});
+
+test("mobile park return time input stays inside the calendar card", () => {
+  const launcherCss = readFileSync(launcherCssPath, "utf8");
+
+  assert.match(
+    launcherCss,
+    /@media \(max-width: 430px\)[\s\S]*\.park-time-field\s*\{[\s\S]*min-width:\s*0/,
+  );
+  assert.match(
+    launcherCss,
+    /@media \(max-width: 430px\)[\s\S]*\.park-time-field\s*\{[\s\S]*overflow:\s*hidden/,
+  );
+  assert.match(
+    launcherCss,
+    /@media \(max-width: 430px\)[\s\S]*\.park-time-field input\s*\{[\s\S]*max-width:\s*100%/,
+  );
+  assert.match(
+    launcherCss,
+    /@media \(max-width: 430px\)[\s\S]*\.park-time-field input\s*\{[\s\S]*min-width:\s*0/,
+  );
+  assert.match(
+    launcherCss,
+    /@media \(max-width: 430px\)[\s\S]*\.park-time-field input\s*\{[\s\S]*box-sizing:\s*border-box/,
+  );
+});
+
 test("mobile process clarification hides secondary chrome on the first choice", () => {
   const launcherCss = readFileSync(launcherCssPath, "utf8");
 

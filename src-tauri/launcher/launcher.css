@@ -1263,6 +1263,15 @@ textarea:focus {
   color: var(--sfo-success);
   background: rgba(73, 246, 163, 0.08);
   font-weight: 650;
+  transition:
+    opacity 220ms ease,
+    transform 220ms ease;
+}
+
+.action-feedback.is-dismissing {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-12px);
 }
 
 .quick-capture input {
@@ -2468,6 +2477,31 @@ textarea:focus {
     margin-top: 12px;
   }
 
+  .process-active-panel {
+    order: 1;
+  }
+
+  .inbox-processing-panel {
+    order: 2;
+  }
+
+  .inbox-panel {
+    display: grid;
+    order: 3;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 12px;
+    align-items: center;
+  }
+
+  .inbox-panel .big-number {
+    margin: 0;
+    font-size: 42px;
+  }
+
+  .inbox-panel .count-grid {
+    display: none;
+  }
+
   .process-active-item {
     margin-top: 10px;
   }
@@ -2590,7 +2624,15 @@ textarea:focus {
     font-size: 16px;
   }
 
+  .park-time-field {
+    min-width: 0;
+    overflow: hidden;
+  }
+
   .park-time-field input {
+    box-sizing: border-box;
+    max-width: 100%;
+    min-width: 0;
     min-height: 48px;
     font-size: 18px;
   }

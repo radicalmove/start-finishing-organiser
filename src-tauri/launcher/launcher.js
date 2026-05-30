@@ -95,6 +95,8 @@ const BLOCK_TYPE_OPTIONS = [
 ];
 const STARTUP_CONNECT_RETRY_MS = 1000;
 const STARTUP_CONNECT_MAX_ATTEMPTS = 30;
+const ACTION_FEEDBACK_DISMISS_MS = 30000;
+const ACTION_FEEDBACK_SLIDE_MS = 260;
 const PARK_RESURFACE_MAX_TIMER_MS = 2147000000;
 const PARK_CALENDAR_WEEKDAYS = [
   { label: "M", title: "Monday" },
@@ -204,6 +206,8 @@ let activeWorkflow = "today";
 let startupReconnectTimer = null;
 let startupReconnectAttempts = 0;
 let parkResurfaceTimer = null;
+let actionFeedbackDismissTimer = null;
+let actionFeedbackHideTimer = null;
 let globalSearchTimer = null;
 let itemDetailOpen = false;
 let currentItemDetail = null;
@@ -1347,7 +1351,7 @@ function guidedCaptureDetails(item, projectOptions, projectTargetDate) {
   details.className = "guided-details";
 
   const summary = document.createElement("summary");
-  summary.textContent = "Clarify this item";
+  summary.textContent = "Clarify current item";
 
   const form = document.createElement("form");
   form.className = "guided-form";
@@ -1649,6 +1653,36 @@ function parkDateKey(date) {
   return `${date.getFullYear()}-${padDatePart(date.getMonth() + 1)}-${padDatePart(date.getDate())}`;
 }
 
+function formatParkedUntilFeedbackLabel(value) {
+  const text = String(value || "").trim();
+  if (!text) return "";
+
+  const localMatch = text.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/);
+  const date = localMatch
+    ? new Date(
+        Number(localMatch[1]),
+        Number(localMatch[2]) - 1,
+        Number(localMatch[3]),
+        Number(localMatch[4]),
+        Number(localMatch[5]),
+      )
+    : new Date(text);
+  if (Number.isNaN(date.getTime())) return text.replace("T", " ");
+
+  const time = formatFeedbackClock(date);
+  const weekday = new Intl.DateTimeFormat(undefined, { weekday: "short" }).format(date);
+  const month = new Intl.DateTimeFormat(undefined, { month: "short" }).format(date);
+  return `${time} ${weekday} ${date.getDate()} ${month} ${date.getFullYear()}`;
+}
+
+function formatFeedbackClock(date) {
+  const hours = date.getHours();
+  const minutes = date.getMinutes();
+  const hour = hours % 12 || 12;
+  const suffix = hours < 12 ? "am" : "pm";
+  return minutes === 0 ? `${hour}${suffix}` : `${hour}:${padDatePart(minutes)}${suffix}`;
+}
+
 function padDatePart(value) {
   return String(value).padStart(2, "0");
 }
@@ -1687,7 +1721,7 @@ async function submitParkRoute(itemId, itemTitle, parkedUntilValue = "") {
     },
   );
   await connectAndLoad();
-  const untilCopy = parkedUntilValue ? ` until ${parkedUntilValue.replace("T", " ")}` : "";
+  const untilCopy = parkedUntilValue ? ` until ${formatParkedUntilFeedbackLabel(parkedUntilValue)}` : "";
   showActionFeedback({
     message: `Parked "${itemTitle || "this item"}"${untilCopy}.`,
     undoPath: `/api/v1/inbox/${encodeURIComponent(itemId)}/undo`,
@@ -2119,8 +2153,40 @@ function emptyState(text) {
 }
 
 function clearActionFeedback() {
+  if (actionFeedbackDismissTimer) {
+    window.clearTimeout(actionFeedbackDismissTimer);
+    actionFeedbackDismissTimer = null;
+  }
+  if (actionFeedbackHideTimer) {
+    window.clearTimeout(actionFeedbackHideTimer);
+    actionFeedbackHideTimer = null;
+  }
   elements.actionFeedback.replaceChildren();
   elements.actionFeedback.classList.add("hidden");
+  elements.actionFeedback.classList.remove("is-dismissing");
+}
+
+function hideActionFeedbackWithTransition() {
+  if (elements.actionFeedback.classList.contains("hidden")) return;
+  if (actionFeedbackHideTimer) {
+    window.clearTimeout(actionFeedbackHideTimer);
+  }
+
+  elements.actionFeedback.classList.add("is-dismissing");
+  actionFeedbackHideTimer = window.setTimeout(() => {
+    actionFeedbackHideTimer = null;
+    clearActionFeedback();
+  }, ACTION_FEEDBACK_SLIDE_MS);
+}
+
+function scheduleActionFeedbackDismiss() {
+  if (actionFeedbackDismissTimer) {
+    window.clearTimeout(actionFeedbackDismissTimer);
+  }
+  actionFeedbackDismissTimer = window.setTimeout(() => {
+    actionFeedbackDismissTimer = null;
+    hideActionFeedbackWithTransition();
+  }, ACTION_FEEDBACK_DISMISS_MS);
 }
 
 function showActionFeedback(feedback) {
@@ -2144,7 +2210,9 @@ function showActionFeedback(feedback) {
     elements.actionFeedback.append(undo);
   }
 
+  elements.actionFeedback.classList.remove("is-dismissing");
   elements.actionFeedback.classList.remove("hidden");
+  scheduleActionFeedbackDismiss();
 }
 
 for (const tab of elements.workflowTabs) {

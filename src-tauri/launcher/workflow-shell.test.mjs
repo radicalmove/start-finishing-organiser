@@ -133,7 +133,7 @@ test("process workflow reserves a dedicated current-decision panel", () => {
   const launcherJs = readFileSync(launcherJsPath, "utf8");
 
   assert.match(indexHtml, /id="process-active-item"/);
-  assert.match(indexHtml, /Current decision/);
+  assert.match(indexHtml, /Current item/);
   assert.match(indexHtml, /id="process-active-actions"/);
   assert.match(launcherJs, /processActiveItem/);
   assert.match(launcherJs, /processActiveActions/);
@@ -222,7 +222,7 @@ test("launcher renders guided process as progressive steps", () => {
 test("launcher starts Process clarification with a compact choice", () => {
   const launcherJs = readFileSync(launcherJsPath, "utf8");
 
-  assert.match(launcherJs, /summary\.textContent = "Clarify this item"/);
+  assert.match(launcherJs, /summary\.textContent = "Clarify current item"/);
   assert.match(launcherJs, /legend\.textContent = "What is this\?"/);
   assert.match(launcherJs, /decisionHelpDetails\(\)/);
   assert.match(launcherJs, /summary\.textContent = "Help me choose"/);
@@ -260,6 +260,32 @@ test("launcher makes Park an explicit optional date-time choice", () => {
   assert.match(launcherCss, /\.park-choice-panel/);
   assert.match(launcherCss, /\.park-calendar-day/);
   assert.match(launcherCss, /min-height:\s*56px/);
+});
+
+test("launcher formats parked feedback and lets it dismiss itself", () => {
+  const launcherJs = readFileSync(launcherJsPath, "utf8");
+  const launcherCss = readFileSync(launcherCssPath, "utf8");
+
+  assert.match(launcherJs, /const ACTION_FEEDBACK_DISMISS_MS = 30000;/);
+  assert.match(launcherJs, /let actionFeedbackDismissTimer = null;/);
+  assert.match(launcherJs, /function scheduleActionFeedbackDismiss\(\)/);
+  assert.match(launcherJs, /function hideActionFeedbackWithTransition\(\)/);
+  assert.match(launcherJs, /formatParkedUntilFeedbackLabel\(parkedUntilValue\)/);
+  assert.match(launcherJs, /function formatParkedUntilFeedbackLabel\(value\)/);
+  assert.doesNotMatch(launcherJs, /parkedUntilValue\.replace\("T", " "\)/);
+  assert.match(launcherCss, /\.action-feedback\s*\{[\s\S]*transition:/);
+  assert.match(launcherCss, /\.action-feedback\.is-dismissing/);
+});
+
+test("process workflow copy explains the active item before clarification", () => {
+  const indexHtml = readFileSync(indexHtmlPath, "utf8");
+
+  assert.match(indexHtml, /Process next item/);
+  assert.match(indexHtml, /Choose what happens to this item\./);
+  assert.match(indexHtml, /Clarify only if needed/);
+  assert.match(indexHtml, /Inbox remaining/);
+  assert.doesNotMatch(indexHtml, /Decision Queue/);
+  assert.doesNotMatch(indexHtml, /One item at a time\./);
 });
 
 test("launcher wires weekly review actions", () => {

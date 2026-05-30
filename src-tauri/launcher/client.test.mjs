@@ -607,7 +607,7 @@ test("process workflow exposes only the active inbox item as actionable", () => 
   });
 
   assert.equal(model.activeItem.id, "task-1");
-  assert.equal(model.positionLabel, "1 of 3");
+  assert.equal(model.positionLabel, "Item 1 of 3");
   assert.deepEqual(
     model.queue.map((item) => item.id),
     ["task-1"],
