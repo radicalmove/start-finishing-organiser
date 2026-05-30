@@ -45,6 +45,11 @@ test("mobile shell has an iPhone SE width treatment", () => {
 
   assert.match(launcherCss, /@media \(max-width: 430px\)/);
   assert.match(launcherCss, /@media \(max-width: 430px\)[\s\S]*width:\s*min\(calc\(100vw - 12px\),\s*680px\)/);
+  assert.match(launcherCss, /@media \(max-width: 430px\)[\s\S]*\.workflow-nav\s*\{[\s\S]*grid-template-columns:\s*repeat\(5,\s*minmax\(0,\s*1fr\)\)/);
+  assert.match(launcherCss, /@media \(max-width: 430px\)[\s\S]*\.workflow-tab\s*\{[\s\S]*font-size:\s*12px/);
+  assert.match(launcherCss, /@media \(max-width: 430px\)[\s\S]*\.workflow-tab\[data-workflow-tab="settings"\]\s*\{[\s\S]*grid-column:\s*auto/);
+  assert.match(launcherCss, /@media \(max-width: 430px\)[\s\S]*\.workflow-tab\[data-workflow-tab="settings"\] \.workflow-tab-label\s*\{[\s\S]*display:\s*none/);
+  assert.match(launcherCss, /@media \(max-width: 430px\)[\s\S]*\.workflow-tab\[data-workflow-tab="settings"\] \.workflow-tab-mobile-icon\s*\{[\s\S]*display:\s*inline/);
   assert.match(launcherCss, /@media \(max-width: 430px\)[\s\S]*\.workflow-panel\s*\{[\s\S]*padding:\s*12px/);
   assert.match(launcherCss, /@media \(max-width: 430px\)[\s\S]*\.mini-button\s*\{[\s\S]*flex:\s*1 1 calc\(50% - 4px\)/);
 });

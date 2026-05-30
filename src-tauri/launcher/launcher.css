@@ -578,6 +578,9 @@ h3 {
 }
 
 .workflow-tab {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   min-height: 50px;
   border: 1px solid transparent;
   border-radius: var(--sfo-radius-button);
@@ -607,6 +610,10 @@ h3 {
     linear-gradient(135deg, rgba(255, 43, 209, 0.24), rgba(25, 135, 255, 0.22)),
     rgba(10, 14, 35, 0.84);
   box-shadow: 0 0 24px rgba(45, 160, 255, 0.16);
+}
+
+.workflow-tab-mobile-icon {
+  display: none;
 }
 
 .workflow-panel {
@@ -2122,19 +2129,32 @@ textarea:focus {
   }
 
   .workflow-nav {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
     gap: 6px;
     margin-top: 10px;
-    padding: 5px;
+    padding: 4px;
   }
 
   .workflow-tab {
-    min-height: 43px;
+    min-height: 38px;
+    padding: 0 2px;
     border-radius: var(--sfo-radius-sm);
-    font-size: 16px;
+    font-size: 12px;
+    letter-spacing: -0.02em;
   }
 
   .workflow-tab[data-workflow-tab="settings"] {
-    grid-column: 1 / -1;
+    grid-column: auto;
+  }
+
+  .workflow-tab[data-workflow-tab="settings"] .workflow-tab-label {
+    display: none;
+  }
+
+  .workflow-tab[data-workflow-tab="settings"] .workflow-tab-mobile-icon {
+    display: inline;
+    font-size: 16px;
+    line-height: 1;
   }
 
   .workflow-panel {

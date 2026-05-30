@@ -40,11 +40,22 @@
       </section>
 
       <nav class="workflow-nav" aria-label="Primary workflows">
-        <button class="workflow-tab is-active" type="button" data-workflow-tab="today" aria-selected="true">Today</button>
-        <button class="workflow-tab" type="button" data-workflow-tab="capture" aria-selected="false">Capture</button>
-        <button class="workflow-tab" type="button" data-workflow-tab="process" aria-selected="false">Process</button>
-        <button class="workflow-tab" type="button" data-workflow-tab="review" aria-selected="false">Review</button>
-        <button class="workflow-tab" type="button" data-workflow-tab="settings" aria-selected="false">Settings</button>
+        <button class="workflow-tab is-active" type="button" data-workflow-tab="today" aria-selected="true">
+          <span class="workflow-tab-label">Today</span>
+        </button>
+        <button class="workflow-tab" type="button" data-workflow-tab="capture" aria-selected="false">
+          <span class="workflow-tab-label">Capture</span>
+        </button>
+        <button class="workflow-tab" type="button" data-workflow-tab="process" aria-selected="false">
+          <span class="workflow-tab-label">Process</span>
+        </button>
+        <button class="workflow-tab" type="button" data-workflow-tab="review" aria-selected="false">
+          <span class="workflow-tab-label">Review</span>
+        </button>
+        <button class="workflow-tab" type="button" data-workflow-tab="settings" aria-label="Settings" aria-selected="false">
+          <span class="workflow-tab-label">Settings</span>
+          <span class="workflow-tab-mobile-icon" aria-hidden="true">&#9881;</span>
+        </button>
       </nav>
 
       <section class="dashboard hidden" id="dashboard">

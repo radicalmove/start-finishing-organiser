@@ -23,6 +23,13 @@ test("launcher exposes the five top-level workflows", () => {
   assert.match(indexHtml, /Settings/);
 });
 
+test("launcher keeps Settings compact on phone without losing accessibility", () => {
+  const indexHtml = readFileSync(indexHtmlPath, "utf8");
+
+  assert.match(indexHtml, /data-workflow-tab="settings"[^>]*aria-label="Settings"/);
+  assert.match(indexHtml, /class="workflow-tab-mobile-icon"[^>]*aria-hidden="true"[^>]*>&#9881;<\/span>/);
+});
+
 test("connection settings are scoped to the Settings workflow", () => {
   const indexHtml = readFileSync(indexHtmlPath, "utf8");
   const settingsPanelStart = indexHtml.indexOf('data-workflow-panel="settings"');
