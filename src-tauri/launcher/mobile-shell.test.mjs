@@ -80,6 +80,43 @@ test("mobile global search does not reserve desktop vertical space", () => {
   );
 });
 
+test("mobile search options collapse to a plus button beside search", () => {
+  const launcherCss = readFileSync(launcherCssPath, "utf8");
+
+  assert.match(
+    launcherCss,
+    /@media \(max-width: 430px\)[\s\S]*\.global-search\s*\{[\s\S]*grid-template-columns:\s*minmax\(0,\s*1fr\) 40px/,
+  );
+  assert.match(
+    launcherCss,
+    /@media \(max-width: 430px\)[\s\S]*\.global-search-options\s*\{[\s\S]*display:\s*contents/,
+  );
+  assert.match(
+    launcherCss,
+    /@media \(max-width: 430px\)[\s\S]*\.global-search-options > summary\s*\{[\s\S]*grid-column:\s*2/,
+  );
+  assert.match(
+    launcherCss,
+    /@media \(max-width: 430px\)[\s\S]*\.global-search-options > summary\s*\{[\s\S]*width:\s*40px/,
+  );
+  assert.match(
+    launcherCss,
+    /@media \(max-width: 430px\)[\s\S]*\.global-search-options > summary\s*\{[\s\S]*font-size:\s*0/,
+  );
+  assert.match(
+    launcherCss,
+    /@media \(max-width: 430px\)[\s\S]*\.global-search-options > summary::after\s*\{[\s\S]*content:\s*"\+"/,
+  );
+  assert.match(
+    launcherCss,
+    /@media \(max-width: 430px\)[\s\S]*\.global-search-recycle\s*\{[\s\S]*grid-column:\s*1 \/ -1/,
+  );
+  assert.match(
+    launcherCss,
+    /@media \(max-width: 430px\)[\s\S]*\.search-results-panel\s*\{[\s\S]*grid-column:\s*1 \/ -1/,
+  );
+});
+
 test("iPhone header collapses connection status to a top-right indicator", () => {
   const launcherCss = readFileSync(launcherCssPath, "utf8");
 

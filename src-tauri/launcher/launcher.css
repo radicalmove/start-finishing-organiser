@@ -2046,9 +2046,12 @@ textarea:focus {
 
   .global-search {
     gap: 6px;
+    grid-template-columns: minmax(0, 1fr) 40px;
+    align-items: end;
   }
 
   .global-search-field {
+    grid-column: 1;
     gap: 4px;
   }
 
@@ -2057,13 +2060,46 @@ textarea:focus {
     padding: 0 12px;
   }
 
+  .global-search-options {
+    display: contents;
+  }
+
   .global-search-options > summary {
-    min-height: 30px;
-    font-size: 11px;
+    display: inline-flex;
+    grid-column: 2;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    min-height: 44px;
+    border: 1px solid rgba(83, 161, 255, 0.32);
+    border-radius: var(--sfo-radius-sm);
+    background: rgba(5, 3, 15, 0.44);
+    font-size: 0;
+    line-height: 1;
+  }
+
+  .global-search-options > summary::after {
+    content: "+";
+    margin-left: 0;
+    font-size: 22px;
+    line-height: 1;
+  }
+
+  .global-search-options[open] > summary::after {
+    content: "-";
+  }
+
+  .global-search-recycle {
+    grid-column: 1 / -1;
+    margin-top: 0;
   }
 
   .global-search-options[open] .global-search-recycle {
-    margin-top: 5px;
+    margin-top: 0;
+  }
+
+  .search-results-panel {
+    grid-column: 1 / -1;
   }
 
   .app-mark {
