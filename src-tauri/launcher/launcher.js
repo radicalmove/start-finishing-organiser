@@ -164,6 +164,7 @@ const elements = {
   inboxTotal: document.getElementById("inbox-total"),
   inboxCounts: document.getElementById("inbox-counts"),
   processWorkflow: document.getElementById("workflow-process"),
+  processActiveHeading: document.getElementById("process-active-heading"),
   processActiveItem: document.getElementById("process-active-item"),
   processActiveActions: document.getElementById("process-active-actions"),
   inboxItems: document.getElementById("inbox-items"),
@@ -911,6 +912,7 @@ function renderProcessWorkflow(model, projectOptions = [], projectTargetDate = "
   elements.processActiveActions.replaceChildren();
   elements.inboxItems.replaceChildren();
   if (!model.queue.length) {
+    elements.processActiveHeading.textContent = "Inbox clear";
     elements.processActiveItem.append(
       emptyState("Inbox is clear. Capture something when it appears."),
     );
@@ -920,10 +922,11 @@ function renderProcessWorkflow(model, projectOptions = [], projectTargetDate = "
 
   const item = model.activeItem || model.queue[0];
   if (!item) return;
+  elements.processActiveHeading.textContent = item.title;
 
   const activeCard = document.createElement("div");
   activeCard.className = "inbox-item process-primary process-active-card";
-  activeCard.append(inboxItemBody(item));
+  activeCard.append(inboxItemBody(item, { includeTitle: false }));
   elements.processActiveItem.append(activeCard);
   elements.processActiveActions.append(...buildInboxActions(item));
 
@@ -1435,7 +1438,7 @@ function guidedCaptureDetails(item, projectOptions, projectTargetDate) {
   return details;
 }
 
-function inboxItemBody(item) {
+function inboxItemBody(item, options = {}) {
   const body = document.createElement("div");
   body.className = "inbox-item-body";
   const title = document.createElement("strong");
@@ -1444,7 +1447,10 @@ function inboxItemBody(item) {
   description.textContent = item.description;
   const meta = document.createElement("small");
   meta.textContent = item.meta;
-  body.append(title, description, meta);
+  if (options.includeTitle !== false) {
+    body.append(title);
+  }
+  body.append(description, meta);
   return body;
 }
 

@@ -2477,6 +2477,31 @@ textarea:focus {
     margin-top: 12px;
   }
 
+  #workflow-process > .section-heading {
+    flex-direction: row;
+    align-items: flex-start;
+    justify-content: space-between;
+  }
+
+  #workflow-process > .section-heading > div:first-child {
+    min-width: 0;
+  }
+
+  #workflow-process > .section-heading h2 {
+    margin-bottom: 0;
+  }
+
+  #workflow-process .workflow-lede {
+    display: none;
+  }
+
+  .process-position {
+    flex: 0 0 auto;
+    padding: 8px 10px;
+    color: white;
+    font-size: 18px;
+  }
+
   .process-active-panel {
     order: 1;
   }
@@ -2486,20 +2511,8 @@ textarea:focus {
   }
 
   .inbox-panel {
-    display: grid;
-    order: 3;
-    grid-template-columns: minmax(0, 1fr) auto;
-    gap: 12px;
-    align-items: center;
-  }
-
-  .inbox-panel .big-number {
-    margin: 0;
-    font-size: 42px;
-  }
-
-  .inbox-panel .count-grid {
     display: none;
+    order: 3;
   }
 
   .process-active-item {

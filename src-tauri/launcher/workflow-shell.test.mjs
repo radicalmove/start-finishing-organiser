@@ -132,9 +132,11 @@ test("process workflow reserves a dedicated current-decision panel", () => {
   const indexHtml = readFileSync(indexHtmlPath, "utf8");
   const launcherJs = readFileSync(launcherJsPath, "utf8");
 
+  assert.match(indexHtml, /id="process-active-heading"/);
   assert.match(indexHtml, /id="process-active-item"/);
   assert.match(indexHtml, /Current item/);
   assert.match(indexHtml, /id="process-active-actions"/);
+  assert.match(launcherJs, /processActiveHeading/);
   assert.match(launcherJs, /processActiveItem/);
   assert.match(launcherJs, /processActiveActions/);
 });
@@ -279,11 +281,14 @@ test("launcher formats parked feedback and lets it dismiss itself", () => {
 
 test("process workflow copy explains the active item before clarification", () => {
   const indexHtml = readFileSync(indexHtmlPath, "utf8");
+  const launcherJs = readFileSync(launcherJsPath, "utf8");
 
   assert.match(indexHtml, /Process next item/);
-  assert.match(indexHtml, /Choose what happens to this item\./);
   assert.match(indexHtml, /Clarify only if needed/);
-  assert.match(indexHtml, /Inbox remaining/);
+  assert.match(launcherJs, /elements\.processActiveHeading\.textContent = item\.title/);
+  assert.doesNotMatch(indexHtml, /Choose what happens to the current inbox item/);
+  assert.doesNotMatch(indexHtml, /Choose what happens to this item\./);
+  assert.doesNotMatch(indexHtml, /Start with a quick route/);
   assert.doesNotMatch(indexHtml, /Decision Queue/);
   assert.doesNotMatch(indexHtml, /One item at a time\./);
 });

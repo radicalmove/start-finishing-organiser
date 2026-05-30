@@ -230,7 +230,7 @@ test("mobile process controls stay inside iPhone SE width", () => {
   );
 });
 
-test("mobile process shows the current item before clarification and inbox count", () => {
+test("mobile process shows the current item first and hides the duplicate inbox count", () => {
   const launcherCss = readFileSync(launcherCssPath, "utf8");
 
   assert.match(
@@ -243,11 +243,19 @@ test("mobile process shows the current item before clarification and inbox count
   );
   assert.match(
     launcherCss,
-    /@media \(max-width: 430px\)[\s\S]*\.inbox-panel\s*\{[\s\S]*order:\s*3/,
+    /@media \(max-width: 430px\)[\s\S]*\.inbox-panel\s*\{[\s\S]*display:\s*none/,
   );
   assert.match(
     launcherCss,
-    /@media \(max-width: 430px\)[\s\S]*\.inbox-panel \.big-number\s*\{[\s\S]*font-size:\s*42px/,
+    /@media \(max-width: 430px\)[\s\S]*#workflow-process > \.section-heading\s*\{[\s\S]*flex-direction:\s*row/,
+  );
+  assert.match(
+    launcherCss,
+    /@media \(max-width: 430px\)[\s\S]*\.process-position\s*\{[\s\S]*color:\s*white/,
+  );
+  assert.match(
+    launcherCss,
+    /@media \(max-width: 430px\)[\s\S]*\.process-position\s*\{[\s\S]*font-size:\s*18px/,
   );
 });
 
