@@ -2129,22 +2129,23 @@ textarea:focus {
   }
 
   .workflow-nav {
-    grid-template-columns: repeat(5, minmax(0, 1fr));
+    grid-template-columns: minmax(0, 1.06fr) minmax(0, 1.24fr) minmax(0, 1.2fr) minmax(0, 1.08fr) minmax(34px, 0.42fr);
     gap: 6px;
     margin-top: 10px;
     padding: 4px;
   }
 
   .workflow-tab {
-    min-height: 38px;
-    padding: 0 2px;
+    min-height: 40px;
+    padding: 0 3px;
     border-radius: var(--sfo-radius-sm);
-    font-size: 12px;
-    letter-spacing: -0.02em;
+    font-size: 13px;
+    letter-spacing: 0;
   }
 
   .workflow-tab[data-workflow-tab="settings"] {
     grid-column: auto;
+    padding: 0;
   }
 
   .workflow-tab[data-workflow-tab="settings"] .workflow-tab-label {
@@ -2153,7 +2154,7 @@ textarea:focus {
 
   .workflow-tab[data-workflow-tab="settings"] .workflow-tab-mobile-icon {
     display: inline;
-    font-size: 16px;
+    font-size: 20px;
     line-height: 1;
   }
 
