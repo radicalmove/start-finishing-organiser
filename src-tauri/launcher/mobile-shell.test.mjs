@@ -4,6 +4,7 @@ import test from "node:test";
 
 const indexHtmlPath = new URL("./index.html", import.meta.url);
 const launcherCssPath = new URL("./launcher.css", import.meta.url);
+const iosInfoPlistPath = new URL("../gen/apple/sfo_iOS/Info.plist", import.meta.url);
 
 test("mobile shell opts into iOS safe-area layout", () => {
   const indexHtml = readFileSync(indexHtmlPath, "utf8");
@@ -12,6 +13,14 @@ test("mobile shell opts into iOS safe-area layout", () => {
   assert.match(indexHtml, /viewport-fit=cover/);
   assert.match(launcherCss, /env\(safe-area-inset-top/);
   assert.match(launcherCss, /body::after/);
+});
+
+test("iOS shell allows private HTTP WebView traffic for LAN and Tailnet servers", () => {
+  const infoPlist = readFileSync(iosInfoPlistPath, "utf8");
+
+  assert.match(infoPlist, /<key>NSAppTransportSecurity<\/key>/);
+  assert.match(infoPlist, /<key>NSAllowsLocalNetworking<\/key>\s*<true\/>/);
+  assert.match(infoPlist, /<key>NSAllowsArbitraryLoadsInWebContent<\/key>\s*<true\/>/);
 });
 
 test("mobile shell paints the full iOS viewport behind safe areas", () => {
