@@ -19,7 +19,7 @@
   --sfo-glow: 0 0 24px rgba(45, 160, 255, 0.34), 0 0 18px rgba(255, 43, 209, 0.28);
   --sfo-soft-glow: 0 20px 80px rgba(0, 0, 0, 0.32), 0 0 32px rgba(45, 160, 255, 0.14);
   --sfo-card-shadow: 0 26px 90px rgba(0, 0, 0, 0.36);
-  --sfo-workflow-title-size: clamp(40px, 5vw, 58px);
+  --sfo-workflow-title-size: clamp(34px, 3.2vw, 44px);
   --sfo-current-item-title-size: clamp(32px, 4vw, 46px);
   --sfo-panel-title-size: 22px;
   --sfo-quiet-heading-size: 20px;

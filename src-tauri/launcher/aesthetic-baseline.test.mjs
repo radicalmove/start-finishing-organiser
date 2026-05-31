@@ -40,8 +40,9 @@ test("app header is compact and leaves room for workflow content", () => {
 test("typography is calmer and small text remains readable", () => {
   const launcherCss = readFileSync(launcherCssPath, "utf8");
 
-  assert.match(launcherCss, /--sfo-workflow-title-size:\s*clamp\(40px, 5vw, 58px\);/);
+  assert.match(launcherCss, /--sfo-workflow-title-size:\s*clamp\(34px, 3\.2vw, 44px\);/);
   assert.match(launcherCss, /--sfo-current-item-title-size:\s*clamp\(32px, 4vw, 46px\);/);
+  assert.match(launcherCss, /--sfo-mobile-workflow-title-size:\s*30px;/);
   assert.match(launcherCss, /--sfo-panel-title-size:\s*22px;/);
   assert.match(launcherCss, /\.workflow-tab\s*\{[\s\S]*font-size:\s*18px/);
   assert.match(launcherCss, /\.workflow-tab\s*\{[\s\S]*font-weight:\s*650/);
