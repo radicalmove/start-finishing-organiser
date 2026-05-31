@@ -29,9 +29,12 @@ test("app header is compact and leaves room for workflow content", () => {
   const indexHtml = readFileSync(indexHtmlPath, "utf8");
 
   assert.match(indexHtml, /<section class="app-header"/);
+  assert.match(indexHtml, /<div class="eyebrow">Capture · Process · Review<\/div>/);
+  assert.match(indexHtml, /<h1>Start Finishing Organiser<\/h1>/);
   assert.match(launcherCss, /\.app-header\s*\{[\s\S]*min-height:\s*0/);
   assert.match(launcherCss, /\.app-header\s*\{[\s\S]*padding:\s*16px 18px/);
   assert.doesNotMatch(indexHtml, /Calm command centre/);
+  assert.doesNotMatch(indexHtml, /Today’s operating system/);
 });
 
 test("typography is calmer and small text remains readable", () => {

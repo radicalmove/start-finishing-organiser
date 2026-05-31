@@ -651,9 +651,19 @@ h3 {
 
 .process-layout {
   display: grid;
-  grid-template-columns: minmax(220px, 0.42fr) minmax(0, 1fr);
+  grid-template-columns: minmax(280px, 0.82fr) minmax(0, 1.18fr);
   gap: 16px;
+  align-items: start;
   margin-top: 18px;
+}
+
+#workflow-process .inbox-panel {
+  display: none;
+}
+
+#workflow-process .inbox-processing-panel {
+  grid-column: auto;
+  min-height: 0;
 }
 
 .process-active-panel {
@@ -720,8 +730,14 @@ h3 {
 }
 
 .process-active-actions {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   margin-top: 16px;
-  justify-content: flex-start;
+  justify-content: stretch;
+}
+
+.process-active-actions button {
+  width: 100%;
 }
 
 .review-count-grid {
@@ -2003,8 +2019,12 @@ textarea:focus {
     width: fit-content;
   }
 
-  .inbox-processing-panel {
-    order: -1;
+  #workflow-process .process-active-panel {
+    order: 1;
+  }
+
+  #workflow-process .inbox-processing-panel {
+    order: 2;
   }
 
   .action-feedback {

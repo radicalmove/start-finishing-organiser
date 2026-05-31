@@ -61,10 +61,18 @@ test("mobile shell prevents iOS input focus zoom", () => {
   assert.match(launcherCss, /input,\s*select,\s*textarea\s*\{[^}]*font-size:\s*16px/);
 });
 
-test("mobile process view puts the actionable queue before inbox stats", () => {
+test("mobile process view keeps current item before clarification and hides inbox stats", () => {
   const launcherCss = readFileSync(launcherCssPath, "utf8");
 
-  assert.match(launcherCss, /@media \(max-width: 1024px\)[\s\S]*\.inbox-processing-panel\s*\{[\s\S]*order:\s*-1/);
+  assert.match(
+    launcherCss,
+    /@media \(max-width: 1024px\)[\s\S]*#workflow-process \.process-active-panel\s*\{[\s\S]*order:\s*1/,
+  );
+  assert.match(
+    launcherCss,
+    /@media \(max-width: 1024px\)[\s\S]*#workflow-process \.inbox-processing-panel\s*\{[\s\S]*order:\s*2/,
+  );
+  assert.match(launcherCss, /#workflow-process \.inbox-panel\s*\{[\s\S]*display:\s*none/);
 });
 
 test("mobile global search does not reserve desktop vertical space", () => {

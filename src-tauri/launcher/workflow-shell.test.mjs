@@ -282,11 +282,29 @@ test("launcher formats parked feedback and lets it dismiss itself", () => {
 test("process workflow copy explains the active item before clarification", () => {
   const indexHtml = readFileSync(indexHtmlPath, "utf8");
   const launcherJs = readFileSync(launcherJsPath, "utf8");
+  const launcherCss = readFileSync(launcherCssPath, "utf8");
 
   assert.match(indexHtml, /To Process/);
   assert.match(indexHtml, /Most likely/);
   assert.match(indexHtml, /Change to Project or Waiting On if needed\./);
+  assert.match(
+    indexHtml,
+    /class="process-layout"[\s\S]*class="panel process-active-panel"[\s\S]*class="panel inbox-processing-panel"[\s\S]*class="panel inbox-panel"/,
+  );
   assert.match(indexHtml, /id="inbox-items"[\s\S]*id="process-active-actions"/);
+  assert.doesNotMatch(indexHtml, /class="panel wide-panel inbox-processing-panel"/);
+  assert.match(
+    launcherCss,
+    /#workflow-process \.inbox-panel\s*\{[\s\S]*display:\s*none/,
+  );
+  assert.match(
+    launcherCss,
+    /#workflow-process \.inbox-processing-panel\s*\{[\s\S]*grid-column:\s*auto/,
+  );
+  assert.match(
+    launcherCss,
+    /\.process-active-actions\s*\{[\s\S]*display:\s*grid;[\s\S]*grid-template-columns:\s*repeat\(4, minmax\(0, 1fr\)\)/,
+  );
   assert.match(launcherJs, /elements\.processActiveHeading\.textContent = item\.title/);
   assert.match(launcherJs, /learn_explore: "Learn"/);
   assert.match(launcherJs, /recycle\.textContent = "♻"/);
