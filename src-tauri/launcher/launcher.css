@@ -19,6 +19,13 @@
   --sfo-glow: 0 0 24px rgba(45, 160, 255, 0.34), 0 0 18px rgba(255, 43, 209, 0.28);
   --sfo-soft-glow: 0 20px 80px rgba(0, 0, 0, 0.32), 0 0 32px rgba(45, 160, 255, 0.14);
   --sfo-card-shadow: 0 26px 90px rgba(0, 0, 0, 0.36);
+  --sfo-workflow-title-size: clamp(40px, 5vw, 58px);
+  --sfo-current-item-title-size: clamp(32px, 4vw, 46px);
+  --sfo-panel-title-size: 22px;
+  --sfo-quiet-heading-size: 20px;
+  --sfo-mobile-workflow-title-size: 30px;
+  --sfo-mobile-process-title-size: 32px;
+  --sfo-mobile-current-item-title-size: 26px;
   --sfo-app-background:
     radial-gradient(circle at 16% 8%, rgba(255, 43, 209, 0.28), transparent 24rem),
     radial-gradient(circle at 84% 12%, rgba(25, 135, 255, 0.32), transparent 26rem),
@@ -493,14 +500,15 @@ h1 {
 
 h2 {
   margin-bottom: 8px;
-  font-size: 32px;
+  font-size: var(--sfo-workflow-title-size);
   font-weight: 650;
+  line-height: 0.95;
   letter-spacing: -0.045em;
 }
 
 h3 {
   margin-bottom: 10px;
-  font-size: 24px;
+  font-size: var(--sfo-panel-title-size);
   font-weight: 650;
   letter-spacing: -0.03em;
 }
@@ -666,6 +674,10 @@ h3 {
   min-height: 0;
 }
 
+#workflow-process > .section-heading h2 {
+  font-size: var(--sfo-workflow-title-size);
+}
+
 .process-active-panel {
   min-height: 0;
   background:
@@ -727,6 +739,21 @@ h3 {
 
 .process-active-card small {
   font-size: 14px;
+}
+
+.process-active-title {
+  max-width: 11ch;
+  margin-bottom: 0;
+  color: white;
+  font-size: var(--sfo-current-item-title-size);
+  line-height: 0.94;
+  letter-spacing: -0.055em;
+}
+
+.process-next-step-title {
+  font-size: var(--sfo-quiet-heading-size);
+  line-height: 1.1;
+  letter-spacing: -0.02em;
 }
 
 .process-active-actions {
@@ -2158,7 +2185,7 @@ textarea:focus {
   }
 
   h2 {
-    font-size: 26px;
+    font-size: var(--sfo-mobile-workflow-title-size);
   }
 
   h3 {
@@ -2509,6 +2536,7 @@ textarea:focus {
 
   #workflow-process > .section-heading h2 {
     margin-bottom: 0;
+    font-size: var(--sfo-mobile-process-title-size);
   }
 
   #workflow-process .workflow-lede {
@@ -2546,6 +2574,15 @@ textarea:focus {
   .process-active-card strong {
     font-size: 22px;
     letter-spacing: 0;
+  }
+
+  .process-active-title {
+    max-width: 9ch;
+    font-size: var(--sfo-mobile-current-item-title-size);
+  }
+
+  .process-next-step-title {
+    font-size: 18px;
   }
 
   .process-active-card span {

@@ -305,6 +305,18 @@ test("process workflow copy explains the active item before clarification", () =
     launcherCss,
     /\.process-active-actions\s*\{[\s\S]*display:\s*grid;[\s\S]*grid-template-columns:\s*repeat\(4, minmax\(0, 1fr\)\)/,
   );
+  assert.match(
+    launcherCss,
+    /#workflow-process > \.section-heading h2\s*\{[\s\S]*font-size:\s*var\(--sfo-workflow-title-size\)/,
+  );
+  assert.match(
+    launcherCss,
+    /\.process-active-title\s*\{[\s\S]*font-size:\s*var\(--sfo-current-item-title-size\)/,
+  );
+  assert.match(
+    launcherCss,
+    /\.process-next-step-title\s*\{[\s\S]*font-size:\s*var\(--sfo-quiet-heading-size\)/,
+  );
   assert.match(launcherJs, /elements\.processActiveHeading\.textContent = item\.title/);
   assert.match(launcherJs, /learn_explore: "Learn"/);
   assert.match(launcherJs, /recycle\.textContent = "♻"/);

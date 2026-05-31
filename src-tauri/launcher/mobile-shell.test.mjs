@@ -247,6 +247,18 @@ test("mobile process shows the current item first and hides the duplicate inbox 
 
   assert.match(
     launcherCss,
+    /@media \(max-width: 430px\)[\s\S]*h2\s*\{[\s\S]*font-size:\s*var\(--sfo-mobile-workflow-title-size\)/,
+  );
+  assert.match(
+    launcherCss,
+    /@media \(max-width: 430px\)[\s\S]*#workflow-process > \.section-heading h2\s*\{[\s\S]*font-size:\s*var\(--sfo-mobile-process-title-size\)/,
+  );
+  assert.match(
+    launcherCss,
+    /@media \(max-width: 430px\)[\s\S]*\.process-active-title\s*\{[\s\S]*font-size:\s*var\(--sfo-mobile-current-item-title-size\)/,
+  );
+  assert.match(
+    launcherCss,
     /@media \(max-width: 430px\)[\s\S]*\.process-active-panel\s*\{[\s\S]*order:\s*1/,
   );
   assert.match(
