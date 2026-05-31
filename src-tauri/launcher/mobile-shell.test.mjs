@@ -138,6 +138,10 @@ test("mobile Today header keeps refresh in the heading row", () => {
   );
   assert.match(
     launcherCss,
+    /@media \(max-width: 430px\)[\s\S]*#workflow-today \.dashboard-topline\s*\{[\s\S]*margin-bottom:\s*8px/,
+  );
+  assert.match(
+    launcherCss,
     /@media \(max-width: 430px\)[\s\S]*#refresh-dashboard\s*\{[\s\S]*width:\s*40px/,
   );
   assert.match(

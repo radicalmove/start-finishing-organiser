@@ -16,6 +16,8 @@ test("launcher exposes the five top-level workflows", () => {
   }
 
   assert.match(indexHtml, /<nav class="workflow-nav"/);
+  assert.match(indexHtml, /<h2>Today<\/h2>/);
+  assert.doesNotMatch(indexHtml, /Home \/ Today/);
   assert.match(indexHtml, /Today/);
   assert.match(indexHtml, /Capture/);
   assert.match(indexHtml, /Process/);

@@ -2279,6 +2279,7 @@ textarea:focus {
     flex-direction: row;
     align-items: flex-end;
     justify-content: space-between;
+    margin-bottom: 8px;
   }
 
   #workflow-today .dashboard-topline > div:first-child {
