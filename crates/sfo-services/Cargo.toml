@@ -8,8 +8,10 @@ repository.workspace = true
 
 [dependencies]
 chrono.workspace = true
+serde.workspace = true
 sfo-core = { path = "../sfo-core" }
 sfo-db = { path = "../sfo-db" }
+serde_json.workspace = true
 sqlx.workspace = true
 thiserror.workspace = true
 

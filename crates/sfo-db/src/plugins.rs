@@ -1,7 +1,7 @@
 use chrono::{DateTime, Utc};
 use sfo_core::{
     PluginCapability, PluginCapabilityId, PluginCapabilityKind, PluginDetail, PluginId,
-    PluginStatus, PluginSuggestion, PluginSuggestionCreate, PluginSuggestionId,
+    PluginStatus, PluginSuggestion, PluginSuggestionCreate, PluginSuggestionId, PluginUpdate,
     PluginSuggestionStatus, PluginTrustLevel,
 };
 use sqlx::FromRow;
@@ -79,6 +79,40 @@ pub async fn get_plugin(
         Some(row) => Ok(Some(plugin_from_row(pool, row).await?)),
         None => Ok(None),
     }
+}
+
+pub async fn update_plugin(
+    pool: &sqlx::SqlitePool,
+    plugin_id: &PluginId,
+    payload: PluginUpdate,
+) -> Result<PluginDetail, DbError> {
+    let current = get_plugin(pool, plugin_id)
+        .await?
+        .ok_or_else(|| DbError::InvalidData("plugin not found".to_string()))?;
+    let enabled = payload.enabled.unwrap_or(current.enabled);
+    let status = payload
+        .status
+        .unwrap_or(if enabled { PluginStatus::Ready } else { PluginStatus::Disabled });
+    let status_detail = payload.status_detail.or(current.status_detail);
+
+    sqlx::query(
+        r#"
+        UPDATE plugins
+        SET enabled = ?, status = ?, status_detail = ?, updated_at = ?
+        WHERE id = ?
+        "#,
+    )
+    .bind(bool_to_i64(enabled))
+    .bind(status.as_str())
+    .bind(status_detail)
+    .bind(now_text())
+    .bind(plugin_id.as_str())
+    .execute(pool)
+    .await?;
+
+    get_plugin(pool, plugin_id)
+        .await?
+        .ok_or_else(|| DbError::InvalidData("updated plugin could not be loaded".to_string()))
 }
 
 pub async fn set_capability_enabled(
