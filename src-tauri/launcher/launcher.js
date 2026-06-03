@@ -11,6 +11,9 @@ import {
   buildSearchApiPath,
   buildInboxActionFeedback,
   buildParkRoutePayload,
+  buildPluginReviewViewModel,
+  buildPluginSuggestionActionPath,
+  buildPluginUpdatePayload,
   buildProcessWorkflowViewModel,
   buildProjectCardPayload,
   buildProjectOptions,
@@ -194,6 +197,10 @@ const elements = {
   reviewParkedCount: document.getElementById("review-parked-count"),
   reviewRecycleBinItems: document.getElementById("review-recycle-bin-items"),
   reviewRecycleBinCount: document.getElementById("review-recycle-bin-count"),
+  reviewPluginSuggestions: document.getElementById("review-plugin-suggestions"),
+  reviewPluginSuggestionsCount: document.getElementById("review-plugin-suggestions-count"),
+  settingsPlugins: document.getElementById("settings-plugins"),
+  settingsPluginsCount: document.getElementById("settings-plugins-count"),
 };
 
 const tauriInvoke = getTauriInvoke(window);
@@ -715,12 +722,15 @@ async function connectAndLoad(options = {}) {
       throw new Error("This server requires an API token.");
     }
 
-    const [summary, inboxContainers, projectsPage, weeklyReview] = await Promise.all([
-      requestJson(window.fetch.bind(window), settings, "/api/v1/bootstrap"),
-      requestJson(window.fetch.bind(window), settings, "/api/v1/inbox/containers"),
-      requestJson(window.fetch.bind(window), settings, "/api/v1/projects?page=1&page_size=100"),
-      requestJson(window.fetch.bind(window), settings, "/api/v1/weekly-review"),
-    ]);
+    const [summary, inboxContainers, projectsPage, weeklyReview, plugins, pluginSuggestions] =
+      await Promise.all([
+        requestJson(window.fetch.bind(window), settings, "/api/v1/bootstrap"),
+        requestJson(window.fetch.bind(window), settings, "/api/v1/inbox/containers"),
+        requestJson(window.fetch.bind(window), settings, "/api/v1/projects?page=1&page_size=100"),
+        requestJson(window.fetch.bind(window), settings, "/api/v1/weekly-review"),
+        requestJson(window.fetch.bind(window), settings, "/api/v1/plugins"),
+        requestJson(window.fetch.bind(window), settings, "/api/v1/plugins/suggestions"),
+      ]);
     const dashboardModel = buildBootstrapViewModel(summary);
     renderDashboard(dashboardModel);
     renderProcessWorkflow(
@@ -729,6 +739,7 @@ async function connectAndLoad(options = {}) {
       defaultGuidedProjectTargetDate(dashboardModel.todayLabel),
     );
     renderWeeklyReview(buildWeeklyReviewViewModel(weeklyReview, inboxContainers));
+    renderPluginReview(buildPluginReviewViewModel(plugins, pluginSuggestions));
     await syncNativeParkReminders(inboxContainers);
     if (startupReconnectTimer) {
       window.clearTimeout(startupReconnectTimer);
@@ -794,13 +805,16 @@ function scheduleStartupReconnect() {
 }
 
 async function refreshDashboardAndReview() {
-  const [summary, weeklyReview, inboxContainers] = await Promise.all([
+  const [summary, weeklyReview, inboxContainers, plugins, pluginSuggestions] = await Promise.all([
     requestJson(window.fetch.bind(window), settings, "/api/v1/bootstrap"),
     requestJson(window.fetch.bind(window), settings, "/api/v1/weekly-review"),
     requestJson(window.fetch.bind(window), settings, "/api/v1/inbox/containers"),
+    requestJson(window.fetch.bind(window), settings, "/api/v1/plugins"),
+    requestJson(window.fetch.bind(window), settings, "/api/v1/plugins/suggestions"),
   ]);
   renderDashboard(buildBootstrapViewModel(summary));
   renderWeeklyReview(buildWeeklyReviewViewModel(weeklyReview, inboxContainers));
+  renderPluginReview(buildPluginReviewViewModel(plugins, pluginSuggestions));
   await syncNativeParkReminders(inboxContainers);
 }
 
@@ -828,16 +842,32 @@ async function refreshWorkflowData(workflow) {
 
   if (workflow === "review") {
     await refreshDashboardAndReview();
+    return;
+  }
+
+  if (workflow === "settings") {
+    await refreshPlugins();
   }
 }
 
 async function reloadWeeklyReview() {
-  const [weeklyReview, inboxContainers] = await Promise.all([
+  const [weeklyReview, inboxContainers, plugins, pluginSuggestions] = await Promise.all([
     requestJson(window.fetch.bind(window), settings, "/api/v1/weekly-review"),
     requestJson(window.fetch.bind(window), settings, "/api/v1/inbox/containers"),
+    requestJson(window.fetch.bind(window), settings, "/api/v1/plugins"),
+    requestJson(window.fetch.bind(window), settings, "/api/v1/plugins/suggestions"),
   ]);
   renderWeeklyReview(buildWeeklyReviewViewModel(weeklyReview, inboxContainers));
+  renderPluginReview(buildPluginReviewViewModel(plugins, pluginSuggestions));
   await syncNativeParkReminders(inboxContainers);
+}
+
+async function refreshPlugins() {
+  const [plugins, pluginSuggestions] = await Promise.all([
+    requestJson(window.fetch.bind(window), settings, "/api/v1/plugins"),
+    requestJson(window.fetch.bind(window), settings, "/api/v1/plugins/suggestions"),
+  ]);
+  renderPluginReview(buildPluginReviewViewModel(plugins, pluginSuggestions));
 }
 
 async function syncNativeParkReminders(inboxContainers) {
@@ -990,6 +1020,41 @@ function renderWeeklyReview(model) {
   );
 }
 
+function renderPluginReview(model) {
+  elements.reviewPluginSuggestionsCount.textContent = model.pendingSuggestionsCountLabel;
+  elements.settingsPluginsCount.textContent = model.pluginCountLabel;
+  renderPluginSuggestions(
+    elements.reviewPluginSuggestions,
+    model.pendingSuggestions,
+    model.emptySuggestions,
+  );
+  renderSettingsPlugins(elements.settingsPlugins, model.plugins, model.emptyPlugins);
+}
+
+function renderPluginSuggestions(container, suggestions, emptyText) {
+  container.replaceChildren();
+  if (!suggestions.length) {
+    container.append(emptyState(emptyText));
+    return;
+  }
+
+  for (const suggestion of suggestions) {
+    container.append(pluginSuggestionCard(suggestion));
+  }
+}
+
+function renderSettingsPlugins(container, plugins, emptyText) {
+  container.replaceChildren();
+  if (!plugins.length) {
+    container.append(emptyState(emptyText));
+    return;
+  }
+
+  for (const plugin of plugins) {
+    container.append(pluginSettingsCard(plugin));
+  }
+}
+
 function renderReviewProjects(container, projects, emptyText) {
   container.replaceChildren();
   if (!projects.length) {
@@ -1048,6 +1113,86 @@ function renderRecycleBinItems(container, items, emptyText) {
   for (const item of items) {
     container.append(reviewRecycleBinItemRow(item));
   }
+}
+
+function pluginSuggestionCard(suggestion) {
+  const card = document.createElement("div");
+  card.className = "plugin-suggestion-card";
+
+  const body = document.createElement("div");
+  body.className = "plugin-suggestion-body";
+  const title = document.createElement("strong");
+  title.textContent = suggestion.title;
+  const meta = document.createElement("span");
+  meta.textContent = suggestion.meta;
+  body.append(title, meta);
+  if (suggestion.summary) {
+    const summary = document.createElement("small");
+    summary.textContent = suggestion.summary;
+    body.append(summary);
+  }
+
+  const actions = document.createElement("div");
+  actions.className = "plugin-suggestion-actions";
+  for (const [action, label, buttonClass] of [
+    ["approve", "Approve", "mini-button"],
+    ["dismiss", "Dismiss", "mini-button quiet"],
+  ]) {
+    const button = document.createElement("button");
+    button.className = buttonClass;
+    button.type = "button";
+    button.dataset.pluginSuggestionAction = action;
+    button.dataset.suggestionId = suggestion.id;
+    button.dataset.suggestionTitle = suggestion.title;
+    button.dataset.actionPath = buildPluginSuggestionActionPath(suggestion, action);
+    button.textContent = label;
+    actions.append(button);
+  }
+
+  card.append(body, actions);
+  return card;
+}
+
+function pluginSettingsCard(plugin) {
+  const card = document.createElement("article");
+  card.className = "plugin-card";
+  card.classList.toggle("is-enabled", plugin.enabled);
+
+  const body = document.createElement("div");
+  body.className = "plugin-card-body";
+  const title = document.createElement("h3");
+  title.textContent = plugin.name;
+  const meta = document.createElement("p");
+  meta.textContent = plugin.description || "No description provided.";
+  const state = document.createElement("span");
+  state.className = "plugin-state";
+  state.textContent = `${plugin.stateLabel} · ${plugin.capabilityLabel}`;
+  body.append(title, meta, state);
+
+  if (plugin.capabilities.length) {
+    const capabilities = document.createElement("div");
+    capabilities.className = "plugin-capability-list";
+    for (const capability of plugin.capabilities) {
+      const item = document.createElement("span");
+      item.className = "plugin-capability";
+      item.classList.toggle("is-enabled", capability.enabled);
+      item.textContent = capability.label;
+      capabilities.append(item);
+    }
+    body.append(capabilities);
+  }
+
+  const button = document.createElement("button");
+  button.className = plugin.enabled ? "mini-button quiet" : "mini-button";
+  button.type = "button";
+  button.dataset.pluginAction = "toggle";
+  button.dataset.pluginId = plugin.id;
+  button.dataset.pluginName = plugin.name;
+  button.dataset.enabled = String(!plugin.enabled);
+  button.textContent = plugin.enabled ? "Disable" : "Enable";
+
+  card.append(body, button);
+  return card;
 }
 
 function reviewProjectCard(project, action = "") {
@@ -2615,6 +2760,61 @@ for (const container of [
     }
   });
 }
+
+elements.reviewPluginSuggestions.addEventListener("click", async (event) => {
+  const button = event.target.closest("[data-plugin-suggestion-action]");
+  if (!button) return;
+
+  const action = button.dataset.pluginSuggestionAction;
+  const path = button.dataset.actionPath;
+  if (!path || !["approve", "dismiss"].includes(action)) return;
+
+  button.disabled = true;
+  try {
+    await requestJson(window.fetch.bind(window), settings, path, { method: "POST" });
+    await refreshDashboardAndReview();
+    showActionFeedback({
+      message:
+        action === "approve"
+          ? `Approved "${button.dataset.suggestionTitle || "plugin suggestion"}".`
+          : `Dismissed "${button.dataset.suggestionTitle || "plugin suggestion"}".`,
+    });
+  } catch (err) {
+    setConnectionState("error", "Plugin suggestion update failed", err.message);
+  } finally {
+    button.disabled = false;
+  }
+});
+
+elements.settingsPlugins.addEventListener("click", async (event) => {
+  const button = event.target.closest("[data-plugin-action]");
+  if (!button || button.dataset.pluginAction !== "toggle") return;
+
+  const pluginId = button.dataset.pluginId;
+  if (!pluginId) return;
+
+  button.disabled = true;
+  try {
+    const enabled = button.dataset.enabled === "true";
+    await requestJson(
+      window.fetch.bind(window),
+      settings,
+      `/api/v1/plugins/${encodeURIComponent(pluginId)}`,
+      {
+        method: "PATCH",
+        body: buildPluginUpdatePayload({ enabled: enabled ? "on" : "" }),
+      },
+    );
+    await refreshPlugins();
+    showActionFeedback({
+      message: `${enabled ? "Enabled" : "Disabled"} ${button.dataset.pluginName || "plugin"}.`,
+    });
+  } catch (err) {
+    setConnectionState("error", "Plugin update failed", err.message);
+  } finally {
+    button.disabled = false;
+  }
+});
 
 for (const container of [elements.reviewWeeklyProjects, elements.reviewFocusCandidates]) {
   container.addEventListener("submit", async (event) => {

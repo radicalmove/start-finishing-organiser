@@ -952,6 +952,103 @@ h3 {
   justify-content: flex-end;
 }
 
+.plugin-suggestion-card,
+.plugin-card {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--sfo-line);
+  border-radius: var(--sfo-radius-md);
+  background:
+    radial-gradient(circle at top right, rgba(45, 160, 255, 0.08), transparent 12rem),
+    rgba(5, 3, 15, 0.36);
+}
+
+.plugin-suggestion-card {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+}
+
+.plugin-suggestion-body,
+.plugin-card-body {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+
+.plugin-suggestion-body span,
+.plugin-suggestion-body small,
+.plugin-card-body p,
+.plugin-state {
+  margin: 0;
+  color: var(--sfo-muted);
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.plugin-suggestion-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.plugin-card {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+}
+
+.plugin-card.is-enabled {
+  border-color: rgba(73, 246, 163, 0.3);
+  background:
+    radial-gradient(circle at top right, rgba(73, 246, 163, 0.1), transparent 12rem),
+    rgba(5, 3, 15, 0.4);
+}
+
+.plugin-card h3 {
+  margin: 0;
+  font-size: 22px;
+}
+
+.settings-count {
+  display: inline-grid;
+  min-width: 44px;
+  min-height: 44px;
+  place-items: center;
+  border: 1px solid var(--sfo-line-strong);
+  border-radius: var(--sfo-radius-sm);
+  color: var(--sfo-cyan);
+  background: rgba(5, 3, 15, 0.42);
+}
+
+.settings-plugin-list,
+.plugin-capability-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.settings-plugin-list {
+  display: grid;
+  margin-top: 14px;
+}
+
+.plugin-capability {
+  display: inline-flex;
+  padding: 5px 8px;
+  border: 1px solid var(--sfo-line);
+  border-radius: var(--sfo-radius-sm);
+  color: var(--sfo-muted);
+  background: rgba(5, 3, 15, 0.34);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.plugin-capability.is-enabled {
+  border-color: rgba(73, 246, 163, 0.34);
+  color: var(--sfo-success);
+}
+
 .project-card-detail {
   display: grid;
   gap: 14px;
@@ -1037,6 +1134,10 @@ h3 {
 .settings-panel .connection-card {
   margin-top: 0;
   box-shadow: none;
+}
+
+.plugins-settings-card {
+  margin-top: 16px;
 }
 
 body[data-connection-state="ready"] .app-shell {
@@ -2750,11 +2851,28 @@ textarea:focus {
   .decision-copy,
   .review-card,
   .review-task-row,
+  .plugin-suggestion-card,
+  .plugin-card,
   .list-row,
   .inbox-item,
   .block-card,
   .empty-state {
     padding: 10px;
+  }
+
+  .plugin-suggestion-card,
+  .plugin-card {
+    grid-template-columns: 1fr;
+  }
+
+  .plugin-suggestion-actions,
+  .plugin-card > .mini-button {
+    justify-content: stretch;
+  }
+
+  .plugin-suggestion-actions .mini-button,
+  .plugin-card > .mini-button {
+    width: 100%;
   }
 
   .review-count-grid,
