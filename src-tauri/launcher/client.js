@@ -396,6 +396,36 @@ export function buildGlobalSearchViewModel(payload = {}) {
   };
 }
 
+export function buildPluginReviewViewModel(plugins = [], suggestions = []) {
+  const pluginViews = (Array.isArray(plugins) ? plugins : []).map(pluginView);
+  const pluginNames = new Map(pluginViews.map((plugin) => [plugin.id, plugin.name]));
+  const pendingSuggestions = (Array.isArray(suggestions) ? suggestions : [])
+    .filter((suggestion) => suggestion?.status === "pending")
+    .map((suggestion) => pluginSuggestionView(suggestion, pluginNames));
+
+  return {
+    plugins: pluginViews,
+    pendingSuggestions,
+    pluginCountLabel: countLabel(pluginViews),
+    pendingSuggestionsCountLabel: countLabel(pendingSuggestions),
+    emptyPlugins: "No plugins are registered.",
+    emptySuggestions: "No plugin suggestions are waiting for review.",
+  };
+}
+
+export function buildPluginUpdatePayload(values = {}) {
+  return {
+    enabled: checkboxValue(values.enabled),
+  };
+}
+
+export function buildPluginSuggestionActionPath(suggestion = {}, action = "") {
+  const id = String(suggestion.id || "").trim();
+  const actionName = String(action || "").trim();
+  if (!id || !["approve", "dismiss"].includes(actionName)) return "";
+  return `/api/v1/plugins/suggestions/${encodeURIComponent(id)}/${actionName}`;
+}
+
 export function buildItemDetailViewModel(item = {}, detailPayload = null) {
   const enrichedItem = mergeItemDetailPayload(item, detailPayload);
   const result = searchResultView(enrichedItem);
@@ -421,6 +451,59 @@ export function buildItemDetailViewModel(item = {}, detailPayload = null) {
     edit: buildItemDetailEditModel({ ...enrichedItem, ...result }),
     actions: buildItemDetailActions({ ...enrichedItem, ...result, workflowLabel }),
     rows,
+  };
+}
+
+function pluginView(plugin = {}) {
+  const capabilities = Array.isArray(plugin.capabilities) ? plugin.capabilities : [];
+  const enabledCapabilities = capabilities.filter((capability) => capability?.enabled).length;
+  const capabilityLabel = capabilities.length
+    ? `${enabledCapabilities} / ${capabilities.length} capabilities on`
+    : "No capabilities";
+  const enabled = Boolean(plugin.enabled);
+  const status = titleCase(plugin.status || (enabled ? "ready" : "disabled"));
+  const enabledLabel = enabled ? "Enabled" : "Disabled";
+  const stateParts = status === enabledLabel ? [enabledLabel] : [enabledLabel, status];
+
+  return {
+    id: plugin.id || "",
+    name: plugin.name || titleCase(plugin.id || "Plugin"),
+    description: plugin.description || "",
+    enabled,
+    status: plugin.status || "",
+    trustLevel: plugin.trust_level || "",
+    stateLabel: compactJoin(stateParts),
+    capabilityLabel,
+    capabilities: capabilities.map((capability) => ({
+      id: capability.id || "",
+      capability: capability.capability || "",
+      label: titleCase(capability.capability || ""),
+      enabled: Boolean(capability.enabled),
+    })),
+  };
+}
+
+function pluginSuggestionView(suggestion = {}, pluginNames = new Map()) {
+  const pluginId = suggestion.plugin_id || "";
+  const pluginName = pluginNames.get(pluginId) || titleCase(pluginId || "Plugin");
+  const kindLabel = titleCase(suggestion.kind || "suggestion");
+  const priorityLabel = titleCase(suggestion.priority || "normal");
+
+  return {
+    id: suggestion.id || "",
+    pluginId,
+    pluginName,
+    kind: suggestion.kind || "",
+    kindLabel,
+    title: suggestion.title || "Untitled suggestion",
+    summary: suggestion.summary || suggestion.detail || "",
+    sourceLabel: suggestion.source_label || "",
+    priority: suggestion.priority || "normal",
+    priorityLabel,
+    createdAt: suggestion.created_at || "",
+    meta: compactJoin([suggestion.source_label || pluginName, kindLabel, priorityLabel]),
+    approvePath: buildPluginSuggestionActionPath(suggestion, "approve"),
+    dismissPath: buildPluginSuggestionActionPath(suggestion, "dismiss"),
   };
 }
 
