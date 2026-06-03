@@ -561,16 +561,16 @@ struct BackupPluginSuggestionRow {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::plugins::{create_suggestion, seed_builtin_plugins, update_plugin};
     use crate::planning::{create_project, create_task, update_task, upsert_success_pack};
+    use crate::plugins::{create_suggestion, seed_builtin_plugins, update_plugin};
     use crate::ritual::save_daily_focus;
     use crate::schedule::create_block;
     use crate::{connect, run_migrations, DbConfig};
     use chrono::{DateTime, NaiveDate, NaiveTime, Utc};
     use sfo_core::{
-        BlockCreate, BlockType, DailyFocusUpdate, ProjectCategory, ProjectCreate,
-        PluginId, PluginSuggestionCreate, PluginSuggestionKind, PluginSuggestionPriority,
-        PluginUpdate, SuccessPackUpdate, TaskCreate, WhenBucket,
+        BlockCreate, BlockType, DailyFocusUpdate, PluginId, PluginSuggestionCreate,
+        PluginSuggestionKind, PluginSuggestionPriority, PluginUpdate, ProjectCategory,
+        ProjectCreate, SuccessPackUpdate, TaskCreate, WhenBucket,
     };
 
     #[tokio::test]
@@ -823,11 +823,10 @@ mod tests {
                 .await
                 .expect("health enabled state");
         assert_eq!(enabled_health, 1);
-        let capability_count: i64 =
-            sqlx::query_scalar("SELECT COUNT(*) FROM plugin_capabilities")
-                .fetch_one(&backup_pool)
-                .await
-                .expect("count backup plugin capabilities");
+        let capability_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM plugin_capabilities")
+            .fetch_one(&backup_pool)
+            .await
+            .expect("count backup plugin capabilities");
         assert_eq!(capability_count, 13);
         let suggestion_status: String =
             sqlx::query_scalar("SELECT status FROM plugin_suggestions WHERE plugin_id = 'health'")
