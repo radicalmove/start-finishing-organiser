@@ -5,6 +5,7 @@ pub mod error;
 pub mod import;
 pub mod inbox;
 pub mod planning;
+pub mod plugins;
 pub mod ritual;
 pub mod schedule;
 pub mod search;

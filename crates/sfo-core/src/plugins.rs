@@ -1,6 +1,6 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use std::fmt;
+use std::{fmt, str::FromStr};
 
 macro_rules! string_id_type {
     ($name:ident) => {
@@ -62,7 +62,28 @@ macro_rules! plugin_enum {
                 formatter.write_str(self.as_str())
             }
         }
+
+        impl FromStr for $name {
+            type Err = PluginEnumParseError;
+
+            fn from_str(value: &str) -> Result<Self, Self::Err> {
+                match value {
+                    $($value => Ok(Self::$variant),)+
+                    _ => Err(PluginEnumParseError {
+                        enum_name: stringify!($name),
+                        value: value.to_string(),
+                    }),
+                }
+            }
+        }
     };
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, thiserror::Error)]
+#[error("invalid {enum_name} value `{value}`")]
+pub struct PluginEnumParseError {
+    pub enum_name: &'static str,
+    pub value: String,
 }
 
 string_id_type!(PluginId);
