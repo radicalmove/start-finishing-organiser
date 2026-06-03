@@ -1,8 +1,8 @@
 use chrono::{DateTime, Utc};
 use sfo_core::{
     PluginCapability, PluginCapabilityId, PluginCapabilityKind, PluginDetail, PluginId,
-    PluginStatus, PluginSuggestion, PluginSuggestionCreate, PluginSuggestionId, PluginUpdate,
-    PluginSuggestionStatus, PluginTrustLevel,
+    PluginStatus, PluginSuggestion, PluginSuggestionCreate, PluginSuggestionId,
+    PluginSuggestionStatus, PluginTrustLevel, PluginUpdate,
 };
 use sqlx::FromRow;
 use std::str::FromStr;
@@ -90,9 +90,11 @@ pub async fn update_plugin(
         .await?
         .ok_or_else(|| DbError::InvalidData("plugin not found".to_string()))?;
     let enabled = payload.enabled.unwrap_or(current.enabled);
-    let status = payload
-        .status
-        .unwrap_or(if enabled { PluginStatus::Ready } else { PluginStatus::Disabled });
+    let status = payload.status.unwrap_or(if enabled {
+        PluginStatus::Ready
+    } else {
+        PluginStatus::Disabled
+    });
     let status_detail = payload.status_detail.or(current.status_detail);
 
     sqlx::query(
@@ -174,9 +176,9 @@ pub async fn create_suggestion(
     .execute(pool)
     .await?;
 
-    get_suggestion(pool, &id)
-        .await?
-        .ok_or_else(|| DbError::InvalidData("created plugin suggestion could not be loaded".to_string()))
+    get_suggestion(pool, &id).await?.ok_or_else(|| {
+        DbError::InvalidData("created plugin suggestion could not be loaded".to_string())
+    })
 }
 
 pub async fn list_suggestions(
@@ -214,12 +216,11 @@ pub async fn get_suggestion(
     pool: &sqlx::SqlitePool,
     suggestion_id: &PluginSuggestionId,
 ) -> Result<Option<PluginSuggestion>, DbError> {
-    let row = sqlx::query_as::<_, PluginSuggestionRow>(
-        "SELECT * FROM plugin_suggestions WHERE id = ?",
-    )
-    .bind(suggestion_id.as_str())
-    .fetch_optional(pool)
-    .await?;
+    let row =
+        sqlx::query_as::<_, PluginSuggestionRow>("SELECT * FROM plugin_suggestions WHERE id = ?")
+            .bind(suggestion_id.as_str())
+            .fetch_optional(pool)
+            .await?;
 
     row.map(PluginSuggestion::try_from).transpose()
 }
@@ -331,10 +332,7 @@ async fn seed_plugin(pool: &sqlx::SqlitePool, plugin: BuiltinPlugin) -> Result<(
     Ok(())
 }
 
-async fn plugin_from_row(
-    pool: &sqlx::SqlitePool,
-    row: PluginRow,
-) -> Result<PluginDetail, DbError> {
+async fn plugin_from_row(pool: &sqlx::SqlitePool, row: PluginRow) -> Result<PluginDetail, DbError> {
     let capabilities = capabilities_for_plugin(pool, &row.id).await?;
     Ok(PluginDetail {
         id: PluginId::from(row.id),

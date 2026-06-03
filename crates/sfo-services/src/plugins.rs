@@ -209,10 +209,7 @@ mod tests {
         (PluginService::new(pool.clone()), pool)
     }
 
-    fn suggestion(
-        kind: PluginSuggestionKind,
-        payload_json: &str,
-    ) -> PluginSuggestionCreate {
+    fn suggestion(kind: PluginSuggestionKind, payload_json: &str) -> PluginSuggestionCreate {
         PluginSuggestionCreate {
             plugin_id: PluginId::from("health"),
             kind,
@@ -237,7 +234,13 @@ mod tests {
             .await
             .expect_err("disabled plugin should fail");
 
-        assert!(matches!(err, ServiceError::Validation { field: "plugin_id", .. }));
+        assert!(matches!(
+            err,
+            ServiceError::Validation {
+                field: "plugin_id",
+                ..
+            }
+        ));
     }
 
     #[tokio::test]
@@ -407,6 +410,12 @@ mod tests {
             .await
             .expect_err("malformed payload should fail");
 
-        assert!(matches!(err, ServiceError::Validation { field: "payload_json", .. }));
+        assert!(matches!(
+            err,
+            ServiceError::Validation {
+                field: "payload_json",
+                ..
+            }
+        ));
     }
 }
