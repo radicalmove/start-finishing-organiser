@@ -8,15 +8,17 @@ use serde::{Deserialize, Serialize};
 use sfo_core::{
     BackupManifest, Block, BlockCreate, BlockId, BlockUpdate, BootstrapSummary, DailyFocus,
     DailyFocusUpdate, GlobalSearchResults, GuidedCaptureRequest, GuidedCaptureResponse,
-    ImportDryRunReport, ImportDryRunRequest, InboxContainers, InboxRouteRequest, Page, Project,
+    ImportDryRunReport, ImportDryRunRequest, InboxContainers, InboxRouteRequest, Page,
+    PluginDetail, PluginId, PluginSuggestion, PluginSuggestionId, PluginUpdate, Project,
     ProjectCard, ProjectCardUpdate, ProjectChunkCreate, ProjectCreate, ProjectId, ProjectUpdate,
     PythonSqliteImportReport, PythonSqliteImportRequest, QuickCapture, Task, TaskCreate, TaskId,
     TaskUpdate, WaitingId, WaitingOn, WaitingOnCreate, WaitingOnUpdate, WeeklyReviewSummary,
     WeeklyReviewTask,
 };
 use sfo_services::{
-    BootstrapService, CaptureService, InboxService, PlanningService, ScheduleService,
-    SearchService, ServiceError, SystemService, WaitingService, WeeklyReviewService,
+    BootstrapService, CaptureService, InboxService, PlanningService, PluginService,
+    ScheduleService, SearchService, ServiceError, SystemService, WaitingService,
+    WeeklyReviewService,
 };
 use std::str::FromStr;
 
@@ -118,6 +120,21 @@ pub fn router() -> Router<AppState> {
         .route("/bootstrap", get(bootstrap))
         .route("/search", get(global_search))
         .route("/daily-focus", put(save_daily_focus))
+        .route("/plugins/suggestions", get(list_plugin_suggestions))
+        .route(
+            "/plugins/suggestions/{suggestion_id}",
+            get(get_plugin_suggestion),
+        )
+        .route(
+            "/plugins/suggestions/{suggestion_id}/approve",
+            post(approve_plugin_suggestion),
+        )
+        .route(
+            "/plugins/suggestions/{suggestion_id}/dismiss",
+            post(dismiss_plugin_suggestion),
+        )
+        .route("/plugins", get(list_plugins))
+        .route("/plugins/{plugin_id}", get(get_plugin).patch(update_plugin))
         .route("/projects", get(list_projects).post(create_project))
         .route(
             "/projects/{project_id}/card",
@@ -216,6 +233,81 @@ async fn global_search(
             )
             .await?,
     ))
+}
+
+async fn list_plugins(State(state): State<AppState>) -> Result<Json<Vec<PluginDetail>>, ApiError> {
+    let service = seeded_plugin_service(state.db).await?;
+    Ok(Json(service.list_plugins().await?))
+}
+
+async fn get_plugin(
+    State(state): State<AppState>,
+    Path(plugin_id): Path<String>,
+) -> Result<Json<PluginDetail>, ApiError> {
+    let service = seeded_plugin_service(state.db).await?;
+    Ok(Json(service.get_plugin(PluginId::from(plugin_id)).await?))
+}
+
+async fn update_plugin(
+    State(state): State<AppState>,
+    Path(plugin_id): Path<String>,
+    Json(payload): Json<PluginUpdate>,
+) -> Result<Json<PluginDetail>, ApiError> {
+    let service = seeded_plugin_service(state.db).await?;
+    Ok(Json(
+        service
+            .update_plugin(PluginId::from(plugin_id), payload)
+            .await?,
+    ))
+}
+
+async fn list_plugin_suggestions(
+    State(state): State<AppState>,
+) -> Result<Json<Vec<PluginSuggestion>>, ApiError> {
+    let service = seeded_plugin_service(state.db).await?;
+    Ok(Json(service.list_suggestions().await?))
+}
+
+async fn get_plugin_suggestion(
+    State(state): State<AppState>,
+    Path(suggestion_id): Path<String>,
+) -> Result<Json<PluginSuggestion>, ApiError> {
+    let service = seeded_plugin_service(state.db).await?;
+    Ok(Json(
+        service
+            .get_suggestion(PluginSuggestionId::from(suggestion_id))
+            .await?,
+    ))
+}
+
+async fn approve_plugin_suggestion(
+    State(state): State<AppState>,
+    Path(suggestion_id): Path<String>,
+) -> Result<Json<PluginSuggestion>, ApiError> {
+    let service = seeded_plugin_service(state.db).await?;
+    Ok(Json(
+        service
+            .approve_suggestion(PluginSuggestionId::from(suggestion_id))
+            .await?,
+    ))
+}
+
+async fn dismiss_plugin_suggestion(
+    State(state): State<AppState>,
+    Path(suggestion_id): Path<String>,
+) -> Result<Json<PluginSuggestion>, ApiError> {
+    let service = seeded_plugin_service(state.db).await?;
+    Ok(Json(
+        service
+            .dismiss_suggestion(PluginSuggestionId::from(suggestion_id))
+            .await?,
+    ))
+}
+
+async fn seeded_plugin_service(db: sqlx::SqlitePool) -> Result<PluginService, ApiError> {
+    let service = PluginService::new(db);
+    service.seed_builtin_plugins().await?;
+    Ok(service)
 }
 
 async fn move_task_to_week(

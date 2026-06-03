@@ -1458,6 +1458,8 @@ name = "sfo-services"
 version = "0.1.0"
 dependencies = [
  "chrono",
+ "serde",
+ "serde_json",
  "sfo-core",
  "sfo-db",
  "sqlx",

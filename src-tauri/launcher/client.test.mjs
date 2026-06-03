@@ -15,6 +15,9 @@ import {
   buildSearchApiPath,
   buildInboxActionFeedback,
   buildParkRoutePayload,
+  buildPluginReviewViewModel,
+  buildPluginSuggestionActionPath,
+  buildPluginUpdatePayload,
   buildParkReminderNotifications,
   buildProjectCardPayload,
   buildTodayTaskActionFeedback,
@@ -76,6 +79,79 @@ test("buildJsonHeaders includes bearer token only when provided", () => {
     "Content-Type": "application/json",
     Authorization: "Bearer secret-token",
   });
+});
+
+test("plugin review view model summarizes registry and suggestion queue", () => {
+  const model = buildPluginReviewViewModel(
+    [
+      {
+        id: "health",
+        name: "Health",
+        description: "Exercise and diet tracking.",
+        enabled: true,
+        status: "ready",
+        trust_level: "first_party",
+        capabilities: [
+          { capability: "read_sfo_context", enabled: true },
+          { capability: "health_read", enabled: false },
+        ],
+      },
+      {
+        id: "communications",
+        name: "Communications",
+        description: "",
+        enabled: false,
+        status: "disabled",
+        trust_level: "first_party",
+        capabilities: [],
+      },
+    ],
+    [
+      {
+        id: "s1",
+        plugin_id: "health",
+        kind: "health_prompt",
+        title: "Plan a recovery walk",
+        summary: "A short recovery walk would fit today.",
+        priority: "high",
+        status: "pending",
+        source_label: "Health",
+        created_at: "2026-06-03T08:00:00Z",
+      },
+      {
+        id: "s2",
+        plugin_id: "health",
+        kind: "task",
+        title: "Old suggestion",
+        status: "dismissed",
+      },
+    ],
+  );
+
+  assert.equal(model.plugins.length, 2);
+  assert.deepEqual(
+    model.plugins.map((plugin) => `${plugin.name}: ${plugin.stateLabel}: ${plugin.capabilityLabel}`),
+    ["Health: Enabled · Ready: 1 / 2 capabilities on", "Communications: Disabled: No capabilities"],
+  );
+  assert.equal(model.pendingSuggestions.length, 1);
+  assert.equal(model.pendingSuggestions[0].title, "Plan a recovery walk");
+  assert.equal(model.pendingSuggestions[0].pluginName, "Health");
+  assert.equal(model.pendingSuggestions[0].meta, "Health · Health Prompt · High");
+  assert.equal(model.pendingSuggestionsCountLabel, "1");
+});
+
+test("plugin helpers build update payloads and suggestion action paths", () => {
+  assert.deepEqual(buildPluginUpdatePayload({ enabled: "on" }), { enabled: true });
+  assert.deepEqual(buildPluginUpdatePayload({ enabled: "" }), { enabled: false });
+  assert.equal(
+    buildPluginSuggestionActionPath({ id: "suggestion/1" }, "approve"),
+    "/api/v1/plugins/suggestions/suggestion%2F1/approve",
+  );
+  assert.equal(
+    buildPluginSuggestionActionPath({ id: "suggestion/1" }, "dismiss"),
+    "/api/v1/plugins/suggestions/suggestion%2F1/dismiss",
+  );
+  assert.equal(buildPluginSuggestionActionPath({}, "approve"), "");
 });
 
 test("global search path trims queries and controls recycle inclusion", () => {

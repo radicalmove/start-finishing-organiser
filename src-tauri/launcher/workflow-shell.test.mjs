@@ -41,6 +41,28 @@ test("connection settings are scoped to the Settings workflow", () => {
   assert.ok(connectionCard > settingsPanelStart, "connection card lives inside settings");
 });
 
+test("launcher exposes plugin registry and suggestion review surfaces", () => {
+  const indexHtml = readFileSync(indexHtmlPath, "utf8");
+  const clientJs = readFileSync(clientJsPath, "utf8");
+  const launcherJs = readFileSync(launcherJsPath, "utf8");
+  const launcherCss = readFileSync(launcherCssPath, "utf8");
+
+  assert.match(indexHtml, /id="review-plugin-suggestions"/);
+  assert.match(indexHtml, /id="review-plugin-suggestions-count"/);
+  assert.match(indexHtml, /id="settings-plugins"/);
+  assert.match(indexHtml, /id="settings-plugins-count"/);
+  assert.match(clientJs, /buildPluginReviewViewModel/);
+  assert.match(clientJs, /buildPluginUpdatePayload/);
+  assert.match(clientJs, /buildPluginSuggestionActionPath/);
+  assert.match(launcherJs, /\/api\/v1\/plugins"/);
+  assert.match(launcherJs, /\/api\/v1\/plugins\/suggestions"/);
+  assert.match(launcherJs, /renderPluginReview/);
+  assert.match(launcherJs, /data-plugin-action/);
+  assert.match(launcherJs, /data-plugin-suggestion-action/);
+  assert.match(launcherCss, /\.plugin-card/);
+  assert.match(launcherCss, /\.plugin-suggestion-card/);
+});
+
 test("launcher exposes persistent global search in the header", () => {
   const indexHtml = readFileSync(indexHtmlPath, "utf8");
   const clientJs = readFileSync(clientJsPath, "utf8");

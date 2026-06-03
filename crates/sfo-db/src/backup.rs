@@ -13,6 +13,9 @@ pub const RUST_BACKUP_TABLES: &[&str] = &[
     "blocks",
     "waiting_on",
     "ritual_entries",
+    "plugins",
+    "plugin_capabilities",
+    "plugin_suggestions",
 ];
 
 pub async fn backup_manifest(pool: &sqlx::SqlitePool) -> Result<BackupManifest, DbError> {
@@ -88,8 +91,28 @@ async fn copy_current_tables(
     let ritual_rows = sqlx::query_as::<_, BackupRitualEntryRow>("SELECT * FROM ritual_entries")
         .fetch_all(source_pool)
         .await?;
+    let plugin_rows = sqlx::query_as::<_, BackupPluginRow>("SELECT * FROM plugins")
+        .fetch_all(source_pool)
+        .await?;
+    let plugin_capability_rows =
+        sqlx::query_as::<_, BackupPluginCapabilityRow>("SELECT * FROM plugin_capabilities")
+            .fetch_all(source_pool)
+            .await?;
+    let plugin_suggestion_rows =
+        sqlx::query_as::<_, BackupPluginSuggestionRow>("SELECT * FROM plugin_suggestions")
+            .fetch_all(source_pool)
+            .await?;
 
     let mut transaction = backup_pool.begin().await?;
+    sqlx::query("DELETE FROM plugin_suggestions")
+        .execute(&mut *transaction)
+        .await?;
+    sqlx::query("DELETE FROM plugin_capabilities")
+        .execute(&mut *transaction)
+        .await?;
+    sqlx::query("DELETE FROM plugins")
+        .execute(&mut *transaction)
+        .await?;
     sqlx::query("DELETE FROM ritual_entries")
         .execute(&mut *transaction)
         .await?;
@@ -119,6 +142,82 @@ async fn copy_current_tables(
             .bind(row.updated_at)
             .execute(&mut *transaction)
             .await?;
+    }
+
+    for row in plugin_rows {
+        sqlx::query(
+            r#"
+            INSERT INTO plugins (
+                id, name, description, version, enabled, trust_level, status,
+                status_detail, created_at, updated_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            "#,
+        )
+        .bind(row.id)
+        .bind(row.name)
+        .bind(row.description)
+        .bind(row.version)
+        .bind(row.enabled)
+        .bind(row.trust_level)
+        .bind(row.status)
+        .bind(row.status_detail)
+        .bind(row.created_at)
+        .bind(row.updated_at)
+        .execute(&mut *transaction)
+        .await?;
+    }
+
+    for row in plugin_capability_rows {
+        sqlx::query(
+            r#"
+            INSERT INTO plugin_capabilities (
+                id, plugin_id, capability, enabled, created_at, updated_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?)
+            "#,
+        )
+        .bind(row.id)
+        .bind(row.plugin_id)
+        .bind(row.capability)
+        .bind(row.enabled)
+        .bind(row.created_at)
+        .bind(row.updated_at)
+        .execute(&mut *transaction)
+        .await?;
+    }
+
+    for row in plugin_suggestion_rows {
+        sqlx::query(
+            r#"
+            INSERT INTO plugin_suggestions (
+                id, plugin_id, kind, title, summary, detail, payload_json,
+                source_label, source_uri, confidence, priority, status,
+                created_core_kind, created_core_id, created_at, updated_at,
+                resolved_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            "#,
+        )
+        .bind(row.id)
+        .bind(row.plugin_id)
+        .bind(row.kind)
+        .bind(row.title)
+        .bind(row.summary)
+        .bind(row.detail)
+        .bind(row.payload_json)
+        .bind(row.source_label)
+        .bind(row.source_uri)
+        .bind(row.confidence)
+        .bind(row.priority)
+        .bind(row.status)
+        .bind(row.created_core_kind)
+        .bind(row.created_core_id)
+        .bind(row.created_at)
+        .bind(row.updated_at)
+        .bind(row.resolved_at)
+        .execute(&mut *transaction)
+        .await?;
     }
 
     for row in project_rows {
@@ -414,17 +513,64 @@ struct BackupBlockRow {
     updated_at: Option<String>,
 }
 
+#[derive(Debug, FromRow)]
+struct BackupPluginRow {
+    id: String,
+    name: String,
+    description: Option<String>,
+    version: String,
+    enabled: i64,
+    trust_level: String,
+    status: String,
+    status_detail: Option<String>,
+    created_at: String,
+    updated_at: String,
+}
+
+#[derive(Debug, FromRow)]
+struct BackupPluginCapabilityRow {
+    id: String,
+    plugin_id: String,
+    capability: String,
+    enabled: i64,
+    created_at: String,
+    updated_at: String,
+}
+
+#[derive(Debug, FromRow)]
+struct BackupPluginSuggestionRow {
+    id: String,
+    plugin_id: String,
+    kind: String,
+    title: String,
+    summary: Option<String>,
+    detail: Option<String>,
+    payload_json: String,
+    source_label: Option<String>,
+    source_uri: Option<String>,
+    confidence: Option<f64>,
+    priority: String,
+    status: String,
+    created_core_kind: Option<String>,
+    created_core_id: Option<String>,
+    created_at: String,
+    updated_at: String,
+    resolved_at: Option<String>,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::planning::{create_project, create_task, update_task, upsert_success_pack};
+    use crate::plugins::{create_suggestion, seed_builtin_plugins, update_plugin};
     use crate::ritual::save_daily_focus;
     use crate::schedule::create_block;
     use crate::{connect, run_migrations, DbConfig};
     use chrono::{DateTime, NaiveDate, NaiveTime, Utc};
     use sfo_core::{
-        BlockCreate, BlockType, DailyFocusUpdate, ProjectCategory, ProjectCreate,
-        SuccessPackUpdate, TaskCreate, WhenBucket,
+        BlockCreate, BlockType, DailyFocusUpdate, PluginId, PluginSuggestionCreate,
+        PluginSuggestionKind, PluginSuggestionPriority, PluginUpdate, ProjectCategory,
+        ProjectCreate, SuccessPackUpdate, TaskCreate, WhenBucket,
     };
 
     #[tokio::test]
@@ -512,6 +658,7 @@ mod tests {
         )
         .await
         .expect("daily focus");
+        seed_plugin_fixture(&pool).await;
 
         let manifest = backup_manifest(&pool).await.expect("backup manifest");
 
@@ -522,6 +669,9 @@ mod tests {
         assert_count(&manifest.tables, "blocks", 1);
         assert_count(&manifest.tables, "ritual_entries", 1);
         assert_count(&manifest.tables, "app_metadata", 1);
+        assert_count(&manifest.tables, "plugins", 2);
+        assert_count(&manifest.tables, "plugin_capabilities", 13);
+        assert_count(&manifest.tables, "plugin_suggestions", 1);
     }
 
     #[tokio::test]
@@ -612,6 +762,7 @@ mod tests {
         )
         .await
         .expect("daily focus");
+        seed_plugin_fixture(&pool).await;
         let backup_dir = temp_dir_path("backup-file");
         std::fs::create_dir_all(&backup_dir).expect("create backup dir");
 
@@ -661,6 +812,28 @@ mod tests {
         .await
         .expect("parked until");
         assert_eq!(parked_until, "2099-01-01T09:00:00+00:00");
+        let plugin_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM plugins")
+            .fetch_one(&backup_pool)
+            .await
+            .expect("count backup plugins");
+        assert_eq!(plugin_count, 2);
+        let enabled_health: i64 =
+            sqlx::query_scalar("SELECT enabled FROM plugins WHERE id = 'health'")
+                .fetch_one(&backup_pool)
+                .await
+                .expect("health enabled state");
+        assert_eq!(enabled_health, 1);
+        let capability_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM plugin_capabilities")
+            .fetch_one(&backup_pool)
+            .await
+            .expect("count backup plugin capabilities");
+        assert_eq!(capability_count, 13);
+        let suggestion_status: String =
+            sqlx::query_scalar("SELECT status FROM plugin_suggestions WHERE plugin_id = 'health'")
+                .fetch_one(&backup_pool)
+                .await
+                .expect("plugin suggestion status");
+        assert_eq!(suggestion_status, "pending");
         backup_pool.close().await;
 
         let _ = std::fs::remove_dir_all(backup_dir);
@@ -686,5 +859,36 @@ mod tests {
         DateTime::parse_from_rfc3339(value)
             .expect("datetime")
             .with_timezone(&Utc)
+    }
+
+    async fn seed_plugin_fixture(pool: &sqlx::SqlitePool) {
+        seed_builtin_plugins(pool).await.expect("seed plugins");
+        update_plugin(
+            pool,
+            &PluginId::from("health"),
+            PluginUpdate {
+                enabled: Some(true),
+                ..PluginUpdate::default()
+            },
+        )
+        .await
+        .expect("enable health");
+        create_suggestion(
+            pool,
+            PluginSuggestionCreate {
+                plugin_id: PluginId::from("health"),
+                kind: PluginSuggestionKind::HealthPrompt,
+                title: "Take a short walk".to_string(),
+                summary: Some("Recovery fits today.".to_string()),
+                detail: None,
+                payload_json: "{}".to_string(),
+                source_label: Some("Health".to_string()),
+                source_uri: None,
+                confidence: Some(0.8),
+                priority: PluginSuggestionPriority::Normal,
+            },
+        )
+        .await
+        .expect("create plugin suggestion");
     }
 }

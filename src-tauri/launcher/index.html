@@ -276,6 +276,24 @@
           <div class="review-checklist">
             <section class="review-step">
               <div class="review-step-heading">
+                <span>Plugins</span>
+                <div>
+                  <h3>Review suggestions</h3>
+                  <p>Approve useful plugin suggestions, or dismiss anything that should not enter SFO.</p>
+                </div>
+              </div>
+              <div class="review-step-grid single">
+                <article class="panel review-panel plugin-suggestions-panel">
+                  <div class="panel-kicker">Plugin Suggestions</div>
+                  <h3 class="review-panel-title">Waiting for review <span id="review-plugin-suggestions-count">0</span></h3>
+                  <p class="panel-note">Nothing from a plugin changes tasks, waiting items, or blocks until you approve it.</p>
+                  <div class="review-list is-scrollable plugin-suggestion-list" id="review-plugin-suggestions"></div>
+                </article>
+              </div>
+            </section>
+
+            <section class="review-step">
+              <div class="review-step-heading">
                 <span>Step 1</span>
                 <div>
                   <h3>Choose this week</h3>
@@ -417,6 +435,18 @@
                 This desktop shell stores the token in local storage; the iPhone build must move it to platform-secure storage before real use.
               </p>
             </div>
+          </section>
+
+          <section class="connection-card plugins-settings-card">
+            <div class="section-heading">
+              <div>
+                <div class="eyebrow">Plugins</div>
+                <h2>Plugin Registry</h2>
+                <p>Enable first-party plugin surfaces when you are ready to review their suggestions.</p>
+              </div>
+              <strong class="settings-count" id="settings-plugins-count">0</strong>
+            </div>
+            <div class="settings-plugin-list" id="settings-plugins"></div>
           </section>
         </section>
       </section>

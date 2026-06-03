@@ -16,6 +16,13 @@ The Rust rewrite lives beside the current Python app while feature parity is bui
 - `GET /api/v1/auth/status`
 - `GET /api/v1/bootstrap`
 - `PUT /api/v1/daily-focus`
+- `GET /api/v1/plugins`
+- `GET /api/v1/plugins/{plugin_id}`
+- `PATCH /api/v1/plugins/{plugin_id}`
+- `GET /api/v1/plugins/suggestions`
+- `GET /api/v1/plugins/suggestions/{suggestion_id}`
+- `POST /api/v1/plugins/suggestions/{suggestion_id}/approve`
+- `POST /api/v1/plugins/suggestions/{suggestion_id}/dismiss`
 - `GET /api/v1/projects`
 - `POST /api/v1/projects`
 - `GET /api/v1/projects/{project_id}/card`
@@ -77,13 +84,31 @@ Real import is exposed at `POST /api/v1/import/python-sqlite` with:
 - Legacy SQLite timestamps like `2026-01-02 03:04:05` are normalized to RFC 3339 UTC text.
 - Re-running the same import is idempotent for imported projects, success packs, tasks, blocks, and waiting items because upserts key off `legacy_id` or project identity.
 
-Unsupported Python tables, including Python `ritual_entries`, are still reported as warnings and are not imported in this slice. The backup endpoint returns a JSON manifest over the Rust database with schema metadata and table counts, including Rust `success_packs` and `ritual_entries`.
+Unsupported Python tables, including Python `ritual_entries`, are still reported as warnings and are not imported in this slice. The backup endpoint returns a JSON manifest over the Rust database with schema metadata and table counts, including Rust `success_packs`, `ritual_entries`, `plugins`, `plugin_capabilities`, and `plugin_suggestions`.
 
 ## Project Cards
 
 Project cards are the first Start Finishing shaping surface in the Rust app. Review is the main home for the card, while Process can create a lightweight shaped project with success level, why, and an optional first chunk.
 
 The card stores the finish line, optional start date, required target date, success level, why, GATES notes, drag-point notes, budget/space notes, Success Pack fields, and roadmap chunks. Roadmap chunks are normal project-linked tasks so planning stays connected to execution.
+
+## Plugin Platform
+
+The first plugin-platform slice is a safe registry and suggestion-review layer, not dynamically loaded plugin code. The Rust database seeds two disabled first-party plugins:
+
+- `health`: exercise, diet, training, supplements, metrics, and goals.
+- `communications`: Outlook/Teams draft responses, follow-up suggestions, and calendar-derived planning prompts.
+
+Plugins expose declared capabilities such as SFO-context reads, suggestion creation, task/waiting creation, health reads/writes, communications metadata/content reads, draft creation, and calendar block suggestions. Enabling a plugin only enables the registry record in this slice; real integrations still need explicit implementation and separate platform permissions.
+
+Plugins can create reviewable suggestions through trusted server-side code. Suggestions may be dismissed or approved through `/api/v1/plugins/suggestions/{suggestion_id}/dismiss` and `/api/v1/plugins/suggestions/{suggestion_id}/approve`. Approval converts supported suggestion kinds through normal SFO services:
+
+- `task` creates a normal task.
+- `waiting` creates a Waiting On item.
+- `calendar_block` creates a schedule block.
+- `draft_message`, `health_prompt`, and `generic` are marked approved without mutating core SFO data in this slice.
+
+The plugin registry, capabilities, and suggestions are included in the backup manifest and SQLite snapshot backup. External sidecar plugin data stores are not backed up yet; future sidecar plugins will need explicit backup hooks before they can store durable data outside the main SFO database.
 
 ## Bootstrap Summary
 
