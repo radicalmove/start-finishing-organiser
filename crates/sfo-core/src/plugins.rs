@@ -221,6 +221,7 @@ pub struct PluginSuggestionApproval {}
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct PluginSuggestionDismissal {}
 
+#[allow(clippy::derivable_impls)]
 impl Default for PluginSuggestionPriority {
     fn default() -> Self {
         Self::Normal

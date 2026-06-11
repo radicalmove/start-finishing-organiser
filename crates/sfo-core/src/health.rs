@@ -100,6 +100,7 @@ health_enum!(HealthExerciseSessionStatus {
     Skipped => "skipped",
 });
 
+#[allow(clippy::derivable_impls)]
 impl Default for HealthExerciseSessionStatus {
     fn default() -> Self {
         Self::Planned
