@@ -2,6 +2,7 @@ pub mod backup;
 pub mod bootstrap;
 pub mod config;
 pub mod error;
+pub mod health;
 pub mod import;
 pub mod inbox;
 pub mod planning;
