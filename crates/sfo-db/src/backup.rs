@@ -16,6 +16,10 @@ pub const RUST_BACKUP_TABLES: &[&str] = &[
     "plugins",
     "plugin_capabilities",
     "plugin_suggestions",
+    "health_exercise_sessions",
+    "health_gym_exercises",
+    "health_cardio_exercises",
+    "health_flexibility_exercises",
 ];
 
 pub async fn backup_manifest(pool: &sqlx::SqlitePool) -> Result<BackupManifest, DbError> {
@@ -102,8 +106,38 @@ async fn copy_current_tables(
         sqlx::query_as::<_, BackupPluginSuggestionRow>("SELECT * FROM plugin_suggestions")
             .fetch_all(source_pool)
             .await?;
+    let health_session_rows = sqlx::query_as::<_, BackupHealthExerciseSessionRow>(
+        "SELECT * FROM health_exercise_sessions",
+    )
+    .fetch_all(source_pool)
+    .await?;
+    let health_gym_rows =
+        sqlx::query_as::<_, BackupHealthGymExerciseRow>("SELECT * FROM health_gym_exercises")
+            .fetch_all(source_pool)
+            .await?;
+    let health_cardio_rows =
+        sqlx::query_as::<_, BackupHealthCardioExerciseRow>("SELECT * FROM health_cardio_exercises")
+            .fetch_all(source_pool)
+            .await?;
+    let health_flexibility_rows = sqlx::query_as::<_, BackupHealthFlexibilityExerciseRow>(
+        "SELECT * FROM health_flexibility_exercises",
+    )
+    .fetch_all(source_pool)
+    .await?;
 
     let mut transaction = backup_pool.begin().await?;
+    sqlx::query("DELETE FROM health_flexibility_exercises")
+        .execute(&mut *transaction)
+        .await?;
+    sqlx::query("DELETE FROM health_cardio_exercises")
+        .execute(&mut *transaction)
+        .await?;
+    sqlx::query("DELETE FROM health_gym_exercises")
+        .execute(&mut *transaction)
+        .await?;
+    sqlx::query("DELETE FROM health_exercise_sessions")
+        .execute(&mut *transaction)
+        .await?;
     sqlx::query("DELETE FROM plugin_suggestions")
         .execute(&mut *transaction)
         .await?;
@@ -216,6 +250,93 @@ async fn copy_current_tables(
         .bind(row.created_at)
         .bind(row.updated_at)
         .bind(row.resolved_at)
+        .execute(&mut *transaction)
+        .await?;
+    }
+
+    for row in health_session_rows {
+        sqlx::query(
+            r#"
+            INSERT INTO health_exercise_sessions (
+                id, session_date, session_type, title, target_duration_minutes,
+                status, notes, created_at, updated_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            "#,
+        )
+        .bind(row.id)
+        .bind(row.session_date)
+        .bind(row.session_type)
+        .bind(row.title)
+        .bind(row.target_duration_minutes)
+        .bind(row.status)
+        .bind(row.notes)
+        .bind(row.created_at)
+        .bind(row.updated_at)
+        .execute(&mut *transaction)
+        .await?;
+    }
+
+    for row in health_gym_rows {
+        sqlx::query(
+            r#"
+            INSERT INTO health_gym_exercises (
+                id, session_id, position, exercise_name, sets, reps, weight,
+                weight_unit, notes
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            "#,
+        )
+        .bind(row.id)
+        .bind(row.session_id)
+        .bind(row.position)
+        .bind(row.exercise_name)
+        .bind(row.sets)
+        .bind(row.reps)
+        .bind(row.weight)
+        .bind(row.weight_unit)
+        .bind(row.notes)
+        .execute(&mut *transaction)
+        .await?;
+    }
+
+    for row in health_cardio_rows {
+        sqlx::query(
+            r#"
+            INSERT INTO health_cardio_exercises (
+                id, session_id, position, activity_type, duration_minutes, intensity, notes
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            "#,
+        )
+        .bind(row.id)
+        .bind(row.session_id)
+        .bind(row.position)
+        .bind(row.activity_type)
+        .bind(row.duration_minutes)
+        .bind(row.intensity)
+        .bind(row.notes)
+        .execute(&mut *transaction)
+        .await?;
+    }
+
+    for row in health_flexibility_rows {
+        sqlx::query(
+            r#"
+            INSERT INTO health_flexibility_exercises (
+                id, session_id, position, movement_name, sets, hold_seconds, side, notes
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            "#,
+        )
+        .bind(row.id)
+        .bind(row.session_id)
+        .bind(row.position)
+        .bind(row.movement_name)
+        .bind(row.sets)
+        .bind(row.hold_seconds)
+        .bind(row.side)
+        .bind(row.notes)
         .execute(&mut *transaction)
         .await?;
     }
@@ -558,9 +679,59 @@ struct BackupPluginSuggestionRow {
     resolved_at: Option<String>,
 }
 
+#[derive(Debug, FromRow)]
+struct BackupHealthExerciseSessionRow {
+    id: String,
+    session_date: String,
+    session_type: String,
+    title: String,
+    target_duration_minutes: Option<i64>,
+    status: String,
+    notes: Option<String>,
+    created_at: String,
+    updated_at: String,
+}
+
+#[derive(Debug, FromRow)]
+struct BackupHealthGymExerciseRow {
+    id: String,
+    session_id: String,
+    position: i64,
+    exercise_name: String,
+    sets: Option<i64>,
+    reps: Option<i64>,
+    weight: Option<f64>,
+    weight_unit: Option<String>,
+    notes: Option<String>,
+}
+
+#[derive(Debug, FromRow)]
+struct BackupHealthCardioExerciseRow {
+    id: String,
+    session_id: String,
+    position: i64,
+    activity_type: String,
+    duration_minutes: Option<i64>,
+    intensity: Option<String>,
+    notes: Option<String>,
+}
+
+#[derive(Debug, FromRow)]
+struct BackupHealthFlexibilityExerciseRow {
+    id: String,
+    session_id: String,
+    position: i64,
+    movement_name: String,
+    sets: Option<i64>,
+    hold_seconds: Option<i64>,
+    side: Option<String>,
+    notes: Option<String>,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::health::create_session;
     use crate::planning::{create_project, create_task, update_task, upsert_success_pack};
     use crate::plugins::{create_suggestion, seed_builtin_plugins, update_plugin};
     use crate::ritual::save_daily_focus;
@@ -568,9 +739,11 @@ mod tests {
     use crate::{connect, run_migrations, DbConfig};
     use chrono::{DateTime, NaiveDate, NaiveTime, Utc};
     use sfo_core::{
-        BlockCreate, BlockType, DailyFocusUpdate, PluginId, PluginSuggestionCreate,
-        PluginSuggestionKind, PluginSuggestionPriority, PluginUpdate, ProjectCategory,
-        ProjectCreate, SuccessPackUpdate, TaskCreate, WhenBucket,
+        BlockCreate, BlockType, DailyFocusUpdate, HealthExerciseDetails,
+        HealthExerciseSessionCreate, HealthExerciseSessionStatus, HealthExerciseSessionType,
+        HealthGymExercise, PluginId, PluginSuggestionCreate, PluginSuggestionKind,
+        PluginSuggestionPriority, PluginUpdate, ProjectCategory, ProjectCreate, SuccessPackUpdate,
+        TaskCreate, WhenBucket,
     };
 
     #[tokio::test]
@@ -658,6 +831,7 @@ mod tests {
         )
         .await
         .expect("daily focus");
+        create_health_fixture(&pool).await;
         seed_plugin_fixture(&pool).await;
 
         let manifest = backup_manifest(&pool).await.expect("backup manifest");
@@ -672,6 +846,10 @@ mod tests {
         assert_count(&manifest.tables, "plugins", 2);
         assert_count(&manifest.tables, "plugin_capabilities", 13);
         assert_count(&manifest.tables, "plugin_suggestions", 1);
+        assert_count(&manifest.tables, "health_exercise_sessions", 1);
+        assert_count(&manifest.tables, "health_gym_exercises", 1);
+        assert_count(&manifest.tables, "health_cardio_exercises", 0);
+        assert_count(&manifest.tables, "health_flexibility_exercises", 0);
     }
 
     #[tokio::test]
@@ -762,6 +940,7 @@ mod tests {
         )
         .await
         .expect("daily focus");
+        create_health_fixture(&pool).await;
         seed_plugin_fixture(&pool).await;
         let backup_dir = temp_dir_path("backup-file");
         std::fs::create_dir_all(&backup_dir).expect("create backup dir");
@@ -834,6 +1013,17 @@ mod tests {
                 .await
                 .expect("plugin suggestion status");
         assert_eq!(suggestion_status, "pending");
+        let health_session_count: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM health_exercise_sessions")
+                .fetch_one(&backup_pool)
+                .await
+                .expect("count backup health sessions");
+        assert_eq!(health_session_count, 1);
+        let gym_name: String = sqlx::query_scalar("SELECT exercise_name FROM health_gym_exercises")
+            .fetch_one(&backup_pool)
+            .await
+            .expect("backup gym exercise name");
+        assert_eq!(gym_name, "Back squat");
         backup_pool.close().await;
 
         let _ = std::fs::remove_dir_all(backup_dir);
@@ -890,5 +1080,34 @@ mod tests {
         )
         .await
         .expect("create plugin suggestion");
+    }
+
+    async fn create_health_fixture(pool: &sqlx::SqlitePool) {
+        create_session(
+            pool,
+            HealthExerciseSessionCreate {
+                session_date: NaiveDate::from_ymd_opt(2026, 6, 8).expect("date"),
+                session_type: HealthExerciseSessionType::Gym,
+                title: "Lower body gym".to_string(),
+                target_duration_minutes: Some(45),
+                status: HealthExerciseSessionStatus::Planned,
+                notes: None,
+                details: HealthExerciseDetails {
+                    gym: vec![HealthGymExercise {
+                        id: None,
+                        exercise_name: "Back squat".to_string(),
+                        sets: Some(3),
+                        reps: Some(5),
+                        weight: Some(80.0),
+                        weight_unit: Some("kg".to_string()),
+                        notes: None,
+                    }],
+                    cardio: vec![],
+                    flexibility: vec![],
+                },
+            },
+        )
+        .await
+        .expect("create health session");
     }
 }

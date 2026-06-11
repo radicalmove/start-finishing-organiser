@@ -23,6 +23,12 @@ The Rust rewrite lives beside the current Python app while feature parity is bui
 - `GET /api/v1/plugins/suggestions/{suggestion_id}`
 - `POST /api/v1/plugins/suggestions/{suggestion_id}/approve`
 - `POST /api/v1/plugins/suggestions/{suggestion_id}/dismiss`
+- `GET /api/v1/plugins/health/exercise/weeks/{date}`
+- `POST /api/v1/plugins/health/exercise/sessions`
+- `GET /api/v1/plugins/health/exercise/sessions/{session_id}`
+- `PUT /api/v1/plugins/health/exercise/sessions/{session_id}`
+- `POST /api/v1/plugins/health/exercise/sessions/{session_id}/status`
+- `DELETE /api/v1/plugins/health/exercise/sessions/{session_id}`
 - `GET /api/v1/projects`
 - `POST /api/v1/projects`
 - `GET /api/v1/projects/{project_id}/card`
@@ -84,7 +90,7 @@ Real import is exposed at `POST /api/v1/import/python-sqlite` with:
 - Legacy SQLite timestamps like `2026-01-02 03:04:05` are normalized to RFC 3339 UTC text.
 - Re-running the same import is idempotent for imported projects, success packs, tasks, blocks, and waiting items because upserts key off `legacy_id` or project identity.
 
-Unsupported Python tables, including Python `ritual_entries`, are still reported as warnings and are not imported in this slice. The backup endpoint returns a JSON manifest over the Rust database with schema metadata and table counts, including Rust `success_packs`, `ritual_entries`, `plugins`, `plugin_capabilities`, and `plugin_suggestions`.
+Unsupported Python tables, including Python `ritual_entries`, are still reported as warnings and are not imported in this slice. The backup endpoint returns a JSON manifest over the Rust database with schema metadata and table counts, including Rust `success_packs`, `ritual_entries`, `plugins`, `plugin_capabilities`, `plugin_suggestions`, `health_exercise_sessions`, `health_gym_exercises`, `health_cardio_exercises`, and `health_flexibility_exercises`.
 
 ## Project Cards
 
@@ -109,6 +115,20 @@ Plugins can create reviewable suggestions through trusted server-side code. Sugg
 - `draft_message`, `health_prompt`, and `generic` are marked approved without mutating core SFO data in this slice.
 
 The plugin registry, capabilities, and suggestions are included in the backup manifest and SQLite snapshot backup. External sidecar plugin data stores are not backed up yet; future sidecar plugins will need explicit backup hooks before they can store durable data outside the main SFO database.
+
+### Health Exercise Planner
+
+The first Health plugin feature is a weekly exercise planner. It stores structured sessions in the main SFO database so Mac and iPhone clients see the same plan:
+
+- `gym` sessions can list individual exercises with sets, reps, optional weight, unit, and notes.
+- `cardio` sessions can list activity type, duration in minutes, intensity such as Zone 2 or VO2 max, and notes.
+- `flexibility` sessions can list stretches or mobility movements with sets, hold seconds, side, and notes.
+
+`GET /api/v1/plugins/health/exercise/weeks/{date}` normalizes any date to its Monday-starting week and returns `week_start`, `week_end`, and sessions. Reads seed the built-in plugin registry but do not require the Health plugin to be enabled. Writes require enabling the `health` plugin first through `PATCH /api/v1/plugins/health`.
+
+Session creates and updates replace the typed detail rows as one unit. `POST /api/v1/plugins/health/exercise/sessions/{session_id}/status` marks a session `planned`, `done`, or `skipped` without replacing its plan details.
+
+Because this Health feature uses first-party SFO tables, `POST /api/v1/export/backup` and the pre-import SQLite snapshot copy preserve exercise sessions and all typed detail rows. External Health device integrations, Apple Health sync, and meal/metric tracking are not implemented in this slice.
 
 ## Bootstrap Summary
 
