@@ -1,5 +1,6 @@
 pub mod bootstrap;
 pub mod capture;
+pub mod health;
 pub mod ids;
 pub mod inbox;
 pub mod planning;
@@ -13,6 +14,7 @@ pub mod weekly_review;
 
 pub use bootstrap::*;
 pub use capture::*;
+pub use health::*;
 pub use ids::{BlockId, ProjectId, RitualId, TaskId, WaitingId};
 pub use inbox::*;
 pub use planning::*;
