@@ -168,7 +168,7 @@ Rust server configuration is environment-first:
 
 ## Native Client Shell
 
-The first Rust client shell lives in `src-tauri/launcher` and is intentionally static: there is no Node build step and no frontend framework yet. It connects to a configured Rust server URL, stores the server URL and API token in browser local storage, checks `/healthz` and `/api/v1/auth/status`, then renders `GET /api/v1/bootstrap`.
+The first Rust client shell lives in `src-tauri/launcher` and is intentionally static: there is no Node build step and no frontend framework yet. It connects to a configured Rust server URL, stores the server URL in browser local storage, stores the API token in Apple Keychain when running inside Tauri on macOS/iOS, checks `/healthz` and `/api/v1/auth/status`, then renders `GET /api/v1/bootstrap`.
 
 Current shell behavior:
 
@@ -183,10 +183,10 @@ Current shell behavior:
 - Inline guided conversion from inbox item to task, project, or OPP/Waiting On item through `POST /api/v1/capture/guided`, with decision-card copy and success feedback after conversion.
 - New-project conversion defaults the target date from the server's Today value so native date inputs submit a real value.
 - New-project conversion infers Personal for obvious personal captures such as appointments, family, home, and health items.
-- No automatic Python backend spawn unless `SFO_SPAWN_BACKEND=1` is explicitly set.
+- No automatic Python backend spawn. The macOS Tauri shell can spawn the bundled Rust backend for standalone desktop use, controlled by `SFO_SPAWN_BACKEND`.
 - Server CORS preflight support for Tauri production origins.
 
-Token storage is a temporary client-shell compromise. Before using this as a polished production Mac/iPhone client, move token storage to Keychain or platform-secure storage.
+Browser-only development still falls back to local storage for the API token because there is no native Tauri bridge in that context. Production macOS/iOS use should run through the Tauri shell so the token is stored in Apple Keychain.
 
 For iPhone, note that some production webview origins are HTTPS. If the webview blocks plain HTTP as mixed content, the Mac mini server will need HTTPS through a local certificate, Caddy/nginx, VPN hostname, or a Tauri-native HTTP path.
 

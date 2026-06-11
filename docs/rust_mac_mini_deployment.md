@@ -100,6 +100,27 @@ launchctl print gui/$(id -u)/com.sfo.rust-server
 tail -n 50 ~/Library/Logs/sfo-rust-server.err.log
 ```
 
+If `/api/v1/auth/status` still reports `{"auth_required":false}` after loading this LaunchAgent, check for an older development server occupying the same port:
+
+```bash
+lsof -nP -iTCP:8088 -sTCP:LISTEN
+launchctl print gui/$(id -u) | grep -i sfo
+```
+
+Disable any stale development agent before restarting the production one:
+
+```bash
+launchctl unload ~/Library/LaunchAgents/com.sfo.rust-server.dev.plist 2>/dev/null || true
+launchctl disable gui/$(id -u)/com.sfo.rust-server.dev 2>/dev/null || true
+launchctl kickstart -k gui/$(id -u)/com.sfo.rust-server
+```
+
+The macOS Tauri shell stores the API token in Apple Keychain under service `com.rcd58.sfo` and account `rust-api-token`. To retrieve the token for entering it on the iPhone:
+
+```bash
+security find-generic-password -s com.rcd58.sfo -a rust-api-token -w
+```
+
 ## Smoke Tests
 
 From the Mac mini:
