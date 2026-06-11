@@ -64,6 +64,7 @@ impl ProjectCategory {
     }
 }
 
+#[allow(clippy::derivable_impls)]
 impl Default for ProjectCategory {
     fn default() -> Self {
         Self::Work
@@ -77,6 +78,7 @@ string_enum!(ProjectStatus {
     Archived => "archived",
 });
 
+#[allow(clippy::derivable_impls)]
 impl Default for ProjectStatus {
     fn default() -> Self {
         Self::Active
@@ -103,6 +105,7 @@ string_enum!(TaskStatus {
     Archived => "archived",
 });
 
+#[allow(clippy::derivable_impls)]
 impl Default for TaskStatus {
     fn default() -> Self {
         Self::Pending
@@ -117,6 +120,7 @@ string_enum!(WhenBucket {
     Later => "later",
 });
 
+#[allow(clippy::derivable_impls)]
 impl Default for WhenBucket {
     fn default() -> Self {
         Self::Later
@@ -142,6 +146,7 @@ string_enum!(OwnerType {
     Opp => "opp",
 });
 
+#[allow(clippy::derivable_impls)]
 impl Default for OwnerType {
     fn default() -> Self {
         Self::Mine

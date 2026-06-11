@@ -8,6 +8,12 @@ import {
   buildCaptureWorkflowViewModel,
   buildGuidedCapturePayload,
   buildGuidedCaptureFeedback,
+  buildHealthExerciseSessionPayload,
+  buildHealthExerciseSessionPath,
+  buildHealthExerciseStatusPath,
+  buildHealthExerciseStatusPayload,
+  buildHealthExerciseWeekPath,
+  buildHealthExerciseWeekViewModel,
   buildItemDetailApiPath,
   buildItemDetailUpdatePayload,
   buildGlobalSearchViewModel,
@@ -152,6 +158,150 @@ test("plugin helpers build update payloads and suggestion action paths", () => {
     "/api/v1/plugins/suggestions/suggestion%2F1/dismiss",
   );
   assert.equal(buildPluginSuggestionActionPath({}, "approve"), "");
+});
+
+test("health exercise helpers build API paths and status payloads", () => {
+  assert.equal(
+    buildHealthExerciseWeekPath("2026-06-10"),
+    "/api/v1/plugins/health/exercise/weeks/2026-06-10",
+  );
+  assert.equal(
+    buildHealthExerciseSessionPath("session/1"),
+    "/api/v1/plugins/health/exercise/sessions/session%2F1",
+  );
+  assert.equal(
+    buildHealthExerciseStatusPath("session/1"),
+    "/api/v1/plugins/health/exercise/sessions/session%2F1/status",
+  );
+  assert.deepEqual(buildHealthExerciseStatusPayload("done"), { status: "done" });
+  assert.throws(() => buildHealthExerciseStatusPayload("complete"), /Choose a valid status/);
+});
+
+test("health exercise payload builder normalizes typed rows", () => {
+  assert.deepEqual(
+    buildHealthExerciseSessionPayload({
+      session_date: "2026-06-10",
+      session_type: "gym",
+      title: "  Lower body gym  ",
+      target_duration_minutes: "45",
+      notes: " ",
+      gym: [
+        {
+          exercise_name: " Back squat ",
+          sets: "3",
+          reps: "5",
+          weight: "80",
+          weight_unit: " kg ",
+          notes: " ",
+        },
+      ],
+      cardio: [
+        {
+          activity_type: " Indoor rowing ",
+          duration_minutes: "10",
+          intensity: " Zone 2 ",
+        },
+      ],
+      flexibility: [
+        {
+          movement_name: " Hip flexor stretch ",
+          sets: "2",
+          hold_seconds: "45",
+          side: " each ",
+        },
+      ],
+    }),
+    {
+      session_date: "2026-06-10",
+      session_type: "gym",
+      title: "Lower body gym",
+      target_duration_minutes: 45,
+      details: {
+        gym: [
+          {
+            exercise_name: "Back squat",
+            sets: 3,
+            reps: 5,
+            weight: 80,
+            weight_unit: "kg",
+          },
+        ],
+        cardio: [
+          {
+            activity_type: "Indoor rowing",
+            duration_minutes: 10,
+            intensity: "Zone 2",
+          },
+        ],
+        flexibility: [
+          {
+            movement_name: "Hip flexor stretch",
+            sets: 2,
+            hold_seconds: 45,
+            side: "each",
+          },
+        ],
+      },
+    },
+  );
+
+  assert.throws(
+    () => buildHealthExerciseSessionPayload({ session_date: "2026-06-10", session_type: "gym" }),
+    /Session title is required/,
+  );
+  assert.throws(
+    () =>
+      buildHealthExerciseSessionPayload({
+        session_date: "2026-06-10",
+        session_type: "gym",
+        title: "Gym",
+        gym: [{ sets: "3" }],
+      }),
+    /Exercise name is required/,
+  );
+});
+
+test("health exercise week view model summarizes sessions and plugin state", () => {
+  const model = buildHealthExerciseWeekViewModel(
+    {
+      week_start: "2026-06-08",
+      week_end: "2026-06-14",
+      sessions: [
+        {
+          id: "s1",
+          session_date: "2026-06-10",
+          session_type: "gym",
+          title: "Lower body gym",
+          target_duration_minutes: 45,
+          status: "planned",
+          details: {
+            gym: [{ exercise_name: "Back squat", sets: 3, reps: 5, weight: 80, weight_unit: "kg" }],
+          },
+        },
+        {
+          id: "s2",
+          session_date: "2026-06-11",
+          session_type: "cardio",
+          title: "Zone 2 row",
+          status: "done",
+          details: {
+            cardio: [{ activity_type: "Indoor rowing", duration_minutes: 20, intensity: "Zone 2" }],
+          },
+        },
+      ],
+    },
+    [{ id: "health", enabled: true }],
+  );
+
+  assert.equal(model.enabled, true);
+  assert.equal(model.weekLabel, "Week of Mon 8 Jun 2026");
+  assert.equal(model.rangeLabel, "Mon 8 Jun 2026 - Sun 14 Jun 2026");
+  assert.equal(model.sessionsCountLabel, "2");
+  assert.deepEqual(
+    model.sessions.map((session) => `${session.title}: ${session.typeLabel}: ${session.detailLabel}`),
+    ["Lower body gym: Gym: 45 min · 1 gym", "Zone 2 row: Cardio: 1 cardio"],
+  );
+  assert.equal(model.days.find((day) => day.date === "2026-06-10").sessions[0].id, "s1");
 });
 
 test("global search path trims queries and controls recycle inclusion", () => {

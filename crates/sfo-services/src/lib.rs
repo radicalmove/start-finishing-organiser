@@ -1,6 +1,7 @@
 pub mod bootstrap;
 pub mod capture;
 pub mod error;
+pub mod health;
 pub mod inbox;
 pub mod planning;
 pub mod plugins;
@@ -13,6 +14,7 @@ pub mod weekly_review;
 pub use bootstrap::BootstrapService;
 pub use capture::CaptureService;
 pub use error::ServiceError;
+pub use health::HealthService;
 pub use inbox::InboxService;
 pub use planning::PlanningService;
 pub use plugins::PluginService;

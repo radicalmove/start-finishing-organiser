@@ -8,6 +8,8 @@ use serde::{Deserialize, Serialize};
 use sfo_core::{
     BackupManifest, Block, BlockCreate, BlockId, BlockUpdate, BootstrapSummary, DailyFocus,
     DailyFocusUpdate, GlobalSearchResults, GuidedCaptureRequest, GuidedCaptureResponse,
+    HealthExerciseSession, HealthExerciseSessionCreate, HealthExerciseSessionId,
+    HealthExerciseSessionUpdate, HealthExerciseStatusUpdate, HealthExerciseWeek,
     ImportDryRunReport, ImportDryRunRequest, InboxContainers, InboxRouteRequest, Page,
     PluginDetail, PluginId, PluginSuggestion, PluginSuggestionId, PluginUpdate, Project,
     ProjectCard, ProjectCardUpdate, ProjectChunkCreate, ProjectCreate, ProjectId, ProjectUpdate,
@@ -16,7 +18,7 @@ use sfo_core::{
     WeeklyReviewTask,
 };
 use sfo_services::{
-    BootstrapService, CaptureService, InboxService, PlanningService, PluginService,
+    BootstrapService, CaptureService, HealthService, InboxService, PlanningService, PluginService,
     ScheduleService, SearchService, ServiceError, SystemService, WaitingService,
     WeeklyReviewService,
 };
@@ -132,6 +134,24 @@ pub fn router() -> Router<AppState> {
         .route(
             "/plugins/suggestions/{suggestion_id}/dismiss",
             post(dismiss_plugin_suggestion),
+        )
+        .route(
+            "/plugins/health/exercise/weeks/{date}",
+            get(get_health_exercise_week),
+        )
+        .route(
+            "/plugins/health/exercise/sessions",
+            post(create_health_exercise_session),
+        )
+        .route(
+            "/plugins/health/exercise/sessions/{session_id}",
+            get(get_health_exercise_session)
+                .put(update_health_exercise_session)
+                .delete(delete_health_exercise_session),
+        )
+        .route(
+            "/plugins/health/exercise/sessions/{session_id}/status",
+            post(update_health_exercise_session_status),
         )
         .route("/plugins", get(list_plugins))
         .route("/plugins/{plugin_id}", get(get_plugin).patch(update_plugin))
@@ -308,6 +328,75 @@ async fn seeded_plugin_service(db: sqlx::SqlitePool) -> Result<PluginService, Ap
     let service = PluginService::new(db);
     service.seed_builtin_plugins().await?;
     Ok(service)
+}
+
+async fn get_health_exercise_week(
+    State(state): State<AppState>,
+    Path(date): Path<String>,
+) -> Result<Json<HealthExerciseWeek>, ApiError> {
+    let service = HealthService::new(state.db);
+    Ok(Json(service.exercise_week(parse_date(&date)?).await?))
+}
+
+async fn create_health_exercise_session(
+    State(state): State<AppState>,
+    Json(payload): Json<HealthExerciseSessionCreate>,
+) -> Result<(StatusCode, Json<HealthExerciseSession>), ApiError> {
+    let service = HealthService::new(state.db);
+    let session = service.create_exercise_session(payload).await?;
+    Ok((StatusCode::CREATED, Json(session)))
+}
+
+async fn get_health_exercise_session(
+    State(state): State<AppState>,
+    Path(session_id): Path<String>,
+) -> Result<Json<HealthExerciseSession>, ApiError> {
+    let service = HealthService::new(state.db);
+    Ok(Json(
+        service
+            .get_exercise_session(parse_health_exercise_session_id(&session_id))
+            .await?,
+    ))
+}
+
+async fn update_health_exercise_session(
+    State(state): State<AppState>,
+    Path(session_id): Path<String>,
+    Json(payload): Json<HealthExerciseSessionUpdate>,
+) -> Result<Json<HealthExerciseSession>, ApiError> {
+    let service = HealthService::new(state.db);
+    Ok(Json(
+        service
+            .update_exercise_session(parse_health_exercise_session_id(&session_id), payload)
+            .await?,
+    ))
+}
+
+async fn update_health_exercise_session_status(
+    State(state): State<AppState>,
+    Path(session_id): Path<String>,
+    Json(payload): Json<HealthExerciseStatusUpdate>,
+) -> Result<Json<HealthExerciseSession>, ApiError> {
+    let service = HealthService::new(state.db);
+    Ok(Json(
+        service
+            .update_exercise_session_status(
+                parse_health_exercise_session_id(&session_id),
+                payload.status,
+            )
+            .await?,
+    ))
+}
+
+async fn delete_health_exercise_session(
+    State(state): State<AppState>,
+    Path(session_id): Path<String>,
+) -> Result<StatusCode, ApiError> {
+    let service = HealthService::new(state.db);
+    service
+        .delete_exercise_session(parse_health_exercise_session_id(&session_id))
+        .await?;
+    Ok(StatusCode::NO_CONTENT)
 }
 
 async fn move_task_to_week(
@@ -680,4 +769,12 @@ fn parse_block_id(value: &str) -> Result<BlockId, ApiError> {
 
 fn parse_waiting_id(value: &str) -> Result<WaitingId, ApiError> {
     WaitingId::from_str(value).map_err(|_| ApiError::bad_request("invalid waiting id"))
+}
+
+fn parse_date(value: &str) -> Result<NaiveDate, ApiError> {
+    NaiveDate::from_str(value).map_err(|_| ApiError::bad_request("invalid date"))
+}
+
+fn parse_health_exercise_session_id(value: &str) -> HealthExerciseSessionId {
+    HealthExerciseSessionId::from(value)
 }

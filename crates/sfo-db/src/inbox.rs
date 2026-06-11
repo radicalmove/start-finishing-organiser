@@ -63,8 +63,7 @@ pub async fn promote_due_parked_items(
     .execute(pool)
     .await?;
 
-    Ok(i64::try_from(result.rows_affected())
-        .map_err(|error| DbError::InvalidData(error.to_string()))?)
+    i64::try_from(result.rows_affected()).map_err(|error| DbError::InvalidData(error.to_string()))
 }
 
 async fn active_unprocessed_items(pool: &sqlx::SqlitePool) -> Result<Vec<Task>, DbError> {

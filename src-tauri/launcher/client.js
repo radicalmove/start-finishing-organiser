@@ -426,6 +426,102 @@ export function buildPluginSuggestionActionPath(suggestion = {}, action = "") {
   return `/api/v1/plugins/suggestions/${encodeURIComponent(id)}/${actionName}`;
 }
 
+export function buildHealthExerciseWeekPath(date) {
+  const value = String(date || "").trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return "";
+  return `/api/v1/plugins/health/exercise/weeks/${encodeURIComponent(value)}`;
+}
+
+export function buildHealthExerciseSessionPath(sessionId) {
+  const id = String(sessionId || "").trim();
+  if (!id) return "";
+  return `/api/v1/plugins/health/exercise/sessions/${encodeURIComponent(id)}`;
+}
+
+export function buildHealthExerciseStatusPath(sessionId) {
+  const base = buildHealthExerciseSessionPath(sessionId);
+  return base ? `${base}/status` : "";
+}
+
+export function buildHealthExerciseStatusPayload(status) {
+  const value = String(status || "").trim();
+  if (!["planned", "done", "skipped"].includes(value)) {
+    throw new Error("Choose a valid status.");
+  }
+  return { status: value };
+}
+
+export function buildHealthExerciseSessionPayload(values = {}) {
+  const sessionDate = optionalText(values.session_date);
+  if (!sessionDate) throw new Error("Session date is required.");
+
+  const sessionType = optionalText(values.session_type) || "gym";
+  if (!["gym", "cardio", "flexibility"].includes(sessionType)) {
+    throw new Error("Choose a valid session type.");
+  }
+
+  const title = optionalText(values.title);
+  if (!title) throw new Error("Session title is required.");
+
+  const payload = {
+    session_date: sessionDate,
+    session_type: sessionType,
+    title,
+    details: {
+      gym: normalizeHealthGymRows(values.gym || values.gym_exercises),
+      cardio: normalizeHealthCardioRows(values.cardio || values.cardio_exercises),
+      flexibility: normalizeHealthFlexibilityRows(
+        values.flexibility || values.flexibility_exercises,
+      ),
+    },
+  };
+
+  setOptional(payload, "notes", values.notes);
+  const status = optionalText(values.status);
+  if (status) {
+    payload.status = buildHealthExerciseStatusPayload(status).status;
+  }
+  const targetDuration = optionalPositiveInteger(
+    values.target_duration_minutes,
+    "Target duration",
+  );
+  if (targetDuration !== null) {
+    payload.target_duration_minutes = targetDuration;
+  }
+
+  return payload;
+}
+
+export function buildHealthExerciseWeekViewModel(payload = {}, plugins = []) {
+  const weekStart = payload.week_start || "";
+  const weekEnd = payload.week_end || "";
+  const sessions = (Array.isArray(payload.sessions) ? payload.sessions : [])
+    .map(healthExerciseSessionView)
+    .sort((left, right) => {
+      const byDate = left.sessionDate.localeCompare(right.sessionDate);
+      if (byDate !== 0) return byDate;
+      return left.title.localeCompare(right.title);
+    });
+  const healthPlugin = (Array.isArray(plugins) ? plugins : []).find(
+    (plugin) => plugin?.id === "health",
+  );
+
+  return {
+    weekStart,
+    weekEnd,
+    weekLabel: weekStart ? `Week of ${formatDateDisplayLabel(weekStart)}` : "Exercise Week",
+    rangeLabel: compactJoin(
+      [formatDateDisplayLabel(weekStart), formatDateDisplayLabel(weekEnd)],
+      " - ",
+    ),
+    enabled: Boolean(healthPlugin?.enabled),
+    sessions,
+    sessionsCountLabel: countLabel(sessions),
+    days: healthExerciseWeekDays(weekStart, sessions),
+    emptyText: "No exercise sessions planned for this week.",
+  };
+}
+
 export function buildItemDetailViewModel(item = {}, detailPayload = null) {
   const enrichedItem = mergeItemDetailPayload(item, detailPayload);
   const result = searchResultView(enrichedItem);
@@ -1134,6 +1230,102 @@ export function defaultGuidedProjectTargetDate(todayLabel, fallbackDate = new Da
   return fallbackDate.toISOString().slice(0, 10);
 }
 
+function normalizeHealthGymRows(rows = []) {
+  return normalizeHealthRows(rows, "Exercise name", "exercise_name", (row, source) => {
+    setOptionalPositiveInteger(row, "sets", source.sets, "Sets");
+    setOptionalPositiveInteger(row, "reps", source.reps, "Reps");
+    const weight = optionalPositiveNumber(source.weight, "Weight");
+    if (weight !== null) row.weight = weight;
+    setOptional(row, "weight_unit", source.weight_unit);
+    setOptional(row, "notes", source.notes);
+  });
+}
+
+function normalizeHealthCardioRows(rows = []) {
+  return normalizeHealthRows(rows, "Activity type", "activity_type", (row, source) => {
+    setOptionalPositiveInteger(row, "duration_minutes", source.duration_minutes, "Duration");
+    setOptional(row, "intensity", source.intensity);
+    setOptional(row, "notes", source.notes);
+  });
+}
+
+function normalizeHealthFlexibilityRows(rows = []) {
+  return normalizeHealthRows(rows, "Movement name", "movement_name", (row, source) => {
+    setOptionalPositiveInteger(row, "sets", source.sets, "Sets");
+    setOptionalPositiveInteger(row, "hold_seconds", source.hold_seconds, "Hold");
+    setOptional(row, "side", source.side);
+    setOptional(row, "notes", source.notes);
+  });
+}
+
+function normalizeHealthRows(rows = [], requiredLabel, requiredKey, assignOptionalFields) {
+  return (Array.isArray(rows) ? rows : [])
+    .filter((source) => healthRowHasInput(source))
+    .map((source) => {
+      const requiredValue = optionalText(source?.[requiredKey]);
+      if (!requiredValue) {
+        throw new Error(`${requiredLabel} is required.`);
+      }
+      const row = {
+        [requiredKey]: requiredValue,
+      };
+      setOptional(row, "id", source.id);
+      assignOptionalFields(row, source);
+      return row;
+    });
+}
+
+function healthRowHasInput(row = {}) {
+  return Object.values(row || {}).some((value) => String(value ?? "").trim());
+}
+
+function healthExerciseSessionView(session = {}) {
+  const details = session.details || {};
+  const gymCount = Array.isArray(details.gym) ? details.gym.length : 0;
+  const cardioCount = Array.isArray(details.cardio) ? details.cardio.length : 0;
+  const flexibilityCount = Array.isArray(details.flexibility) ? details.flexibility.length : 0;
+
+  return {
+    id: session.id || "",
+    sessionDate: session.session_date || "",
+    dateLabel: formatDateDisplayLabel(session.session_date),
+    type: session.session_type || "gym",
+    typeLabel: titleCase(session.session_type || "gym"),
+    status: session.status || "planned",
+    statusLabel: titleCase(session.status || "planned"),
+    title: session.title || "Untitled session",
+    notes: session.notes || "",
+    targetDurationMinutes: Number(session.target_duration_minutes || 0),
+    detailLabel: compactJoin([
+      minutesDetail(session.target_duration_minutes),
+      gymCount ? `${gymCount} gym` : "",
+      cardioCount ? `${cardioCount} cardio` : "",
+      flexibilityCount ? `${flexibilityCount} flexibility` : "",
+    ]),
+    details: {
+      gym: details.gym || [],
+      cardio: details.cardio || [],
+      flexibility: details.flexibility || [],
+    },
+  };
+}
+
+function healthExerciseWeekDays(weekStart, sessions = []) {
+  const parts = dateDisplayParts(weekStart);
+  if (!parts) return [];
+
+  return Array.from({ length: 7 }, (_, index) => {
+    const date = new Date(Date.UTC(parts.year, parts.month - 1, parts.day + index));
+    const value = date.toISOString().slice(0, 10);
+    return {
+      date: value,
+      label: formatDateDisplayLabel(value),
+      shortLabel: formatDateDisplayLabel(value).replace(/^(\w{3})\s+/, "$1 "),
+      sessions: sessions.filter((session) => session.sessionDate === value),
+    };
+  });
+}
+
 function blockView(block) {
   return {
     title: block.title || titleCase(`${block.block_type || "time"} block`),
@@ -1429,6 +1621,33 @@ function checkboxValue(value) {
 function positiveInteger(value) {
   const number = Number.parseInt(String(value || ""), 10);
   return Number.isFinite(number) && number > 0 ? number : null;
+}
+
+function optionalPositiveInteger(value, label) {
+  const text = String(value ?? "").trim();
+  if (!text) return null;
+  const number = Number(text);
+  if (!Number.isInteger(number) || number <= 0) {
+    throw new Error(`${label} must be greater than zero.`);
+  }
+  return number;
+}
+
+function setOptionalPositiveInteger(target, key, value, label) {
+  const number = optionalPositiveInteger(value, label);
+  if (number !== null) {
+    target[key] = number;
+  }
+}
+
+function optionalPositiveNumber(value, label) {
+  const text = String(value ?? "").trim();
+  if (!text) return null;
+  const number = Number(text);
+  if (!Number.isFinite(number) || number <= 0) {
+    throw new Error(`${label} must be greater than zero.`);
+  }
+  return number;
 }
 
 function trimSeconds(value) {

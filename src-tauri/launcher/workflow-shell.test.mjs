@@ -63,6 +63,42 @@ test("launcher exposes plugin registry and suggestion review surfaces", () => {
   assert.match(launcherCss, /\.plugin-suggestion-card/);
 });
 
+test("review exposes health exercise planner without adding a workflow tab", () => {
+  const indexHtml = readFileSync(indexHtmlPath, "utf8");
+  const clientJs = readFileSync(clientJsPath, "utf8");
+  const launcherJs = readFileSync(launcherJsPath, "utf8");
+  const launcherCss = readFileSync(launcherCssPath, "utf8");
+  const workflowTabs = indexHtml.match(/data-workflow-tab="/g) || [];
+
+  assert.equal(workflowTabs.length, 5);
+  assert.match(indexHtml, /id="review-health-exercise-count"/);
+  assert.match(indexHtml, /id="review-health-week"/);
+  assert.match(indexHtml, /id="review-health-week-status"/);
+  assert.match(indexHtml, /id="review-health-week-days"/);
+  assert.match(indexHtml, /id="review-health-session-form"/);
+  assert.match(indexHtml, /id="health-session-date"/);
+  assert.match(indexHtml, /id="health-session-type"/);
+  assert.match(indexHtml, /id="health-session-title"/);
+  assert.match(indexHtml, /id="health-session-duration"/);
+  assert.match(indexHtml, /id="health-gym-exercises"/);
+  assert.match(indexHtml, /id="health-cardio-exercises"/);
+  assert.match(indexHtml, /id="health-flexibility-exercises"/);
+  assert.match(clientJs, /buildHealthExerciseWeekViewModel/);
+  assert.match(launcherJs, /buildHealthExerciseWeekPath/);
+  assert.match(launcherJs, /buildHealthExerciseSessionPath/);
+  assert.match(launcherJs, /buildHealthExerciseStatusPath/);
+  assert.match(launcherJs, /buildHealthExerciseStatusPayload/);
+  assert.match(launcherJs, /buildHealthExerciseSessionPayload/);
+  assert.match(launcherJs, /buildHealthExerciseWeekViewModel/);
+  assert.match(launcherJs, /\/api\/v1\/plugins\/health\/exercise\/weeks\//);
+  assert.match(launcherJs, /function renderHealthExerciseWeek/);
+  assert.match(launcherJs, /data-health-session-action/);
+  assert.match(launcherJs, /reviewHealthSessionForm\.addEventListener\("submit"/);
+  assert.match(launcherCss, /\.health-exercise-panel/);
+  assert.match(launcherCss, /\.health-week-days/);
+  assert.match(launcherCss, /\.health-session-card/);
+});
+
 test("launcher exposes persistent global search in the header", () => {
   const indexHtml = readFileSync(indexHtmlPath, "utf8");
   const clientJs = readFileSync(clientJsPath, "utf8");

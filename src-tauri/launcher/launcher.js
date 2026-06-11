@@ -5,6 +5,12 @@ import {
   buildGuidedCaptureFeedback,
   buildGuidedCapturePayload,
   buildGlobalSearchViewModel,
+  buildHealthExerciseSessionPayload,
+  buildHealthExerciseSessionPath,
+  buildHealthExerciseStatusPath,
+  buildHealthExerciseStatusPayload,
+  buildHealthExerciseWeekPath,
+  buildHealthExerciseWeekViewModel,
   buildItemDetailApiPath,
   buildItemDetailUpdatePayload,
   buildItemDetailViewModel,
@@ -101,6 +107,7 @@ const STARTUP_CONNECT_MAX_ATTEMPTS = 30;
 const ACTION_FEEDBACK_DISMISS_MS = 30000;
 const ACTION_FEEDBACK_SLIDE_MS = 260;
 const PARK_RESURFACE_MAX_TIMER_MS = 2147000000;
+const HEALTH_EXERCISE_WEEKS_PATH_PREFIX = "/api/v1/plugins/health/exercise/weeks/";
 const PARK_CALENDAR_WEEKDAYS = [
   { label: "M", title: "Monday" },
   { label: "T", title: "Tuesday" },
@@ -199,6 +206,19 @@ const elements = {
   reviewRecycleBinCount: document.getElementById("review-recycle-bin-count"),
   reviewPluginSuggestions: document.getElementById("review-plugin-suggestions"),
   reviewPluginSuggestionsCount: document.getElementById("review-plugin-suggestions-count"),
+  reviewHealthExerciseCount: document.getElementById("review-health-exercise-count"),
+  reviewHealthWeek: document.getElementById("review-health-week"),
+  reviewHealthWeekStatus: document.getElementById("review-health-week-status"),
+  reviewHealthWeekDays: document.getElementById("review-health-week-days"),
+  reviewHealthSessionForm: document.getElementById("review-health-session-form"),
+  healthSessionDate: document.getElementById("health-session-date"),
+  healthSessionType: document.getElementById("health-session-type"),
+  healthSessionTitle: document.getElementById("health-session-title"),
+  healthSessionDuration: document.getElementById("health-session-duration"),
+  healthSessionNotes: document.getElementById("health-session-notes"),
+  healthGymExercises: document.getElementById("health-gym-exercises"),
+  healthCardioExercises: document.getElementById("health-cardio-exercises"),
+  healthFlexibilityExercises: document.getElementById("health-flexibility-exercises"),
   settingsPlugins: document.getElementById("settings-plugins"),
   settingsPluginsCount: document.getElementById("settings-plugins-count"),
 };
@@ -219,6 +239,8 @@ let actionFeedbackHideTimer = null;
 let globalSearchTimer = null;
 let itemDetailOpen = false;
 let currentItemDetail = null;
+let currentHealthWeekDate = localDateKey(new Date());
+let lastPluginModel = [];
 
 function setWorkflow(workflow) {
   const nextWorkflow = WORKFLOWS.some((item) => item.id === workflow) ? workflow : "today";
@@ -740,6 +762,7 @@ async function connectAndLoad(options = {}) {
     );
     renderWeeklyReview(buildWeeklyReviewViewModel(weeklyReview, inboxContainers));
     renderPluginReview(buildPluginReviewViewModel(plugins, pluginSuggestions));
+    await refreshHealthExerciseWeek(dashboardModel.todayLabel, lastPluginModel);
     await syncNativeParkReminders(inboxContainers);
     if (startupReconnectTimer) {
       window.clearTimeout(startupReconnectTimer);
@@ -815,6 +838,7 @@ async function refreshDashboardAndReview() {
   renderDashboard(buildBootstrapViewModel(summary));
   renderWeeklyReview(buildWeeklyReviewViewModel(weeklyReview, inboxContainers));
   renderPluginReview(buildPluginReviewViewModel(plugins, pluginSuggestions));
+  await refreshHealthExerciseWeek(summary?.today || currentHealthWeekDate, lastPluginModel);
   await syncNativeParkReminders(inboxContainers);
 }
 
@@ -859,6 +883,7 @@ async function reloadWeeklyReview() {
   ]);
   renderWeeklyReview(buildWeeklyReviewViewModel(weeklyReview, inboxContainers));
   renderPluginReview(buildPluginReviewViewModel(plugins, pluginSuggestions));
+  await refreshHealthExerciseWeek(currentHealthWeekDate, lastPluginModel);
   await syncNativeParkReminders(inboxContainers);
 }
 
@@ -868,6 +893,7 @@ async function refreshPlugins() {
     requestJson(window.fetch.bind(window), settings, "/api/v1/plugins/suggestions"),
   ]);
   renderPluginReview(buildPluginReviewViewModel(plugins, pluginSuggestions));
+  await refreshHealthExerciseWeek(currentHealthWeekDate, lastPluginModel);
 }
 
 async function syncNativeParkReminders(inboxContainers) {
@@ -877,6 +903,231 @@ async function syncNativeParkReminders(inboxContainers) {
   } catch (err) {
     console.warn("SFO park reminder scheduling failed", err);
   }
+}
+
+async function refreshHealthExerciseWeek(date = currentHealthWeekDate, plugins = lastPluginModel) {
+  if (!elements.reviewHealthWeekDays) return;
+
+  const requestedDate = normalizeHealthDateKey(date);
+  const path = buildHealthExerciseWeekPath(requestedDate);
+  elements.reviewHealthWeekStatus.textContent = "Loading exercise week...";
+  if (!path || !path.startsWith(HEALTH_EXERCISE_WEEKS_PATH_PREFIX)) {
+    renderHealthExerciseWeek(buildHealthExerciseWeekViewModel({}, plugins));
+    return;
+  }
+
+  try {
+    const payload = await requestJson(window.fetch.bind(window), settings, path);
+    currentHealthWeekDate = payload?.week_start || requestedDate;
+    renderHealthExerciseWeek(buildHealthExerciseWeekViewModel(payload, plugins));
+  } catch (err) {
+    const fallback = {
+      week_start: requestedDate,
+      week_end: shiftHealthDateKey(requestedDate, 6),
+      sessions: [],
+    };
+    renderHealthExerciseWeek(buildHealthExerciseWeekViewModel(fallback, plugins));
+    setHealthSessionFormEnabled(false);
+    elements.reviewHealthWeekStatus.textContent = `Health exercise unavailable: ${
+      err instanceof Error ? err.message : String(err)
+    }`;
+    console.warn("SFO health exercise week failed to load", err);
+  }
+}
+
+function renderHealthExerciseWeek(model) {
+  if (!elements.reviewHealthWeekDays) return;
+
+  currentHealthWeekDate = model.weekStart || currentHealthWeekDate;
+  elements.reviewHealthExerciseCount.textContent = model.sessionsCountLabel;
+  elements.reviewHealthWeek.textContent = model.rangeLabel || model.weekLabel;
+  elements.reviewHealthWeekStatus.textContent = model.enabled
+    ? "Health is enabled. Add sessions here, then mark them done or skipped during Review."
+    : "Enable Health in Settings to add or update sessions.";
+  setHealthSessionFormEnabled(model.enabled);
+
+  elements.reviewHealthWeekDays.replaceChildren();
+  const days = model.days || [];
+  const visibleDates = new Set(days.map((day) => day.date));
+  if (!visibleDates.has(elements.healthSessionDate.value)) {
+    elements.healthSessionDate.value = model.weekStart || currentHealthWeekDate;
+  }
+  if (!days.length) {
+    elements.reviewHealthWeekDays.append(emptyState(model.emptyText));
+    return;
+  }
+
+  for (const day of days) {
+    elements.reviewHealthWeekDays.append(healthWeekDayCard(day, model.enabled));
+  }
+}
+
+function setHealthSessionFormEnabled(enabled) {
+  if (!elements.reviewHealthSessionForm) return;
+  for (const field of elements.reviewHealthSessionForm.querySelectorAll(
+    "input, select, textarea, button",
+  )) {
+    field.disabled = !enabled;
+  }
+}
+
+function healthWeekDayCard(day, enabled) {
+  const card = document.createElement("article");
+  card.className = "health-day-card";
+  const heading = document.createElement("div");
+  heading.className = "health-day-heading";
+  const title = document.createElement("strong");
+  title.textContent = day.shortLabel || day.label || day.date;
+  const count = document.createElement("span");
+  count.textContent = `${day.sessions.length}`;
+  heading.append(title, count);
+  card.append(heading);
+
+  const sessions = document.createElement("div");
+  sessions.className = "health-session-list";
+  if (!day.sessions.length) {
+    const empty = document.createElement("p");
+    empty.className = "health-empty-day";
+    empty.textContent = "No session planned.";
+    sessions.append(empty);
+  } else {
+    for (const session of day.sessions) {
+      sessions.append(healthExerciseSessionCard(session, enabled));
+    }
+  }
+
+  card.append(sessions);
+  return card;
+}
+
+function healthExerciseSessionCard(session, enabled) {
+  const card = document.createElement("article");
+  card.className = `health-session-card is-${session.status}`;
+
+  const body = document.createElement("div");
+  body.className = "health-session-body";
+  const title = document.createElement("strong");
+  title.textContent = session.title;
+  const meta = document.createElement("span");
+  meta.textContent = [session.typeLabel, session.detailLabel, session.statusLabel]
+    .filter(Boolean)
+    .join(" · ");
+  body.append(title, meta);
+  for (const line of healthExerciseDetailLines(session)) {
+    const detail = document.createElement("small");
+    detail.textContent = line;
+    body.append(detail);
+  }
+  if (session.notes) {
+    const notes = document.createElement("small");
+    notes.textContent = session.notes;
+    body.append(notes);
+  }
+  card.append(body);
+
+  if (enabled && session.id) {
+    const actions = document.createElement("div");
+    actions.className = "health-session-actions";
+    for (const [status, label] of [
+      ["done", "Done"],
+      ["skipped", "Skip"],
+      ["planned", "Plan"],
+    ]) {
+      const button = document.createElement("button");
+      button.className = status === session.status ? "mini-button quiet" : "mini-button";
+      button.type = "button";
+      button.dataset.healthSessionAction = "status";
+      button.dataset.healthSessionId = session.id;
+      button.dataset.healthStatus = status;
+      button.disabled = status === session.status;
+      button.textContent = label;
+      actions.append(button);
+    }
+    const deleteButton = document.createElement("button");
+    deleteButton.className = "mini-button danger";
+    deleteButton.type = "button";
+    deleteButton.dataset.healthSessionAction = "delete";
+    deleteButton.dataset.healthSessionId = session.id;
+    deleteButton.dataset.healthSessionTitle = session.title;
+    deleteButton.textContent = "Delete";
+    actions.append(deleteButton);
+    card.append(actions);
+  }
+
+  return card;
+}
+
+function healthExerciseDetailLines(session) {
+  const details = session.details || {};
+  return [
+    ...(details.gym || []).map((row) =>
+      [
+        row.exercise_name,
+        row.sets ? `${row.sets} sets` : "",
+        row.reps ? `${row.reps} reps` : "",
+        row.weight ? `${row.weight}${row.weight_unit ? ` ${row.weight_unit}` : ""}` : "",
+      ]
+        .filter(Boolean)
+        .join(" · "),
+    ),
+    ...(details.cardio || []).map((row) =>
+      [
+        row.activity_type,
+        row.duration_minutes ? `${row.duration_minutes} min` : "",
+        row.intensity,
+      ]
+        .filter(Boolean)
+        .join(" · "),
+    ),
+    ...(details.flexibility || []).map((row) =>
+      [
+        row.movement_name,
+        row.sets ? `${row.sets} sets` : "",
+        row.hold_seconds ? `${row.hold_seconds}s hold` : "",
+        row.side,
+      ]
+        .filter(Boolean)
+        .join(" · "),
+    ),
+  ].filter(Boolean);
+}
+
+function healthExerciseFormValues(form) {
+  return {
+    session_date: elements.healthSessionDate.value,
+    session_type: elements.healthSessionType.value,
+    title: elements.healthSessionTitle.value,
+    target_duration_minutes: elements.healthSessionDuration.value,
+    notes: elements.healthSessionNotes.value,
+    gym: [
+      {
+        exercise_name: formElementValue(form, "health-gym-name"),
+        sets: formElementValue(form, "health-gym-sets"),
+        reps: formElementValue(form, "health-gym-reps"),
+        weight: formElementValue(form, "health-gym-weight"),
+        weight_unit: formElementValue(form, "health-gym-weight-unit"),
+      },
+    ],
+    cardio: [
+      {
+        activity_type: formElementValue(form, "health-cardio-type"),
+        duration_minutes: formElementValue(form, "health-cardio-duration"),
+        intensity: formElementValue(form, "health-cardio-intensity"),
+      },
+    ],
+    flexibility: [
+      {
+        movement_name: formElementValue(form, "health-flex-name"),
+        sets: formElementValue(form, "health-flex-sets"),
+        hold_seconds: formElementValue(form, "health-flex-hold"),
+        side: formElementValue(form, "health-flex-side"),
+      },
+    ],
+  };
+}
+
+function formElementValue(form, name) {
+  return form.elements[name]?.value || "";
 }
 
 function scheduleParkResurfaceRefresh(inboxContainers) {
@@ -1021,6 +1272,7 @@ function renderWeeklyReview(model) {
 }
 
 function renderPluginReview(model) {
+  lastPluginModel = model.plugins || [];
   elements.reviewPluginSuggestionsCount.textContent = model.pendingSuggestionsCountLabel;
   elements.settingsPluginsCount.textContent = model.pluginCountLabel;
   renderPluginSuggestions(
@@ -1802,7 +2054,22 @@ function parkMonthKey(date) {
 }
 
 function parkDateKey(date) {
+  return localDateKey(date);
+}
+
+function localDateKey(date) {
   return `${date.getFullYear()}-${padDatePart(date.getMonth() + 1)}-${padDatePart(date.getDate())}`;
+}
+
+function normalizeHealthDateKey(value) {
+  const text = String(value || "").trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(text)) return text;
+  return localDateKey(new Date());
+}
+
+function shiftHealthDateKey(value, days) {
+  const [year, month, day] = normalizeHealthDateKey(value).split("-").map(Number);
+  return localDateKey(new Date(year, month - 1, day + days));
 }
 
 function formatParkedUntilFeedbackLabel(value) {
@@ -2816,6 +3083,90 @@ elements.settingsPlugins.addEventListener("click", async (event) => {
   }
 });
 
+elements.reviewHealthSessionForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const button = form.querySelector('button[type="submit"]');
+  button.disabled = true;
+  try {
+    const payload = buildHealthExerciseSessionPayload(healthExerciseFormValues(form));
+    await requestJson(window.fetch.bind(window), settings, "/api/v1/plugins/health/exercise/sessions", {
+      method: "POST",
+      body: payload,
+    });
+    form.reset();
+    elements.healthSessionDate.value = currentHealthWeekDate;
+    await refreshHealthExerciseWeek(currentHealthWeekDate, lastPluginModel);
+    showActionFeedback({ message: `Added "${payload.title}" to Health.` });
+  } catch (err) {
+    setConnectionState("error", "Health exercise update failed", err.message);
+  } finally {
+    button.disabled = false;
+  }
+});
+
+elements.reviewHealthSessionForm
+  .closest(".health-exercise-panel")
+  ?.addEventListener("click", async (event) => {
+    const weekButton = event.target.closest("[data-health-week-shift]");
+    if (weekButton) {
+      const shift = Number(weekButton.dataset.healthWeekShift || 0);
+      if (!shift) return;
+      weekButton.disabled = true;
+      try {
+        currentHealthWeekDate = shiftHealthDateKey(currentHealthWeekDate, shift);
+        await refreshHealthExerciseWeek(currentHealthWeekDate, lastPluginModel);
+      } catch (err) {
+        setConnectionState("error", "Health exercise week failed", err.message);
+      } finally {
+        weekButton.disabled = false;
+      }
+      return;
+    }
+
+    const actionButton = event.target.closest("[data-health-session-action]");
+    if (!actionButton) return;
+
+    const sessionId = actionButton.dataset.healthSessionId;
+    if (!sessionId) return;
+
+    actionButton.disabled = true;
+    try {
+      if (actionButton.dataset.healthSessionAction === "status") {
+        const status = actionButton.dataset.healthStatus;
+        await requestJson(
+          window.fetch.bind(window),
+          settings,
+          buildHealthExerciseStatusPath(sessionId),
+          {
+            method: "POST",
+            body: buildHealthExerciseStatusPayload(status),
+          },
+        );
+        await refreshHealthExerciseWeek(currentHealthWeekDate, lastPluginModel);
+        showActionFeedback({ message: `Marked exercise session ${status}.` });
+        return;
+      }
+
+      if (actionButton.dataset.healthSessionAction === "delete") {
+        await requestJson(
+          window.fetch.bind(window),
+          settings,
+          buildHealthExerciseSessionPath(sessionId),
+          { method: "DELETE" },
+        );
+        await refreshHealthExerciseWeek(currentHealthWeekDate, lastPluginModel);
+        showActionFeedback({
+          message: `Deleted "${actionButton.dataset.healthSessionTitle || "exercise session"}".`,
+        });
+      }
+    } catch (err) {
+      setConnectionState("error", "Health exercise update failed", err.message);
+    } finally {
+      actionButton.disabled = false;
+    }
+  });
+
 for (const container of [elements.reviewWeeklyProjects, elements.reviewFocusCandidates]) {
   container.addEventListener("submit", async (event) => {
     const cardForm = event.target.closest(".project-card-form");
@@ -3073,6 +3424,7 @@ async function initialize() {
   try {
     settings = await loadSettings(window.localStorage, tauriInvoke);
     renderCaptureWorkflow();
+    setHealthSessionFormEnabled(false);
     applySettingsToForm();
     await connectAndLoad({ startupRetry: true });
   } catch (err) {
