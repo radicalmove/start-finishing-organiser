@@ -357,3 +357,25 @@ test("mobile review view stays readable with five workflow tabs", () => {
     /@media \(max-width: 1024px\)[\s\S]*\.review-step-grid[\s\S]*grid-template-columns:\s*1fr/,
   );
 });
+
+test("mobile health exercise planner stays compact on iPhone SE width", () => {
+  const launcherCss = readFileSync(launcherCssPath, "utf8");
+
+  assert.match(launcherCss, /\.health-exercise-panel/);
+  assert.match(
+    launcherCss,
+    /@media \(max-width: 430px\)[\s\S]*\.health-exercise-panel\s*\{[\s\S]*min-height:\s*0/,
+  );
+  assert.match(
+    launcherCss,
+    /@media \(max-width: 430px\)[\s\S]*\.health-week-days\s*\{[\s\S]*grid-template-columns:\s*1fr/,
+  );
+  assert.match(
+    launcherCss,
+    /@media \(max-width: 430px\)[\s\S]*\.health-session-form-grid\s*\{[\s\S]*grid-template-columns:\s*1fr/,
+  );
+  assert.match(
+    launcherCss,
+    /@media \(max-width: 430px\)[\s\S]*\.health-session-actions\s*\{[\s\S]*grid-template-columns:\s*repeat\(3, minmax\(0, 1fr\)\)/,
+  );
+});

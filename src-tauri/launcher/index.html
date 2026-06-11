@@ -282,12 +282,90 @@
                   <p>Approve useful plugin suggestions, or dismiss anything that should not enter SFO.</p>
                 </div>
               </div>
-              <div class="review-step-grid single">
+              <div class="review-step-grid plugin-review-grid">
                 <article class="panel review-panel plugin-suggestions-panel">
                   <div class="panel-kicker">Plugin Suggestions</div>
                   <h3 class="review-panel-title">Waiting for review <span id="review-plugin-suggestions-count">0</span></h3>
                   <p class="panel-note">Nothing from a plugin changes tasks, waiting items, or blocks until you approve it.</p>
                   <div class="review-list is-scrollable plugin-suggestion-list" id="review-plugin-suggestions"></div>
+                </article>
+
+                <article class="panel review-panel health-exercise-panel">
+                  <div class="panel-kicker">Health</div>
+                  <h3 class="review-panel-title">Exercise week <span id="review-health-exercise-count">0</span></h3>
+                  <p class="panel-note" id="review-health-week-status">Enable Health in Settings to add or update sessions.</p>
+                  <div class="health-week-header">
+                    <div>
+                      <strong id="review-health-week">Exercise Week</strong>
+                      <small>Plan gym, cardio, and flexibility without leaving SFO.</small>
+                    </div>
+                    <div class="health-week-actions" aria-label="Health exercise week navigation">
+                      <button class="mini-button quiet" type="button" data-health-week-shift="-7">Prev</button>
+                      <button class="mini-button quiet" type="button" data-health-week-shift="7">Next</button>
+                    </div>
+                  </div>
+                  <div class="health-week-days" id="review-health-week-days"></div>
+                  <details class="health-session-editor">
+                    <summary>Plan a session</summary>
+                    <form class="health-session-form" id="review-health-session-form">
+                      <div class="health-session-form-grid">
+                        <label>
+                          <span>Date</span>
+                          <input id="health-session-date" name="health-session-date" type="date" required />
+                        </label>
+                        <label>
+                          <span>Type</span>
+                          <select id="health-session-type" name="health-session-type" required>
+                            <option value="gym">Gym</option>
+                            <option value="cardio">Cardio</option>
+                            <option value="flexibility">Flexibility</option>
+                          </select>
+                        </label>
+                        <label>
+                          <span>Title</span>
+                          <input id="health-session-title" name="health-session-title" placeholder="Lower body gym" autocomplete="off" required />
+                        </label>
+                        <label>
+                          <span>Minutes</span>
+                          <input id="health-session-duration" name="health-session-duration" type="number" min="1" step="1" placeholder="45" inputmode="numeric" />
+                        </label>
+                      </div>
+                      <label class="health-session-notes-field">
+                        <span>Notes</span>
+                        <textarea id="health-session-notes" name="health-session-notes" placeholder="Optional plan notes"></textarea>
+                      </label>
+                      <div class="health-session-detail-grid">
+                        <fieldset class="health-session-detail" id="health-gym-exercises">
+                          <legend>Gym</legend>
+                          <div class="health-detail-row">
+                            <input name="health-gym-name" placeholder="Exercise" autocomplete="off" />
+                            <input name="health-gym-sets" type="number" min="1" step="1" placeholder="Sets" inputmode="numeric" />
+                            <input name="health-gym-reps" type="number" min="1" step="1" placeholder="Reps" inputmode="numeric" />
+                            <input name="health-gym-weight" type="number" min="0" step="0.5" placeholder="Weight" inputmode="decimal" />
+                            <input name="health-gym-weight-unit" placeholder="kg" autocomplete="off" />
+                          </div>
+                        </fieldset>
+                        <fieldset class="health-session-detail" id="health-cardio-exercises">
+                          <legend>Cardio</legend>
+                          <div class="health-detail-row">
+                            <input name="health-cardio-type" placeholder="Run, bike, rowing" autocomplete="off" />
+                            <input name="health-cardio-duration" type="number" min="1" step="1" placeholder="Minutes" inputmode="numeric" />
+                            <input name="health-cardio-intensity" placeholder="Zone 2, VO2 max" autocomplete="off" />
+                          </div>
+                        </fieldset>
+                        <fieldset class="health-session-detail" id="health-flexibility-exercises">
+                          <legend>Flexibility</legend>
+                          <div class="health-detail-row">
+                            <input name="health-flex-name" placeholder="Stretch" autocomplete="off" />
+                            <input name="health-flex-sets" type="number" min="1" step="1" placeholder="Sets" inputmode="numeric" />
+                            <input name="health-flex-hold" type="number" min="1" step="1" placeholder="Hold seconds" inputmode="numeric" />
+                            <input name="health-flex-side" placeholder="Side" autocomplete="off" />
+                          </div>
+                        </fieldset>
+                      </div>
+                      <button class="primary-button" type="submit">Add session</button>
+                    </form>
+                  </details>
                 </article>
               </div>
             </section>
